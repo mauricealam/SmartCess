@@ -8,6 +8,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 
 /** Spec outlined text field with a visible label (never placeholder-only). */
@@ -22,6 +25,8 @@ fun SmartCessTextField(
     singleLine: Boolean = true,
     minLines: Int = 1,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    /** Mask input (API keys): hidden on screen and not spoken aloud by TalkBack. */
+    isPassword: Boolean = false,
 ) {
     OutlinedTextField(
         value = value,
@@ -32,7 +37,16 @@ fun SmartCessTextField(
         supportingText = error?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
         singleLine = singleLine,
         minLines = minLines,
-        keyboardOptions = keyboardOptions,
+        keyboardOptions = if (isPassword) {
+            keyboardOptions.copy(keyboardType = KeyboardType.Password)
+        } else {
+            keyboardOptions
+        },
+        visualTransformation = if (isPassword) {
+            PasswordVisualTransformation()
+        } else {
+            VisualTransformation.None
+        },
         textStyle = MaterialTheme.typography.bodyLarge,
         modifier = modifier.fillMaxWidth().heightIn(min = 48.dp),
     )

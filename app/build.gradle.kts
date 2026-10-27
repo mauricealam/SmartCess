@@ -9,24 +9,44 @@ plugins {
     alias(libs.plugins.serialization)
 }
 
-// API key: local.properties (dev) or META_API_KEY env var (CI). Never hard-code.
-// Empty string when unset; ApiKeyProvider treats blank as absent.
+// API key sources (first non-blank wins): process env, local.properties, root .env.
+// Never hard-code. Empty string when unset; ApiKeyProvider treats blank as absent.
 val localProperties = Properties()
 val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
     localPropertiesFile.inputStream().use(localProperties::load)
 }
-val metaApiKey: String =
-    (localProperties.getProperty("META_API_KEY") ?: System.getenv("META_API_KEY") ?: "")
-        .trim().replace("\"", "")
-// Meta Model API endpoints were unspecified in the spec; override via local.properties/env.
-// The .invalid defaults are placeholders that fail closed into offline mode.
+// Minimal .env reader: NAME=value lines, skips blanks/comments, strips quotes.
+// A file containing only a bare key with no NAME= line provides nothing.
+val dotEnv = mutableMapOf<String, String>()
+val dotEnvFile = rootProject.file(".env")
+if (dotEnvFile.exists()) {
+    dotEnvFile.forEachLine { line ->
+        val trimmed = line.trim()
+        if (trimmed.isEmpty() || trimmed.startsWith("#")) return@forEachLine
+        val eq = trimmed.indexOf('=')
+        if (eq <= 0) return@forEachLine
+        val name = trimmed.substring(0, eq).trim().removePrefix("export").trim()
+        val value = trimmed.substring(eq + 1).trim().trim('"').trim('\'')
+        if (name.isNotEmpty()) dotEnv[name] = value
+    }
+}
+fun configValue(vararg names: String): String {
+    for (name in names) {
+        System.getenv(name)?.takeIf { it.isNotBlank() }?.let { return it.trim() }
+        localProperties.getProperty(name)?.takeIf { it.isNotBlank() }?.let { return it.trim() }
+        dotEnv[name]?.takeIf { it.isNotBlank() }?.let { return it.trim() }
+    }
+    return ""
+}
+// META_API_KEY matches LiteLLM convention; MODEL_API_KEY matches Meta's own examples.
+val metaApiKey: String = configValue("META_API_KEY", "MODEL_API_KEY")
+// Official Meta Model API defaults (dev.meta.ai/docs); override via env/local.properties/.env.
 val metaApiBaseUrl: String =
-    (localProperties.getProperty("META_API_BASE_URL") ?: System.getenv("META_API_BASE_URL")
-        ?: "https://meta-model-api.example.invalid/v1/").trim()
+    configValue("META_API_BASE_URL", "META_API_BASE")
+        .takeIf { it.isNotBlank() } ?: "https://api.meta.ai/v1/"
 val metaSttUrl: String =
-    (localProperties.getProperty("META_STT_URL") ?: System.getenv("META_STT_URL")
-        ?: "wss://meta-model-api.example.invalid/stt").trim()
+    configValue("META_STT_URL").takeIf { it.isNotBlank() } ?: "wss://api.meta.ai/v1/asr/realtime"
 
 android {
     namespace = "com.smartcess.app"
@@ -52,6 +72,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Distributable APKs are always keyless: release ignores every key
+            // source. Real keys reach release builds only via in-app Settings.
+            buildConfigField("String", "META_API_KEY", "\"\"")
         }
         debug {
             // Keep BuildConfig fields present in both build types.

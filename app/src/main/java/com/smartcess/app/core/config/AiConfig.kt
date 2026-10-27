@@ -5,15 +5,17 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Meta Model API configuration. Endpoint/auth details were unspecified in the spec,
- * so base URLs are overridable via local.properties / env (see app/build.gradle.kts).
+ * Meta Model API configuration. Base URLs default to the official endpoints
+ * (dev.meta.ai/docs) and stay overridable via env / local.properties / .env
+ * (see app/build.gradle.kts).
  */
 @Singleton
 class AiConfig @Inject constructor() {
     val sparkBaseUrl: String = BuildConfig.META_API_BASE_URL
-    val sparkModel: String = "muse-spark"
-    val sparkFallbackModel: String = "muse-spark-fallback"
+    val sparkModel: String = "muse-spark-1.3"
+    val sparkFallbackModel: String = "muse-spark-1.1"
     val sttUrl: String = BuildConfig.META_STT_URL
+    val sttModel: String = "muse-voice-transcribe-1.0"
 
     /** Per-call timeouts (spec budgets: capture->result <30s, doc <45s, briefing <10s). */
     val extractionTimeoutMillis: Long = 30_000

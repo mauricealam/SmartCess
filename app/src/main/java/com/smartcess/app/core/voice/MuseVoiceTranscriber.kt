@@ -6,27 +6,73 @@ import android.media.MediaRecorder
 import com.smartcess.app.core.ai.RateLimitedException
 import com.smartcess.app.core.config.AiConfig
 import com.smartcess.app.core.config.ApiKeyProvider
+import com.smartcess.app.core.serialization.SmartCessJson
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * Muse Voice Transcribe: realtime speech-to-text over WebSocket.
  * Audio: mono 16-bit PCM @ 24kHz. Mantra: Transcribe listens, Spark thinks.
+ *
+ * Protocol (dev.meta.ai/docs/api-reference/voice/realtime): connect with a
+ * sessionId query param, send a JSON handshake first (credential travels in
+ * the handshake, not the HTTP Authorization header), stream raw PCM binary
+ * frames, parse JSON transcript events, send {"type":"endStream"} to finish.
  */
 sealed interface TranscriptEvent {
     data class Partial(val text: String) : TranscriptEvent
     data class Final(val text: String) : TranscriptEvent
     data class Error(val message: String) : TranscriptEvent
 }
+
+/**
+ * Parses one server text frame. Returns null for the handshake acknowledgement
+ * (no "type" field) and for unrecognized or malformed frames.
+ */
+internal fun parseServerEvent(text: String): TranscriptEvent? {
+    val obj = runCatching {
+        SmartCessJson.instance.parseToJsonElement(text).jsonObject
+    }.getOrNull() ?: return null
+    return when (obj["type"]?.jsonPrimitive?.contentOrNull) {
+        null -> null // Handshake acknowledgement; no action needed.
+        "transcript" -> {
+            val transcript = obj["transcript"]?.jsonPrimitive?.contentOrNull ?: return null
+            if (obj["final"]?.jsonPrimitive?.booleanOrNull == true) {
+                TranscriptEvent.Final(transcript)
+            } else {
+                TranscriptEvent.Partial(transcript)
+            }
+        }
+        // Server error text is not surfaced; keep the message generic and safe.
+        "error" -> TranscriptEvent.Error("Speech recognition failed. Please type instead.")
+        else -> null
+    }
+}
+
+internal fun handshakeFrame(apiKey: String, model: String): String =
+    buildJsonObject {
+        putJsonObject("authorization") { put("accessToken", "Bearer $apiKey") }
+        put("audioEncoding", "PCM_24KHZ")
+        put("model", model)
+        put("mode", "PUSH_TO_TALK")
+    }.toString()
 
 interface MuseVoiceTranscriber {
     /** Streams mic audio and emits transcript events until [stop] or flow close. */
@@ -39,6 +85,9 @@ object SttAudioSpec {
     const val CHANNEL = AudioFormat.CHANNEL_IN_MONO
     const val ENCODING = AudioFormat.ENCODING_PCM_16BIT
 }
+
+/** Grace period after endStream for final transcripts before forcing close. */
+private const val END_STREAM_GRACE_MILLIS = 10_000L
 
 @Singleton
 class MuseVoiceTranscriberImpl @Inject constructor(
@@ -73,16 +122,29 @@ class MuseVoiceTranscriberImpl @Inject constructor(
             return@callbackFlow
         }
         recorder = record
+        val sessionId = "stream-${UUID.randomUUID()}"
+        val separator = if (config.sttUrl.contains("?")) "&" else "?"
         val request = Request.Builder()
-            .url(config.sttUrl)
-            .addHeader("Authorization", "Bearer $key")
+            .url("${config.sttUrl}${separator}sessionId=$sessionId")
             .build()
         running = true
         socket = http.newWebSocket(request, object : WebSocketListener() {
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                // Handshake must be the first frame (within 10s per the docs).
+                webSocket.send(handshakeFrame(key, config.sttModel))
+            }
+
             override fun onMessage(webSocket: WebSocket, text: String) {
-                // Minimal protocol: "final:..." vs partial chunk. Server format may refine this.
-                if (text.startsWith("final:")) trySend(TranscriptEvent.Final(text.removePrefix("final:")))
-                else trySend(TranscriptEvent.Partial(text))
+                parseServerEvent(text)?.let { event ->
+                    trySend(event)
+                    if (event is TranscriptEvent.Error) close()
+                }
+            }
+
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                // Server closed (normally 1000 after endStream): end the flow,
+                // which releases the recorder and socket in awaitClose.
+                close()
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
@@ -112,6 +174,8 @@ class MuseVoiceTranscriberImpl @Inject constructor(
             try { pump.join(500) } catch (_: InterruptedException) { }
             runCatching { record.stop() }
             record.release()
+            // Final cleanup: end input if stop() was never called, then close.
+            runCatching { socket?.send("""{"type":"endStream"}""") }
             socket?.close(1000, "done")
             socket = null
             recorder = null
@@ -120,6 +184,18 @@ class MuseVoiceTranscriberImpl @Inject constructor(
 
     override fun stop() {
         running = false
-        socket?.close(1000, "stop")
+        val ws = socket
+        // End input but keep reading: the server sends final transcripts,
+        // then closes with 1000 (onClosed ends the flow).
+        runCatching { ws?.send("""{"type":"endStream"}""") }
+        // Grace close if the server never closes the session itself.
+        Thread {
+            try {
+                Thread.sleep(END_STREAM_GRACE_MILLIS)
+            } catch (_: InterruptedException) {
+                return@Thread
+            }
+            if (socket === ws) ws?.close(1000, "endstream-timeout")
+        }.apply { isDaemon = true; start() }
     }
 }

@@ -1,8 +1,12 @@
 # Copy to local.properties (git-ignored) and fill in. Never commit real keys.
-# META_API_KEY is injected into BuildConfig and used only as a fallback when no
-# user-supplied key is stored in EncryptedSharedPreferences. CI can provide it
-# via the META_API_KEY environment variable instead.
+# A root .env file with the same NAME=value lines also works (also git-ignored).
+# META_API_KEY (or MODEL_API_KEY) is injected into BuildConfig and used only as
+# a fallback when no user-supplied key is stored in EncryptedSharedPreferences
+# (Settings screen). CI can provide it via environment variable instead.
+# Note: a real key in a build ships inside the APK; keep public APKs keyless.
 META_API_KEY=
-# Optional Meta Model API endpoint overrides (defaults fail closed to offline mode).
-# META_API_BASE_URL=https://meta-model-api.example.invalid/v1/
-# META_STT_URL=wss://meta-model-api.example.invalid/stt
+# Optional Meta Model API endpoint overrides. Defaults are the official
+# endpoints (dev.meta.ai/docs): https://api.meta.ai/v1/ for chat/completions
+# and wss://api.meta.ai/v1/asr/realtime for voice transcription.
+# META_API_BASE_URL=https://api.meta.ai/v1/
+# META_STT_URL=wss://api.meta.ai/v1/asr/realtime

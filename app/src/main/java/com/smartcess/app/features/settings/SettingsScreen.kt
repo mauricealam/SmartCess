@@ -86,6 +86,7 @@ fun SettingsScreen(
                 onValueChange = viewModel::onApiKeyInput,
                 label = stringResource(R.string.settings_api_key_label),
                 hint = stringResource(R.string.settings_api_key_hint),
+                isPassword = true,
             )
             SmartCessPrimaryButton(
                 text = stringResource(R.string.action_save),
