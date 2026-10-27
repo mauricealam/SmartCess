@@ -5,6 +5,9 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -13,6 +16,7 @@ import com.smartcess.app.data.repository.PreferencesRepository
 import com.smartcess.app.navigation.SmartCessNavGraph
 import com.smartcess.app.ui.theme.SmartCessTheme
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.compose.ui.Modifier
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -62,7 +66,16 @@ class MainActivity : ComponentActivity() {
                 highContrast = preferences?.highContrast == true,
                 largeText = preferences?.largeText == true,
             ) {
-                SmartCessNavGraph()
+                // Single theme surface for the whole app: guarantees every
+                // screen paints the scheme background with matching content
+                // color (no bare columns leaking window/default colors).
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background,
+                    contentColor = MaterialTheme.colorScheme.onBackground,
+                ) {
+                    SmartCessNavGraph()
+                }
             }
         }
     }

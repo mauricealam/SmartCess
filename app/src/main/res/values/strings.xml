@@ -339,6 +339,9 @@
     <string name="perm_mic_title" translatable="true">Microphone access</string>
     <string name="perm_mic_rationale" translatable="true">SmartCess needs microphone access to hear you.</string>
     <string name="perm_allow" translatable="true">Allow</string>
+    <string name="perm_allow_mic" translatable="true">Allow microphone</string>
+    <string name="perm_allow_camera" translatable="true">Allow camera</string>
+    <string name="perm_allow_notif" translatable="true">Allow notifications</string>
     <string name="perm_open_settings" translatable="true">Open Settings</string>
 
     <!-- Camera voice capture -->
@@ -359,7 +362,8 @@
     <string name="onboarding_perm_not_yet" translatable="true">Not yet</string>
     <string name="onboarding_perm_skip_note" translatable="true">You can skip any permission and grant it later. SmartCess still works with touch.</string>
     <string name="onboarding_voice_title" translatable="true">Talk or tap — your choice</string>
-    <string name="onboarding_voice_body" translatable="true">Tap Talk and speak, or use touch — every voice command has a touch equivalent. Voice needs a Meta API key in Settings; touch works fully offline.</string>
+    <string name="onboarding_voice_body" translatable="true">Tap Talk and speak, or use touch — every voice command has a touch equivalent. Touch works fully offline now; you can add a Meta API key later in Settings to unlock voice understanding.</string>
+    <string name="onboarding_voice_open_settings" translatable="true">Open Settings</string>
     <string name="onboarding_voice_sample" translatable="true">Play sample voice</string>
     <string name="onboarding_voice_sample_text" translatable="true">Hello! I am SmartCess. I will read your bills and remind you before they are due.</string>
     <string name="onboarding_scan_title" translatable="true">Try your first scan</string>

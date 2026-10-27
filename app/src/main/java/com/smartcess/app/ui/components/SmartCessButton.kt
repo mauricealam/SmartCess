@@ -42,6 +42,10 @@ fun SmartCessPrimaryButton(
         enabled = enabled,
         interactionSource = interaction,
         shape = SmartCessButtonShape,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+        ),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
         modifier = modifier
             .heightIn(min = 48.dp)
@@ -68,6 +72,9 @@ fun SmartCessSecondaryButton(
         enabled = enabled,
         interactionSource = interaction,
         shape = SmartCessButtonShape,
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = MaterialTheme.colorScheme.primary,
+        ),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
         border = ButtonDefaults.outlinedButtonBorder,
         modifier = modifier
@@ -95,6 +102,9 @@ fun SmartCessTextAction(
         enabled = enabled,
         interactionSource = interaction,
         shape = SmartCessButtonShape,
+        colors = ButtonDefaults.textButtonColors(
+            contentColor = MaterialTheme.colorScheme.primary,
+        ),
         modifier = modifier
             .heightIn(min = 48.dp)
             .focusRing(focused)

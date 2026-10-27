@@ -19,7 +19,6 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.smartcess.app.ui.theme.SmartCessTheme
 
 enum class BannerKind { INFO, WARNING, ERROR, OFFLINE }
 
@@ -36,12 +35,12 @@ fun SmartCessBanner(
 ) {
     val container = when (kind) {
         BannerKind.INFO -> MaterialTheme.colorScheme.primaryContainer
-        BannerKind.WARNING, BannerKind.OFFLINE -> SmartCessTheme.extra.warning.copy(alpha = 0.18f)
+        BannerKind.WARNING, BannerKind.OFFLINE -> MaterialTheme.colorScheme.tertiaryContainer
         BannerKind.ERROR -> MaterialTheme.colorScheme.errorContainer
     }
     val content = when (kind) {
         BannerKind.INFO -> MaterialTheme.colorScheme.onPrimaryContainer
-        BannerKind.WARNING, BannerKind.OFFLINE -> MaterialTheme.colorScheme.onSurface
+        BannerKind.WARNING, BannerKind.OFFLINE -> MaterialTheme.colorScheme.onTertiaryContainer
         BannerKind.ERROR -> MaterialTheme.colorScheme.onErrorContainer
     }
     Surface(

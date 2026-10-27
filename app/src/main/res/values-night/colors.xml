@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Night overrides so the pre-Compose window matches the dark scheme. -->
+<resources>
+    <color name="smartcess_surface">#121212</color>
+    <color name="smartcess_background">#000000</color>
+</resources>

@@ -15,10 +15,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,8 +35,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
@@ -77,6 +81,7 @@ private fun hasPermission(context: Context, permission: String): Boolean =
 fun OnboardingScreen(
     onDone: () -> Unit,
     onScanBill: () -> Unit,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: OnboardingViewModel = hiltViewModel(),
 ) {
@@ -103,36 +108,66 @@ fun OnboardingScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .navigationBarsPadding()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.onboarding_page_desc, page + 1, titles.size),
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.weight(1f)
+                    .semantics { liveRegion = LiveRegionMode.Polite },
+            )
+            if (page < titles.lastIndex) {
+                SmartCessTextAction(
+                    text = stringResource(R.string.action_skip),
+                    onClick = finish,
+                )
+            }
+        }
         SmartCessLogo(
             modifier = Modifier.size(96.dp).align(Alignment.CenterHorizontally),
         )
-        Text(
-            text = stringResource(R.string.onboarding_page_desc, page + 1, titles.size),
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        LinearProgressIndicator(
+            progress = { (page + 1) / titles.size.toFloat() },
+            modifier = Modifier.fillMaxWidth().semantics {
+                progressBarRangeInfo = ProgressBarRangeInfo(
+                    current = (page + 1).toFloat(),
+                    range = 0f..titles.size.toFloat(),
+                )
+            },
         )
-        Text(
-            text = titles[page],
-            style = MaterialTheme.typography.displayLarge,
-            modifier = Modifier.semantics { heading() },
-        )
-        when (page) {
-            0 -> Text(
-                text = stringResource(R.string.onboarding_body_1),
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        Column(
+            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                text = titles[page],
+                style = MaterialTheme.typography.displayLarge,
+                modifier = Modifier.semantics { heading() },
             )
-            1 -> TalkBackStep()
-            2 -> PermissionsStep()
-            3 -> VoiceStep(onPlaySample = {
-                viewModel.playSample(context.getString(R.string.onboarding_voice_sample_text))
-            })
-            4 -> ScanStep(onScan = finishAndScan)
-            else -> PrivacyStep()
+            when (page) {
+                0 -> Text(
+                    text = stringResource(R.string.onboarding_body_1),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
+                1 -> TalkBackStep()
+                2 -> PermissionsStep()
+                3 -> VoiceStep(
+                    onPlaySample = {
+                        viewModel.playSample(context.getString(R.string.onboarding_voice_sample_text))
+                    },
+                    onOpenSettings = onOpenSettings,
+                )
+                4 -> ScanStep(onScan = finishAndScan)
+                else -> PrivacyStep()
+            }
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -142,12 +177,6 @@ fun OnboardingScreen(
                 SmartCessSecondaryButton(
                     text = stringResource(R.string.action_back),
                     onClick = { page-- },
-                    modifier = Modifier.weight(1f),
-                )
-            } else {
-                SmartCessTextAction(
-                    text = stringResource(R.string.action_skip),
-                    onClick = finish,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -223,17 +252,20 @@ private fun PermissionsStep(modifier: Modifier = Modifier) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         PermissionRow(
             label = stringResource(R.string.onboarding_perm_mic),
+            allowLabel = stringResource(R.string.perm_allow_mic),
             granted = micGranted,
             onAllow = { launcher.launch(Manifest.permission.RECORD_AUDIO) },
         )
         PermissionRow(
             label = stringResource(R.string.onboarding_perm_camera),
+            allowLabel = stringResource(R.string.perm_allow_camera),
             granted = camGranted,
             onAllow = { launcher.launch(Manifest.permission.CAMERA) },
         )
         if (Build.VERSION.SDK_INT >= 33) {
             PermissionRow(
                 label = stringResource(R.string.onboarding_perm_notif),
+                allowLabel = stringResource(R.string.perm_allow_notif),
                 granted = notifGranted,
                 onAllow = { launcher.launch(Manifest.permission.POST_NOTIFICATIONS) },
             )
@@ -248,6 +280,7 @@ private fun PermissionsStep(modifier: Modifier = Modifier) {
 @Composable
 private fun PermissionRow(
     label: String,
+    allowLabel: String,
     granted: Boolean,
     onAllow: () -> Unit,
     modifier: Modifier = Modifier,
@@ -268,7 +301,7 @@ private fun PermissionRow(
         }
         if (!granted) {
             SmartCessSecondaryButton(
-                text = stringResource(R.string.perm_allow),
+                text = allowLabel,
                 onClick = onAllow,
             )
         }
@@ -278,6 +311,7 @@ private fun PermissionRow(
 @Composable
 private fun VoiceStep(
     onPlaySample: () -> Unit,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -289,6 +323,11 @@ private fun VoiceStep(
         SmartCessSecondaryButton(
             text = stringResource(R.string.onboarding_voice_sample),
             onClick = onPlaySample,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        SmartCessSecondaryButton(
+            text = stringResource(R.string.onboarding_voice_open_settings),
+            onClick = onOpenSettings,
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -305,7 +344,7 @@ private fun ScanStep(
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
         )
-        SmartCessPrimaryButton(
+        SmartCessSecondaryButton(
             text = stringResource(R.string.onboarding_scan_button),
             onClick = onScan,
             modifier = Modifier.fillMaxWidth(),

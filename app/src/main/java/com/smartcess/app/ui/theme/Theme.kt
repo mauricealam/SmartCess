@@ -14,18 +14,84 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.sp
 
-private val LightScheme = lightColorScheme(
-    primary = SmartCessLightTokens.Primary,
-    surface = SmartCessLightTokens.Surface,
-    background = SmartCessLightTokens.Background,
-    error = SmartCessLightTokens.Error,
+/**
+ * Full brand schemes. Every slot is specified so no Material3 baseline
+ * default can ever leak into the UI (the cause of the pastel unbranded look).
+ * Text pairs are locked to WCAG AA by ColorContrastTest.
+ */
+/** Visible to tests so ColorContrastTest locks the AA ratios of the real schemes. */
+internal val LightScheme = lightColorScheme(
+    primary = SmartCessLightTokens.Primary, // #0B3D91
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFD9E6FF),
+    onPrimaryContainer = Color(0xFF0B3D91),
+    secondary = Color(0xFF3B5BA9),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFDCE6F5),
+    onSecondaryContainer = Color(0xFF0B3D91),
+    tertiary = Color(0xFF7A5200),
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFFFE1A8),
+    onTertiaryContainer = Color(0xFF4A3200),
+    surface = SmartCessLightTokens.Surface, // #FFFFFF
+    onSurface = Color(0xFF191C20),
+    surfaceVariant = Color(0xFFE2E6EC),
+    onSurfaceVariant = Color(0xFF43474E),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFF6F8FB),
+    surfaceContainer = Color(0xFFEDF1F7),
+    surfaceContainerHigh = Color(0xFFE6EAF1),
+    surfaceContainerHighest = Color(0xFFDFE4EC),
+    background = SmartCessLightTokens.Background, // #F6F8FB
+    onBackground = Color(0xFF191C20),
+    error = SmartCessLightTokens.Error, // #B3261E
+    onError = Color.White,
+    errorContainer = Color(0xFFF9DEDC),
+    onErrorContainer = Color(0xFF410E0B),
+    outline = Color(0xFF74777F),
+    outlineVariant = Color(0xFFC4C6CF),
+    scrim = Color.Black,
+    inverseSurface = Color(0xFF2F3033),
+    inverseOnSurface = Color(0xFFF1F0F4),
+    inversePrimary = Color(0xFF8AB4F8),
+    surfaceTint = SmartCessLightTokens.Primary,
 )
 
-private val DarkScheme = darkColorScheme(
-    primary = SmartCessDarkTokens.Primary,
-    surface = SmartCessDarkTokens.Surface,
-    background = SmartCessDarkTokens.Background,
-    error = SmartCessDarkTokens.Error,
+internal val DarkScheme = darkColorScheme(
+    primary = SmartCessDarkTokens.Primary, // #8AB4F8
+    onPrimary = Color(0xFF062B5C),
+    primaryContainer = Color(0xFF0B3D91),
+    onPrimaryContainer = Color(0xFFD9E6FF),
+    secondary = Color(0xFFA0BFF0),
+    onSecondary = Color(0xFF062B5C),
+    secondaryContainer = Color(0xFF24407C),
+    onSecondaryContainer = Color(0xFFDCE6F5),
+    tertiary = Color(0xFFFFB74D),
+    onTertiary = Color(0xFF4A2F00),
+    tertiaryContainer = Color(0xFF6B4A00),
+    onTertiaryContainer = Color(0xFFFFE1A8),
+    surface = SmartCessDarkTokens.Surface, // #121212
+    onSurface = Color(0xFFE3E2E6),
+    surfaceVariant = Color(0xFF43474E),
+    onSurfaceVariant = Color(0xFFC4C7C5),
+    surfaceContainerLowest = Color(0xFF0B0C0E),
+    surfaceContainerLow = Color(0xFF121212),
+    surfaceContainer = Color(0xFF1A1C1F),
+    surfaceContainerHigh = Color(0xFF24262B),
+    surfaceContainerHighest = Color(0xFF2F3136),
+    background = SmartCessDarkTokens.Background, // #000000
+    onBackground = Color(0xFFE3E2E6),
+    error = SmartCessDarkTokens.Error, // #F2B8B5
+    onError = Color(0xFF601410),
+    errorContainer = Color(0xFF8C1D18),
+    onErrorContainer = Color(0xFFF9DEDC),
+    outline = Color(0xFF8E9099),
+    outlineVariant = Color(0xFF43474E),
+    scrim = Color.Black,
+    inverseSurface = Color(0xFFE3E2E6),
+    inverseOnSurface = Color(0xFF2F3033),
+    inversePrimary = Color(0xFF0B3D91),
+    surfaceTint = SmartCessDarkTokens.Primary,
 )
 
 /** Maximum-contrast overrides for the high-contrast preference. */

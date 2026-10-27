@@ -47,6 +47,7 @@ fun SmartCessNavGraph() {
                         popUpTo(Routes.ONBOARDING) { inclusive = true }
                     }
                 },
+                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
             )
         }
         composable(Routes.HOME) {

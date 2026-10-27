@@ -28,11 +28,15 @@ fun SmartCessCard(
         if (heading != null) heading()
         contentDescription?.let { desc -> this.contentDescription = desc }
     }
+    val colors = CardDefaults.cardColors(
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    )
     if (onClick != null) {
         Card(
             onClick = onClick,
             shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            colors = colors,
             modifier = modifier.fillMaxWidth().then(semantics),
         ) {
             Column(modifier = Modifier.padding(8.dp)) { content() }
@@ -40,7 +44,7 @@ fun SmartCessCard(
     } else {
         Card(
             shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            colors = colors,
             modifier = modifier.fillMaxWidth().then(semantics),
         ) {
             Column(modifier = Modifier.padding(8.dp)) { content() }
