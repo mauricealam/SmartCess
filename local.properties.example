@@ -1,0 +1,8 @@
+# Copy to local.properties (git-ignored) and fill in. Never commit real keys.
+# META_API_KEY is injected into BuildConfig and used only as a fallback when no
+# user-supplied key is stored in EncryptedSharedPreferences. CI can provide it
+# via the META_API_KEY environment variable instead.
+META_API_KEY=
+# Optional Meta Model API endpoint overrides (defaults fail closed to offline mode).
+# META_API_BASE_URL=https://meta-model-api.example.invalid/v1/
+# META_STT_URL=wss://meta-model-api.example.invalid/stt

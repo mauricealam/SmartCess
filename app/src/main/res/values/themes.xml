@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Launcher/activity theme; Compose SmartCessTheme takes over in content. -->
+    <style name="Theme.SmartCess" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/smartcess_background</item>
+        <item name="android:statusBarColor">@color/smartcess_primary</item>
+        <item name="android:navigationBarColor">@color/smartcess_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

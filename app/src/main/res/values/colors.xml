@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mirrors SmartCessTheme tokens for launcher theme / XML surfaces. -->
+<resources>
+    <color name="smartcess_primary">#0B3D91</color>
+    <color name="smartcess_surface">#FFFFFF</color>
+    <color name="smartcess_background">#F6F8FB</color>
+    <color name="smartcess_success">#1B7F3B</color>
+    <color name="smartcess_warning">#B26A00</color>
+    <color name="smartcess_error">#B3261E</color>
+    <color name="smartcess_focus">#FFD54F</color>
+</resources>

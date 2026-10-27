@@ -1,0 +1,414 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_name" translatable="true">SmartCess</string>
+
+    <!-- Home (spec: Talk, Today card, Scan Bill primary, More sheet, Settings) -->
+    <string name="home_talk" translatable="true">Talk</string>
+    <string name="home_talk_desc" translatable="true">Talk to SmartCess. Double tap and speak your request.</string>
+    <string name="home_today" translatable="true">Today</string>
+    <string name="home_today_see_all" translatable="true">See all</string>
+    <string name="home_scan_bill" translatable="true">Scan bill</string>
+    <string name="home_scan_bill_desc" translatable="true">Scan a bill. Opens the guided camera.</string>
+    <string name="home_more" translatable="true">More</string>
+    <string name="home_settings" translatable="true">Settings</string>
+    <string name="logo_content_desc" translatable="true">SmartCess logo</string>
+
+    <!-- More sheet destinations -->
+    <string name="more_bills" translatable="true">Bills</string>
+    <string name="more_documents" translatable="true">Documents</string>
+    <string name="more_appointments" translatable="true">Appointments</string>
+    <string name="more_routines" translatable="true">Routines</string>
+    <string name="more_email" translatable="true">Email briefing</string>
+    <string name="more_settings" translatable="true">Settings</string>
+
+    <!-- Voice -->
+    <string name="voice_title" translatable="true">Talk to SmartCess</string>
+    <string name="voice_hint" translatable="true">Try “What is due this week?” or “Scan my bill”.</string>
+
+    <!-- Guided camera / framing phrases (exact contracted wording) -->
+    <string name="camera_title" translatable="true">Scan document</string>
+    <string name="camera_capture" translatable="true">Capture</string>
+    <string name="camera_capture_desc" translatable="true">Capture the document photo</string>
+    <string name="camera_processing" translatable="true">Processing your bill…</string>
+    <string name="camera_voice_hint" translatable="true">You can also say “capture”.</string>
+    <string name="camera_framing_desc" translatable="true">Camera framing guide. Follow the spoken instruction to position the bill.</string>
+    <string name="camera_permission_desc" translatable="true">SmartCess needs the camera to scan your bill. Framing guidance stays on this device; only the photo you capture is analyzed.</string>
+    <string name="camera_grant_permission" translatable="true">Allow camera</string>
+    <string name="camera_open_settings" translatable="true">Open settings</string>
+    <string name="framing_no_text" translatable="true">I do not see a document. Point the camera at the bill.</string>
+    <string name="framing_move_closer" translatable="true">Move closer to the bill.</string>
+    <string name="framing_move_back" translatable="true">Move back slightly.</string>
+    <string name="framing_move_left" translatable="true">Move the phone slightly to the left.</string>
+    <string name="framing_move_right" translatable="true">Move the phone slightly to the right.</string>
+    <string name="framing_move_up" translatable="true">Move the phone down a little.</string>
+    <string name="framing_move_down" translatable="true">Move the phone up a little.</string>
+    <string name="framing_hold_straight" translatable="true">Hold the phone straight over the bill.</string>
+    <string name="framing_too_dark" translatable="true">It is too dark. Move to better light if possible.</string>
+    <string name="framing_ready" translatable="true">Ready. Tap capture or say capture.</string>
+    <string name="framing_unavailable" translatable="true">Automatic framing is unavailable. Position the bill in the frame and tap capture when ready.</string>
+
+    <!-- Bills -->
+    <string name="bills_title" translatable="true">Bills</string>
+    <string name="bill_result_title" translatable="true">Bill result</string>
+    <string name="bill_compare_title" translatable="true">Compare with last bill</string>
+    <string name="bill_save" translatable="true">Save bill</string>
+    <string name="bill_low_confidence" translatable="true">Low confidence. Please review before saving.</string>
+
+    <!-- Reminders / briefing / modules -->
+    <string name="reminder_title" translatable="true">Reminder</string>
+    <string name="reminder_confirm" translatable="true">Confirm reminder</string>
+    <string name="briefing_title" translatable="true">Daily briefing</string>
+    <string name="email_title" translatable="true">Email briefing</string>
+    <string name="document_title" translatable="true">Document summary</string>
+    <string name="appointment_title" translatable="true">Appointment</string>
+    <string name="routine_title" translatable="true">Routine</string>
+    <string name="settings_title" translatable="true">Settings</string>
+
+    <!-- Banners / errors / offline -->
+    <string name="banner_offline" translatable="true">Offline mode. Please review.</string>
+    <string name="error_generic" translatable="true">Something went wrong. Please try again.</string>
+    <string name="error_no_speech" translatable="true">I did not hear anything. Try again or type below.</string>
+    <string name="error_capture_failed" translatable="true">Could not capture the photo. Please try again.</string>
+    <string name="error_extraction_failed" translatable="true">Could not read the bill. Try rescanning, or enter it manually.</string>
+    <string name="error_permission" translatable="true">Permission needed to continue. Open settings to allow it.</string>
+    <string name="action_retry" translatable="true">Retry</string>
+    <string name="action_cancel" translatable="true">Cancel</string>
+    <string name="action_back" translatable="true">Back</string>
+
+    <!-- Notifications -->
+    <string name="notif_channel_reminders" translatable="true">Reminders</string>
+    <string name="notif_channel_reminders_desc" translatable="true">Bill, appointment, and routine reminders.</string>
+
+    <!-- Common actions -->
+    <string name="action_save" translatable="true">Save</string>
+    <string name="action_confirm" translatable="true">Confirm</string>
+    <string name="action_delete" translatable="true">Delete</string>
+    <string name="action_close" translatable="true">Close</string>
+    <string name="action_add" translatable="true">Add</string>
+    <string name="action_compare" translatable="true">Compare</string>
+    <string name="action_archive" translatable="true">Archive</string>
+    <string name="action_remind" translatable="true">Remind me</string>
+    <string name="action_listen" translatable="true">Listen</string>
+    <string name="action_stop" translatable="true">Stop</string>
+    <string name="action_next" translatable="true">Next</string>
+    <string name="action_skip" translatable="true">Skip</string>
+    <string name="action_get_started" translatable="true">Get started</string>
+    <string name="action_done" translatable="true">Done</string>
+    <string name="action_clear" translatable="true">Clear</string>
+    <string name="status_loading" translatable="true">Loading…</string>
+    <string name="option_selected" translatable="true">Selected</string>
+    <string name="banner_error_title" translatable="true">Something needs your attention</string>
+    <string name="error_not_found" translatable="true">This item is no longer available.</string>
+
+    <!-- Urgency chips -->
+    <string name="urgency_low" translatable="true">Low</string>
+    <string name="urgency_normal" translatable="true">Normal</string>
+    <string name="urgency_high" translatable="true">High</string>
+    <string name="urgency_urgent" translatable="true">Urgent</string>
+    <string name="chip_overdue" translatable="true">Overdue</string>
+    <string name="chip_due_soon" translatable="true">Due soon</string>
+    <string name="chip_today" translatable="true">Today</string>
+    <string name="chip_tomorrow" translatable="true">Tomorrow</string>
+    <string name="chip_offline" translatable="true">Offline</string>
+    <string name="chip_low_confidence" translatable="true">Needs review</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title_1" translatable="true">Welcome to SmartCess</string>
+    <string name="onboarding_body_1" translatable="true">SmartCess turns inaccessible life admin into independent action. Bills, mail, appointments, and routines — read aloud and organized for you.</string>
+
+    <string name="onboarding_title_3" translatable="true">Private by design</string>
+    <string name="onboarding_privacy_note" translatable="true">SmartCess stores your bills, reminders, and summaries on this device only. Analytics are off unless you turn them on in Settings.</string>
+    <string name="onboarding_page_desc" translatable="true">Step %1$d of %2$d</string>
+
+    <!-- Home -->
+    <string name="home_header_desc" translatable="true">SmartCess home</string>
+    <string name="home_today_empty" translatable="true">Nothing urgent. Enjoy your day.</string>
+    <string name="home_today_more" translatable="true">%1$d more in your briefing</string>
+    <string name="home_today_overdue" translatable="true">%1$s bill overdue</string>
+    <string name="home_today_due_soon" translatable="true">%1$s due %2$s</string>
+    <string name="home_today_appointment" translatable="true">%1$s at %2$s</string>
+    <string name="home_today_email" translatable="true">Urgent email: %1$s</string>
+    <string name="home_today_routine" translatable="true">Routine due: %1$s</string>
+    <string name="home_today_document" translatable="true">Document deadline: %1$s</string>
+    <string name="home_more_desc" translatable="true">More options. Opens Bills, Documents, Appointments, Routines, and Settings.</string>
+    <string name="home_greeting" translatable="true">Good day. Here is what needs you.</string>
+
+    <!-- More sheet -->
+    <string name="more_title" translatable="true">More</string>
+    <string name="more_dismiss_desc" translatable="true">Close more options</string>
+
+    <!-- Briefing -->
+    <string name="briefing_listen_desc" translatable="true">Read my briefing aloud</string>
+    <string name="briefing_empty" translatable="true">All clear. No overdue bills, appointments, urgent mail, or routines due.</string>
+    <string name="briefing_section_overdue" translatable="true">Overdue bills</string>
+    <string name="briefing_section_due_soon" translatable="true">Due in the next 7 days</string>
+    <string name="briefing_section_appointments" translatable="true">Appointments today and tomorrow</string>
+    <string name="briefing_section_email" translatable="true">Urgent email</string>
+    <string name="briefing_section_documents" translatable="true">Document deadlines</string>
+    <string name="briefing_section_routines" translatable="true">Routines due</string>
+    <string name="briefing_spoken_intro" translatable="true">Here is your daily briefing.</string>
+    <string name="briefing_spoken_empty" translatable="true">All clear. Nothing needs your attention today.</string>
+    <string name="briefing_spoken_overdue" translatable="true">%1$s, %2$s, overdue.</string>
+    <string name="briefing_spoken_due" translatable="true">%1$s, due %2$s.</string>
+    <string name="briefing_spoken_email" translatable="true">%1$s from %2$s.</string>
+
+    <!-- Bills -->
+    <string name="bills_empty" translatable="true">No bills yet. Scan your first bill to get started.</string>
+    <string name="bills_active_section" translatable="true">Current bills</string>
+    <string name="bills_archived_section" translatable="true">Archived</string>
+    <string name="bills_scan_first" translatable="true">Scan a bill</string>
+    <string name="bill_provider" translatable="true">Provider</string>
+    <string name="bill_amount" translatable="true">Amount</string>
+    <string name="bill_currency" translatable="true">Currency (3 letters)</string>
+    <string name="bill_due_date" translatable="true">Due date</string>
+    <string name="bill_account" translatable="true">Account</string>
+    <string name="bill_period" translatable="true">Billing period</string>
+    <string name="bill_summary_label" translatable="true">Summary</string>
+    <string name="bill_missing_fields" translatable="true">Missing: %1$s</string>
+    <string name="bill_review_title" translatable="true">Review this bill</string>
+    <string name="bill_save_confirm_title" translatable="true">Save this bill?</string>
+    <string name="bill_save_confirm_message" translatable="true">%1$s, %2$s, due %3$s. Nothing will be paid — this only saves the bill.</string>
+    <string name="bill_saved" translatable="true">Bill saved.</string>
+    <string name="bill_archive_confirm_title" translatable="true">Archive this bill?</string>
+    <string name="bill_archive_confirm_message" translatable="true">The bill stays on this device but moves out of your current list.</string>
+    <string name="bill_archived" translatable="true">Bill archived.</string>
+    <string name="bill_remind_options" translatable="true">Remind me before the due date</string>
+    <plurals name="bill_remind_days">
+        <item quantity="one">%1$d day before</item>
+        <item quantity="other">%1$d days before</item>
+    </plurals>
+    <string name="bill_reminder_set" translatable="true">Reminder set.</string>
+    <string name="bill_no_previous" translatable="true">No previous bill from this provider to compare.</string>
+    <string name="bill_rescan" translatable="true">Rescan</string>
+    <string name="bill_item_desc" translatable="true">%1$s, %2$s, due %3$s</string>
+    <string name="comparison_difference_up" translatable="true">%1$s more than last time (%2$s).</string>
+    <string name="comparison_difference_down" translatable="true">%1$s less than last time (%2$s).</string>
+    <string name="comparison_no_change" translatable="true">Same amount as last time.</string>
+    <string name="comparison_recommendation" translatable="true">Recommendation</string>
+    <string name="comparison_reasons" translatable="true">Possible reasons</string>
+    <string name="comparison_current" translatable="true">This bill</string>
+    <string name="comparison_previous" translatable="true">Last bill</string>
+    <string name="comparison_percent" translatable="true">%1$.0f%%</string>
+
+    <!-- Reminders -->
+    <string name="reminder_when" translatable="true">When</string>
+    <string name="reminder_detail" translatable="true">Details</string>
+    <string name="reminder_confirm_message" translatable="true">Remind you about “%1$s” on %2$s?</string>
+    <string name="reminder_scheduled" translatable="true">Reminder confirmed and scheduled.</string>
+    <string name="reminder_cancel_title" translatable="true">Cancel this reminder?</string>
+    <string name="reminder_cancel_message" translatable="true">You will no longer be reminded about “%1$s”.</string>
+    <string name="reminder_cancelled" translatable="true">Reminder cancelled.</string>
+    <string name="reminder_completed" translatable="true">Reminder completed.</string>
+    <string name="reminder_mark_complete" translatable="true">Mark completed</string>
+    <string name="reminder_status" translatable="true">Status: %1$s</string>
+
+    <!-- Email -->
+    <string name="email_empty" translatable="true">Your demo inbox is empty.</string>
+    <string name="email_demo_note" translatable="true">Demo inbox on this device. Real Gmail and Outlook support is coming later.</string>
+    <string name="email_from" translatable="true">From %1$s</string>
+    <string name="email_deadline" translatable="true">Deadline: %1$s</string>
+    <string name="email_briefing_label" translatable="true">Briefing</string>
+    <string name="email_mark_read" translatable="true">Mark as read</string>
+    <string name="email_is_read" translatable="true">Read</string>
+    <string name="email_safety_note" translatable="true">SmartCess only reads your mail aloud. It never sends, replies, deletes, or forwards.</string>
+    <string name="email_item_desc" translatable="true">%1$s from %2$s, %3$s</string>
+    <string name="email_spoken" translatable="true">%1$s. %2$s</string>
+
+    <!-- Documents -->
+    <string name="documents_title" translatable="true">Documents</string>
+    <string name="documents_empty" translatable="true">No documents yet. Scan or import a letter to hear its summary.</string>
+    <string name="documents_import" translatable="true">Import file</string>
+    <string name="documents_scan" translatable="true">Scan document</string>
+    <string name="documents_summary_label" translatable="true">Plain summary</string>
+    <string name="documents_key_points" translatable="true">Key points</string>
+    <string name="documents_deadline" translatable="true">Deadline: %1$s</string>
+    <string name="documents_amount" translatable="true">Amount: %1$s</string>
+    <string name="documents_ask_title" translatable="true">Ask about this document</string>
+    <string name="documents_ask_hint" translatable="true">Type your question, or ask by voice on the Talk screen</string>
+    <string name="documents_ask_button" translatable="true">Ask</string>
+    <string name="documents_answer_label" translatable="true">Answer</string>
+    <string name="documents_item_desc" translatable="true">%1$s, %2$s</string>
+    <string name="documents_import_failed" translatable="true">Could not read that file. Try a PDF or a clear photo.</string>
+    <string name="documents_no_answer" translatable="true">I could not find that in this document. Try different words.</string>
+    <string name="documents_saved" translatable="true">Document summary saved.</string>
+    <string name="documents_type_other" translatable="true">Letter</string>
+    <string name="documents_save_title" translatable="true">Save this summary?</string>
+    <string name="documents_reading" translatable="true">Reading your file…</string>
+
+    <!-- Appointments -->
+    <string name="appointments_title" translatable="true">Appointments</string>
+    <string name="appointments_empty" translatable="true">No appointments yet. Add one below, or say “Add an appointment”.</string>
+    <string name="appointments_add" translatable="true">Add appointment</string>
+    <string name="appt_title_label" translatable="true">Title</string>
+    <string name="appt_provider_label" translatable="true">Provider or clinic</string>
+    <string name="appt_location_label" translatable="true">Location</string>
+    <string name="appt_doctor_label" translatable="true">Doctor</string>
+    <string name="appt_start_label" translatable="true">Start (day, date, time)</string>
+    <string name="appt_end_label" translatable="true">End (optional)</string>
+    <string name="appt_prep_label" translatable="true">What to bring or prepare</string>
+    <string name="appt_saved" translatable="true">Appointment saved.</string>
+    <string name="appt_calendar_title" translatable="true">Add to calendar?</string>
+    <string name="appt_calendar_message" translatable="true">Add “%1$s” to your device calendar?</string>
+    <string name="appt_calendar_saved" translatable="true">Added to your calendar.</string>
+    <string name="appt_travel_title" translatable="true">Travel reminder?</string>
+    <string name="appt_travel_message" translatable="true">Remind you to leave in time for “%1$s”? Choose how early.</string>
+    <string name="appt_travel_minutes" translatable="true">%1$d minutes before</string>
+    <string name="appt_travel_saved" translatable="true">Travel reminder set.</string>
+    <string name="appt_when" translatable="true">%1$s at %2$s</string>
+    <string name="appt_item_desc" translatable="true">%1$s, %2$s at %3$s</string>
+    <string name="appt_extract_hint" translatable="true">Paste an appointment letter or message to fill this in automatically.</string>
+    <string name="appt_extract_button" translatable="true">Fill from text</string>
+    <string name="appt_start_hint" translatable="true">2026-11-05 10:30</string>
+    <string name="appt_delete_title" translatable="true">Delete this appointment?</string>
+    <string name="appt_delete_message" translatable="true">“%1$s” will be removed from this device.</string>
+
+    <!-- Routines -->
+    <string name="routines_title" translatable="true">Routines</string>
+    <string name="routines_empty" translatable="true">No routines yet. Add medication, deliveries, or anything repeating.</string>
+    <string name="routines_add" translatable="true">Add routine</string>
+    <string name="routine_kind_medication" translatable="true">Medication</string>
+    <string name="routine_kind_delivery" translatable="true">Delivery</string>
+    <string name="routine_kind_recurring" translatable="true">Recurring</string>
+    <string name="routine_kind_other" translatable="true">Other</string>
+    <string name="routine_title_label" translatable="true">Title</string>
+    <string name="routine_schedule_label" translatable="true">Schedule (for example: DAILY 08:00)</string>
+    <string name="routine_notes_label" translatable="true">Notes</string>
+    <string name="routine_saved" translatable="true">Routine saved.</string>
+    <string name="routine_complete" translatable="true">Mark done</string>
+    <string name="routine_completed" translatable="true">Done. Well done keeping on track.</string>
+    <string name="routine_streak" translatable="true">%1$d day streak</string>
+    <string name="routine_next_due" translatable="true">Next due: %1$s</string>
+    <string name="routine_no_advice" translatable="true">SmartCess tracks your routine. It never gives medical advice — always follow your doctor.</string>
+    <string name="routine_item_desc" translatable="true">%1$s, %2$s</string>
+    <string name="routine_describe_label" translatable="true">Describe it in your own words</string>
+    <string name="routine_describe_hint" translatable="true">For example: blood pressure pill every morning at 8</string>
+    <string name="routine_draft_button" translatable="true">Draft from words</string>
+    <string name="routine_complete_title" translatable="true">Mark this done?</string>
+    <string name="routine_complete_message" translatable="true">“%1$s” will be marked done and your streak grows.</string>
+    <string name="routine_delete_title" translatable="true">Delete this routine?</string>
+    <string name="routine_delete_message" translatable="true">“%1$s” will be removed from this device.</string>
+
+    <!-- Settings -->
+    <string name="settings_section_speech" translatable="true">Speech</string>
+    <string name="settings_section_reminders" translatable="true">Reminders</string>
+    <string name="settings_section_appearance" translatable="true">Appearance</string>
+    <string name="settings_section_privacy" translatable="true">Privacy</string>
+    <string name="settings_section_data" translatable="true">Your data</string>
+    <string name="settings_api_key_label" translatable="true">Meta API key</string>
+    <string name="settings_api_key_hint" translatable="true">Paste your key, or leave empty for offline mode</string>
+    <string name="settings_api_key_saved" translatable="true">Key saved securely on this device.</string>
+    <string name="settings_api_key_cleared" translatable="true">Key removed. Offline mode is on.</string>
+    <string name="settings_tts_rate" translatable="true">Speech speed</string>
+    <string name="settings_tts_rate_value" translatable="true">%1$.1f× speed</string>
+    <string name="settings_bill_reminder_days" translatable="true">Remind me about bills</string>
+    <string name="settings_bill_reminder_days_value" translatable="true">%1$d days before due</string>
+    <string name="settings_high_contrast" translatable="true">High contrast</string>
+    <string name="settings_large_text" translatable="true">Large text</string>
+    <string name="settings_analytics" translatable="true">Share anonymous usage counts</string>
+    <string name="settings_analytics_desc" translatable="true">Off by default. Only counts and flags, never your bills or words.</string>
+    <string name="settings_crash" translatable="true">Share crash reports</string>
+    <string name="settings_crash_desc" translatable="true">Off by default. Helps fix bugs, with no personal content.</string>
+    <string name="settings_privacy_body" translatable="true">Your data stays on this device. The camera and microphone only run when you ask. SmartCess never pays, sends, submits, or calls without your explicit confirmation.</string>
+    <string name="settings_export" translatable="true">Export my data</string>
+    <string name="settings_export_done" translatable="true">Your data is ready to share.</string>
+    <string name="settings_delete_title" translatable="true">Delete everything?</string>
+    <string name="settings_delete_message" translatable="true">This removes all bills, reminders, documents, emails, appointments, and routines from this device. This cannot be undone.</string>
+    <string name="settings_delete_button" translatable="true">Delete everything</string>
+    <string name="settings_deleted" translatable="true">Everything deleted.</string>
+    <string name="settings_about_title" translatable="true">About SmartCess</string>
+    <string name="settings_about_body" translatable="true">SmartCess turns inaccessible life admin into independent action. Built with co-designer Hillarry for blind and low-vision users.</string>
+    <string name="settings_version" translatable="true">Version %1$s</string>
+
+    <!-- Voice -->
+    <string name="voice_listening" translatable="true">Listening… speak now.</string>
+    <string name="voice_transcript_label" translatable="true">What I heard</string>
+    <string name="voice_type_label" translatable="true">Or type your request</string>
+    <string name="voice_type_hint" translatable="true">For example: what needs my attention today?</string>
+    <string name="voice_send" translatable="true">Send</string>
+    <string name="voice_stop" translatable="true">Stop listening</string>
+    <string name="voice_listen_again" translatable="true">Listen again</string>
+    <string name="voice_no_speech" translatable="true">I did not hear you. Tap Talk and try again.</string>
+    <string name="voice_not_clear" translatable="true">Sorry, I could not hear that clearly.</string>
+    <string name="voice_api_unavailable" translatable="true">SmartCess cannot reach Meta AI right now.</string>
+    <string name="voice_timeout" translatable="true">That is taking too long. Please try again.</string>
+    <string name="voice_help" translatable="true">I can help with bills, email, documents, appointments, and routines. What do you need?</string>
+    <string name="error_rate_limit" translatable="true">Too many requests. Please try again shortly.</string>
+
+    <!-- Permissions -->
+    <string name="perm_mic_title" translatable="true">Microphone access</string>
+    <string name="perm_mic_rationale" translatable="true">SmartCess needs microphone access to hear you.</string>
+    <string name="perm_allow" translatable="true">Allow</string>
+    <string name="perm_open_settings" translatable="true">Open Settings</string>
+
+    <!-- Camera voice capture -->
+    <string name="camera_voice_capture_off" translatable="true">Say capture: off</string>
+    <string name="camera_voice_capture_on" translatable="true">Say capture is on. Say capture to take the photo.</string>
+    <string name="camera_voice_listening" translatable="true">Listening for “capture”…</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_talkback_title" translatable="true">Works with TalkBack</string>
+    <string name="onboarding_talkback_on" translatable="true">TalkBack is on. SmartCess is designed for it — every screen has headings, labels, and spoken feedback.</string>
+    <string name="onboarding_talkback_off" translatable="true">TalkBack seems to be off. SmartCess works best with TalkBack. You can turn it on in Accessibility settings.</string>
+    <string name="onboarding_talkback_open" translatable="true">Open Accessibility settings</string>
+    <string name="onboarding_perm_title" translatable="true">Three quick permissions</string>
+    <string name="onboarding_perm_mic" translatable="true">Microphone — to hear your voice commands</string>
+    <string name="onboarding_perm_camera" translatable="true">Camera — to scan bills and documents</string>
+    <string name="onboarding_perm_notif" translatable="true">Notifications — to remind you before deadlines</string>
+    <string name="onboarding_perm_granted" translatable="true">Allowed</string>
+    <string name="onboarding_perm_not_yet" translatable="true">Not yet</string>
+    <string name="onboarding_perm_skip_note" translatable="true">You can skip any permission and grant it later. SmartCess still works with touch.</string>
+    <string name="onboarding_voice_title" translatable="true">Talk or tap — your choice</string>
+    <string name="onboarding_voice_body" translatable="true">Tap Talk and speak, or use touch — every voice command has a touch equivalent. Voice needs a Meta API key in Settings; touch works fully offline.</string>
+    <string name="onboarding_voice_sample" translatable="true">Play sample voice</string>
+    <string name="onboarding_voice_sample_text" translatable="true">Hello! I am SmartCess. I will read your bills and remind you before they are due.</string>
+    <string name="onboarding_scan_title" translatable="true">Try your first scan</string>
+    <string name="onboarding_scan_body" translatable="true">Point the camera at any bill. SmartCess speaks instructions — move closer, a little left — then says Ready.</string>
+    <string name="onboarding_scan_button" translatable="true">Scan your first bill</string>
+    <string name="onboarding_privacy_body" translatable="true">SmartCess processes your bill or document only when you ask it to. Camera framing guidance happens entirely on your phone. Your reminders and saved information stay on your phone.</string>
+
+    <!-- Document import -->
+    <string name="doc_unsupported" translatable="true">I cannot read this file format. Try a photo, a text file, or a simple PDF.</string>
+    <string name="doc_pdf_failed" translatable="true">I cannot read this PDF format.</string>
+    <string name="doc_first_page_only" translatable="true">This PDF has more than one page. Only the first page was read.</string>
+
+    <!-- Calendar -->
+    <string name="appt_calendar_denied" translatable="true">Calendar permission was not granted. The appointment stays in SmartCess only.</string>
+    <string name="appt_calendar_local_warn" translatable="true">No device calendar found. The appointment stays in SmartCess only.</string>
+
+    <!-- Misc spec gaps -->
+    <string name="email_has_attachment" translatable="true">Has attachment</string>
+    <string name="settings_haptics" translatable="true">Framing vibration cues</string>
+    <string name="settings_haptics_desc" translatable="true">Short pulses while positioning the camera. Speech guidance always stays on.</string>
+    <string name="bill_question_label" translatable="true">Ask about this bill</string>
+    <string name="bill_question_hint" translatable="true">For example: when is it due?</string>
+    <string name="bill_ask" translatable="true">Ask</string>
+    <string name="bill_no_answer" translatable="true">I could not find that in the saved bill details.</string>
+    <string name="reminder_lead_title" translatable="true">Remind me</string>
+    <plurals name="reminder_lead_days">
+        <item quantity="one">%1$d day before</item>
+        <item quantity="other">%1$d days before</item>
+    </plurals>
+    <string name="reminder_lead_updated" translatable="true">Reminder time updated.</string>
+    <string name="notif_snooze" translatable="true">Snooze 10 min</string>
+    <string name="notif_complete" translatable="true">Mark done</string>
+    <string name="routine_missed" translatable="true">Missed — still needs doing</string>
+    <string name="settings_export_csv" translatable="true">Export as CSV file</string>
+    <string name="settings_export_json" translatable="true">Export as JSON file</string>
+    <string name="settings_export_saved" translatable="true">Export saved to the file you chose.</string>
+    <string name="settings_feedback_label" translatable="true">Send feedback</string>
+    <string name="settings_feedback_hint" translatable="true">What worked? What did not?</string>
+    <string name="settings_feedback_saved" translatable="true">Thanks! Your feedback is saved on this device.</string>
+
+    <!-- Bill result extras -->
+    <string name="bill_read_aloud" translatable="true">Read aloud</string>
+    <string name="bill_spoken" translatable="true">Bill from %1$s: %2$s, due %3$s. %4$s</string>
+    <string name="bill_discard" translatable="true">Discard</string>
+    <string name="bill_discard_confirm_title" translatable="true">Discard this bill?</string>
+    <string name="bill_discard_confirm_message" translatable="true">“%1$s” will be removed from this device.</string>
+
+    <!-- Settings extras -->
+    <string name="settings_meta_on" translatable="true">Meta AI: connected</string>
+    <string name="settings_meta_off" translatable="true">Meta AI: offline mode</string>
+    <string name="settings_reminder_time" translatable="true">Daily routine time</string>
+</resources>
