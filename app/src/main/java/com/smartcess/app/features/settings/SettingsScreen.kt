@@ -8,12 +8,20 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,10 +33,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.smartcess.app.BuildConfig
@@ -36,7 +49,6 @@ import com.smartcess.app.R
 import com.smartcess.app.ui.components.SmartCessBanner
 import com.smartcess.app.ui.components.SmartCessCard
 import com.smartcess.app.ui.components.SmartCessConfirmDialog
-import com.smartcess.app.ui.components.SmartCessLogo
 import com.smartcess.app.ui.components.SmartCessPrimaryButton
 import com.smartcess.app.ui.components.SmartCessSecondaryButton
 import com.smartcess.app.ui.components.SmartCessTextField
@@ -73,9 +85,6 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         SmartCessTopBar(title = stringResource(R.string.settings_title), onBack = onBack)
-        SmartCessLogo(
-            modifier = Modifier.size(72.dp).align(Alignment.CenterHorizontally),
-        )
         state.messageRes?.let {
             SmartCessBanner(message = stringResource(it), kind = BannerKind.INFO)
         }
@@ -106,11 +115,9 @@ fun SettingsScreen(
                 ),
                 style = MaterialTheme.typography.bodyMedium,
             )
-            Text(
-                text = stringResource(R.string.settings_tts_rate_value, prefs.ttsRate),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Slider(
+            SettingSlider(
+                label = stringResource(R.string.settings_tts_rate),
+                valueText = stringResource(R.string.settings_tts_rate_value, prefs.ttsRate),
                 value = prefs.ttsRate,
                 onValueChange = viewModel::setTtsRate,
                 valueRange = 0.5f..2.0f,
@@ -119,11 +126,9 @@ fun SettingsScreen(
         }
 
         SettingsSection(title = stringResource(R.string.settings_section_reminders)) {
-            Text(
-                text = stringResource(R.string.settings_bill_reminder_days_value, prefs.defaultBillReminderDays),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Slider(
+            SettingSlider(
+                label = stringResource(R.string.settings_bill_reminder_days),
+                valueText = stringResource(R.string.settings_bill_reminder_days_value, prefs.defaultBillReminderDays),
                 value = prefs.defaultBillReminderDays.toFloat(),
                 onValueChange = { viewModel.setBillReminderDays(it.toInt()) },
                 valueRange = 0f..14f,
@@ -131,19 +136,19 @@ fun SettingsScreen(
             )
             val reminderHour = prefs.defaultReminderTime / 60
             val reminderMinute = prefs.defaultReminderTime % 60
-            Text(
-                text = stringResource(R.string.settings_reminder_time) + ": " +
-                    reminderHour.toString().padStart(2, '0') + ":" +
-                    reminderMinute.toString().padStart(2, '0'),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Slider(
+            SettingSlider(
+                label = stringResource(R.string.settings_reminder_time) + " · " +
+                    stringResource(R.string.settings_hour),
+                valueText = stringResource(R.string.settings_hour_value, reminderHour),
                 value = reminderHour.toFloat(),
                 onValueChange = { viewModel.setDefaultReminderTime(it.toInt() * 60 + reminderMinute) },
                 valueRange = 0f..23f,
                 steps = 22,
             )
-            Slider(
+            SettingSlider(
+                label = stringResource(R.string.settings_reminder_time) + " · " +
+                    stringResource(R.string.settings_minute),
+                valueText = stringResource(R.string.settings_minute_value, reminderMinute),
                 value = reminderMinute.toFloat(),
                 onValueChange = { viewModel.setDefaultReminderTime(reminderHour * 60 + it.toInt()) },
                 valueRange = 0f..59f,
@@ -269,13 +274,106 @@ private fun SettingsSection(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.semantics { heading() },
         )
         SmartCessCard { content() }
+    }
+}
+
+/**
+ * Low-vision slider row: label + mono value badge side by side, 28dp thumb,
+ * 48dp touch height, 16dp breathing room between adjacent rows (8dp padding
+ * top and bottom). TalkBack keeps the slider's native progress semantics.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingSlider(
+    label: String,
+    valueText: String,
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    modifier: Modifier = Modifier,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    Column(
+        modifier = modifier.padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            ) {
+                Text(
+                    text = valueText,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                    ),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
+        }
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = valueRange,
+            steps = steps,
+            interactionSource = interaction,
+            thumb = {
+                SliderDefaults.Thumb(
+                    interactionSource = interaction,
+                    thumbSize = DpSize(28.dp, 28.dp),
+                )
+            },
+            track = {
+                val span = valueRange.endInclusive - valueRange.start
+                val fraction = if (span > 0f) (value - valueRange.start) / span else 0f
+                ThickSliderTrack(fraction = fraction)
+            },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        )
+    }
+}
+
+/**
+ * Thick control-center-style track: a 12dp rounded bar with the active
+ * portion filled, so the 28dp thumb reads as integrated into one
+ * touchable bar instead of floating on a hairline.
+ */
+@Composable
+private fun ThickSliderTrack(
+    fraction: Float,
+    modifier: Modifier = Modifier,
+) {
+    val active = MaterialTheme.colorScheme.primary
+    val inactive = MaterialTheme.colorScheme.surfaceContainerHighest
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(12.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(inactive),
+    ) {
+        drawRect(
+            color = active,
+            size = Size(size.width * fraction.coerceIn(0f, 1f), size.height),
+        )
     }
 }
 

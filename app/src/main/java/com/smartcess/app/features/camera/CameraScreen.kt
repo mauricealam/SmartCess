@@ -54,6 +54,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.smartcess.app.R
+import com.smartcess.app.ui.components.OpsNotice
 
 /**
  * Guided bill scanner: live preview + framing overlay + one spoken
@@ -187,19 +188,12 @@ private fun CameraPreviewContent(
                 Spacer(Modifier.height(8.dp))
             }
 
-            // Spoken instruction, mirrored as a live region for TalkBack.
-            Text(
+            // Spoken instruction, mirrored as a live region for TalkBack and
+            // rendered as an ops notice strip: the journey layer floats over
+            // the camera content without restyling it.
+            OpsNotice(
                 text = stringResource(uiState.instructionRes),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .semantics { liveRegion = LiveRegionMode.Polite }
-                    .background(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
-                        RoundedCornerShape(12.dp),
-                    )
-                    .padding(16.dp),
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
             Spacer(Modifier.height(12.dp))
 

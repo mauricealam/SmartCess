@@ -23,3 +23,15 @@ object SmartCessDarkTokens {
     val Error = Color(0xFFF2B8B5)
     val Focus = Color(0xFFFFD54F)
 }
+
+/**
+ * Night Ops console tokens. The accent pair differs per mode: bright teal
+ * with near-black ink at night, deep teal with white ink by day. Both hold
+ * AA or better (locked by ColorContrastTest).
+ */
+object SmartCessOpsTokens {
+    val NightAccent = Color(0xFF2DD4BF)
+    val OnNightAccent = Color(0xFF06231F)
+    val DayAccent = Color(0xFF006B5E)
+    val OnDayAccent = Color(0xFFFFFFFF)
+}

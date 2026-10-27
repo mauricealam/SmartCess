@@ -76,10 +76,10 @@ internal val DarkScheme = darkColorScheme(
     onSurfaceVariant = Color(0xFFC4C7C5),
     surfaceContainerLowest = Color(0xFF0B0C0E),
     surfaceContainerLow = Color(0xFF121212),
-    surfaceContainer = Color(0xFF1A1C1F),
+    surfaceContainer = Color(0xFF1C1C1E),
     surfaceContainerHigh = Color(0xFF24262B),
     surfaceContainerHighest = Color(0xFF2F3136),
-    background = SmartCessDarkTokens.Background, // #000000
+    background = Color(0xFF0F1115),
     onBackground = Color(0xFFE3E2E6),
     error = SmartCessDarkTokens.Error, // #F2B8B5
     onError = Color(0xFF601410),
@@ -117,12 +117,14 @@ private val DarkHighContrastScheme = darkColorScheme(
     onError = Color.Black,
 )
 
-/** Extra spec tokens beyond the Material3 palette (status + focus highlight). */
+/** Extra tokens beyond the Material3 palette (status + focus + ops accent). */
 @Immutable
 data class SmartCessColors(
     val success: androidx.compose.ui.graphics.Color,
     val warning: androidx.compose.ui.graphics.Color,
     val focus: androidx.compose.ui.graphics.Color,
+    val ops: androidx.compose.ui.graphics.Color,
+    val onOps: androidx.compose.ui.graphics.Color,
 )
 
 private val LocalSmartCessColors = staticCompositionLocalOf {
@@ -130,6 +132,8 @@ private val LocalSmartCessColors = staticCompositionLocalOf {
         success = SmartCessLightTokens.Success,
         warning = SmartCessLightTokens.Warning,
         focus = SmartCessLightTokens.Focus,
+        ops = SmartCessOpsTokens.DayAccent,
+        onOps = SmartCessOpsTokens.OnDayAccent,
     )
 }
 
@@ -159,12 +163,16 @@ fun SmartCessTheme(
             success = SmartCessDarkTokens.Success,
             warning = SmartCessDarkTokens.Warning,
             focus = SmartCessDarkTokens.Focus,
+            ops = SmartCessOpsTokens.NightAccent,
+            onOps = SmartCessOpsTokens.OnNightAccent,
         )
     } else {
         SmartCessColors(
             success = SmartCessLightTokens.Success,
             warning = SmartCessLightTokens.Warning,
             focus = SmartCessLightTokens.Focus,
+            ops = SmartCessOpsTokens.DayAccent,
+            onOps = SmartCessOpsTokens.OnDayAccent,
         )
     }
     CompositionLocalProvider(LocalSmartCessColors provides extra) {

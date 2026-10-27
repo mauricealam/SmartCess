@@ -9,7 +9,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -21,10 +20,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.smartcess.app.ui.theme.SmartCessTheme
 
-private val SmartCessButtonShape = RoundedCornerShape(8.dp)
+private val SmartCessButtonShape = RoundedCornerShape(16.dp)
 
 /**
- * Spec primary button: filled, 48dp minimum height, 8dp radius,
+ * Spec primary button: filled, 48dp minimum height, 16dp radius,
  * visible #FFD54F focus ring for keyboard/switch users.
  */
 @Composable
@@ -56,7 +55,10 @@ fun SmartCessPrimaryButton(
     }
 }
 
-/** Spec secondary button: outlined, same 48dp target and focus ring. */
+/**
+ * Tonal secondary button: soft container fill, same 48dp target and focus
+ * ring. No wireframe outline; separation comes from tonal elevation.
+ */
 @Composable
 fun SmartCessSecondaryButton(
     text: String,
@@ -67,16 +69,16 @@ fun SmartCessSecondaryButton(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    OutlinedButton(
+    Button(
         onClick = onClick,
         enabled = enabled,
         interactionSource = interaction,
         shape = SmartCessButtonShape,
-        colors = ButtonDefaults.outlinedButtonColors(
-            contentColor = MaterialTheme.colorScheme.primary,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
-        border = ButtonDefaults.outlinedButtonBorder,
         modifier = modifier
             .heightIn(min = 48.dp)
             .focusRing(focused)

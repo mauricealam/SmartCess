@@ -131,6 +131,9 @@
     <string name="home_today_email" translatable="true">Urgent email: %1$s</string>
     <string name="home_today_routine" translatable="true">Routine due: %1$s</string>
     <string name="home_today_document" translatable="true">Document deadline: %1$s</string>
+    <string name="queue_status_overdue" translatable="true">OVERDUE</string>
+    <string name="queue_status_due_soon" translatable="true">DUE SOON</string>
+    <string name="queue_status_queued" translatable="true">QUEUED</string>
     <string name="home_more_desc" translatable="true">More options. Opens Bills, Documents, Appointments, Routines, and Settings.</string>
     <string name="home_greeting" translatable="true">Good day. Here is what needs you.</string>
 
@@ -415,4 +418,8 @@
     <string name="settings_meta_on" translatable="true">Meta AI: connected</string>
     <string name="settings_meta_off" translatable="true">Meta AI: offline mode</string>
     <string name="settings_reminder_time" translatable="true">Daily routine time</string>
+    <string name="settings_hour" translatable="true">Hour</string>
+    <string name="settings_hour_value" translatable="true">%1$02d</string>
+    <string name="settings_minute" translatable="true">Minute</string>
+    <string name="settings_minute_value" translatable="true">%1$02d</string>
 </resources>

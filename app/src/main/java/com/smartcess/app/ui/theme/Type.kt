@@ -28,7 +28,7 @@ val SmartCessTypography = Typography(
     // Section 16sp
     titleMedium = TextStyle(
         fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         fontSize = 16.sp,
         lineHeight = 24.sp,
     ),
@@ -37,7 +37,7 @@ val SmartCessTypography = Typography(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
-        lineHeight = 24.sp,
+        lineHeight = 26.sp,
     ),
     bodyMedium = TextStyle(
         fontFamily = FontFamily.Default,

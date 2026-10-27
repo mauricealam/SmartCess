@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LinearProgressIndicator
@@ -45,11 +44,11 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.smartcess.app.R
+import com.smartcess.app.ui.components.OpsButton
 import com.smartcess.app.ui.components.SmartCessBanner
-import com.smartcess.app.ui.components.SmartCessLogo
-import com.smartcess.app.ui.components.SmartCessPrimaryButton
 import com.smartcess.app.ui.components.SmartCessSecondaryButton
 import com.smartcess.app.ui.components.SmartCessTextAction
+import com.smartcess.app.ui.theme.SmartCessTheme
 import kotlinx.coroutines.launch
 
 private const val ONBOARDING_PREFS = "smartcess_onboarding"
@@ -130,11 +129,9 @@ fun OnboardingScreen(
                 )
             }
         }
-        SmartCessLogo(
-            modifier = Modifier.size(96.dp).align(Alignment.CenterHorizontally),
-        )
         LinearProgressIndicator(
             progress = { (page + 1) / titles.size.toFloat() },
+            color = SmartCessTheme.extra.ops,
             modifier = Modifier.fillMaxWidth().semantics {
                 progressBarRangeInfo = ProgressBarRangeInfo(
                     current = (page + 1).toFloat(),
@@ -181,13 +178,13 @@ fun OnboardingScreen(
                 )
             }
             if (page < titles.lastIndex) {
-                SmartCessPrimaryButton(
+                OpsButton(
                     text = stringResource(R.string.action_next),
                     onClick = { page++ },
                     modifier = Modifier.weight(1f),
                 )
             } else {
-                SmartCessPrimaryButton(
+                OpsButton(
                     text = stringResource(R.string.action_get_started),
                     onClick = finish,
                     modifier = Modifier.weight(1f),

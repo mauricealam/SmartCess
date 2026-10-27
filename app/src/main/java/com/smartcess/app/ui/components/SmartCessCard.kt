@@ -15,7 +15,10 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
-/** Spec card: 12dp radius, 8dp inner padding, single-column full width. */
+/**
+ * Spec card: 12dp radius, 8dp inner padding, single-column full width.
+ * Tonal separation (container on background) instead of wireframe borders.
+ */
 @Composable
 fun SmartCessCard(
     modifier: Modifier = Modifier,

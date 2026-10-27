@@ -47,4 +47,16 @@ class ColorContrastTest {
 
     @Test
     fun darkScheme_meetsAA() = checkScheme("dark", DarkScheme)
+
+    @Test
+    fun opsPairs_meetAA() {
+        // Night Ops accent pairs, per mode: bright teal + near-black ink at
+        // night (~11:1), deep teal + white ink by day (~6.4:1).
+        val nightFg = SmartCessOpsTokens.OnNightAccent
+        val nightBg = SmartCessOpsTokens.NightAccent
+        assertTrue("night ops ratio ${ratio(nightFg, nightBg)} below 4.5", ratio(nightFg, nightBg) >= 4.5)
+        val dayFg = SmartCessOpsTokens.OnDayAccent
+        val dayBg = SmartCessOpsTokens.DayAccent
+        assertTrue("day ops ratio ${ratio(dayFg, dayBg)} below 4.5", ratio(dayFg, dayBg) >= 4.5)
+    }
 }
