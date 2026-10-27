@@ -7,4 +7,12 @@
         <item name="android:navigationBarColor">@color/smartcess_background</item>
         <item name="android:windowLightStatusBar">false</item>
     </style>
+
+    <!-- System splash: brand reveal on primary blue, then the app theme. -->
+    <style name="Theme.SmartCess.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/smartcess_primary</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/avd_splash_wordmark</item>
+        <item name="windowSplashScreenAnimationDuration">700</item>
+        <item name="postSplashScreenTheme">@style/Theme.SmartCess</item>
+    </style>
 </resources>

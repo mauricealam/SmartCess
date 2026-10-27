@@ -1,0 +1,30 @@
+<!-- Splash entrance: fade in with a gentle settle (safe on all API levels;
+     pre-31 shows the static first frame). Respects reduced motion in code. -->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:drawable="@drawable/splash_wordmark">
+    <target android:name="mark">
+        <aapt:attr name="android:animation">
+            <set
+                android:ordering="together">
+                <objectAnimator
+                    android:propertyName="alpha"
+                    android:valueFrom="0"
+                    android:valueTo="1"
+                    android:duration="450" />
+                <objectAnimator
+                    android:propertyName="scaleX"
+                    android:valueFrom="0.94"
+                    android:valueTo="1"
+                    android:duration="650"
+                    android:interpolator="@android:interpolator/decelerate_quint" />
+                <objectAnimator
+                    android:propertyName="scaleY"
+                    android:valueFrom="0.94"
+                    android:valueTo="1"
+                    android:duration="650"
+                    android:interpolator="@android:interpolator/decelerate_quint" />
+            </set>
+        </aapt:attr>
+    </target>
+</animated-vector>
