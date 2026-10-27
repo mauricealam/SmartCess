@@ -50,19 +50,18 @@ and Muse Spark (structured-output reasoning). See [ARCHITECTURE.md](ARCHITECTURE
    Then edit `local.properties`:
    ```properties
    META_API_KEY=<your-meta-model-api-key>
-   # Optional endpoint overrides (defaults fail closed into offline mode):
+   # Optional endpoint overrides (defaults are the official Meta endpoints):
    # META_API_BASE_URL=https://...
    # META_STT_URL=wss://...
    ```
    You can also enter or override the key inside the app: **Settings → API key**
    (stored in EncryptedSharedPreferences; app-supplied key wins over BuildConfig).
-   CI provides the key via the `META_API_KEY` environment variable instead.
+   CI builds keyless, and release builds never embed a key.
 3. Open the project in Android Studio and let Gradle sync, or build from the CLI:
    ```sh
    ./gradlew :app:assembleDebug
    ```
-   (If `gradlew` is missing, generate it once with `gradle wrapper` or open the
-   project in Android Studio, which creates it on import.)
+   (The Gradle wrapper is committed to the repo; no local Gradle install needed.)
 
 ## Build
 

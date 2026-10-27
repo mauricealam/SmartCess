@@ -1,0 +1,7 @@
+# Keep shell/CI scripts LF so the Linux runner executes them correctly.
+gradlew text eol=lf
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+gradlew.bat text eol=crlf
+*.jar binary

@@ -18,9 +18,6 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - name: Generate Gradle wrapper
-        run: gradle wrapper --gradle-version 8.7
-
       - name: Run instrumented tests on emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
