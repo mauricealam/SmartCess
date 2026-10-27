@@ -7,9 +7,6 @@ low-vision users. It reads bills, summarizes email and documents, tracks appoint
 and routines, and speaks a prioritized Daily Briefing — every action available by both
 voice and touch.
 
-Built for the **Build for Your World** hackathon (Indie track) by Maurice, co-designed
-and tested with Hillarry.
-
 ## Features (6 modules)
 
 | Module | What it does |
