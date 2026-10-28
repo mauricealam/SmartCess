@@ -49,6 +49,12 @@ class ColorContrastTest {
     fun darkScheme_meetsAA() = checkScheme("dark", DarkScheme)
 
     @Test
+    fun lightHighContrastScheme_meetsAA() = checkScheme("light-hc", LightHighContrastScheme)
+
+    @Test
+    fun darkHighContrastScheme_meetsAA() = checkScheme("dark-hc", DarkHighContrastScheme)
+
+    @Test
     fun opsPairs_meetAA() {
         // Night Ops accent pairs, per mode: bright teal + near-black ink at
         // night (~11:1), deep teal + white ink by day (~6.4:1).

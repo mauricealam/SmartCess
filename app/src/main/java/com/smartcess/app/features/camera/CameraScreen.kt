@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,15 +23,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -40,7 +41,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
@@ -54,7 +57,11 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.smartcess.app.R
+import com.smartcess.app.ui.components.OpsButton
 import com.smartcess.app.ui.components.OpsNotice
+import com.smartcess.app.ui.components.SmartCessPrimaryButton
+import com.smartcess.app.ui.components.SmartCessSecondaryButton
+import com.smartcess.app.ui.theme.SmartCessTheme
 
 /**
  * Guided bill scanner: live preview + framing overlay + one spoken
@@ -199,26 +206,31 @@ private fun CameraPreviewContent(
 
             val busy = uiState.phase == CameraPhase.CAPTURING ||
                 uiState.phase == CameraPhase.PROCESSING
-            Button(
+            OpsButton(
+                text = stringResource(
+                    if (busy) R.string.camera_processing else R.string.camera_capture,
+                ),
                 onClick = viewModel::capture,
                 enabled = uiState.captureEnabled && !busy,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp),
-            ) {
-                if (busy) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 3.dp,
-                    )
-                    Spacer(Modifier.size(8.dp))
-                    Text(stringResource(R.string.camera_processing))
+                modifier = Modifier.fillMaxWidth(),
+                leadingContent = if (busy) {
+                    {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 3.dp,
+                            color = SmartCessTheme.extra.onOps,
+                        )
+                    }
                 } else {
-                    Text(stringResource(R.string.camera_capture))
-                }
-            }
+                    null
+                },
+            )
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(
+            SmartCessSecondaryButton(
+                text = stringResource(
+                    if (uiState.voiceCapture) R.string.camera_voice_capture_on
+                    else R.string.camera_voice_capture_off,
+                ),
                 onClick = {
                     if (hasMic) {
                         viewModel.setVoiceCaptureEnabled(!uiState.voiceCapture)
@@ -227,29 +239,17 @@ private fun CameraPreviewContent(
                     }
                 },
                 enabled = uiState.phase == CameraPhase.FRAMING,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp),
-            ) {
-                Text(
-                    stringResource(
-                        if (uiState.voiceCapture) R.string.camera_voice_capture_on
-                        else R.string.camera_voice_capture_off,
-                    ),
-                )
-            }
+                modifier = Modifier.fillMaxWidth(),
+            )
             if (uiState.voiceCapture) {
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = stringResource(R.string.camera_voice_listening),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = Color.White,
                     modifier = Modifier
                         .semantics { liveRegion = LiveRegionMode.Polite }
-                        .background(
-                            androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.55f),
-                            RoundedCornerShape(8.dp),
-                        )
+                        .background(Color(0xFF0B0F0E), RoundedCornerShape(8.dp))
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                 )
             } else {
@@ -257,12 +257,9 @@ private fun CameraPreviewContent(
                 Text(
                     text = stringResource(R.string.camera_voice_hint),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = Color.White,
                     modifier = Modifier
-                        .background(
-                            androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.55f),
-                            RoundedCornerShape(8.dp),
-                        )
+                        .background(Color(0xFF0B0F0E), RoundedCornerShape(8.dp))
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                 )
             }
@@ -270,22 +267,43 @@ private fun CameraPreviewContent(
     }
 }
 
+/**
+ * Header on a solid console strip: white stays verifiable (~19:1) instead of
+ * floating on raw video, and the back action gets the tonal circle.
+ */
 @Composable
 private fun RowHeader(onBack: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = stringResource(R.string.action_back),
-                tint = MaterialTheme.colorScheme.onPrimary,
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFF0B0F0E),
+        contentColor = Color.White,
+    ) {
+        Row(
+            modifier = Modifier.padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(
+                        MaterialTheme.colorScheme.surfaceContainerHighest,
+                        CircleShape,
+                    ),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.action_back),
+                    tint = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            Text(
+                text = stringResource(R.string.camera_title),
+                style = MaterialTheme.typography.headlineLarge,
+                modifier = Modifier.semantics { heading() },
             )
         }
-        Text(
-            text = stringResource(R.string.camera_title),
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.semantics { heading() },
-        )
     }
 }
 
@@ -319,9 +337,11 @@ private fun ErrorBanner(text: String, onRescan: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(text = text, style = MaterialTheme.typography.bodyLarge)
-        Button(onClick = onRescan, modifier = Modifier.heightIn(min = 48.dp)) {
-            Text(stringResource(R.string.action_retry))
-        }
+        SmartCessPrimaryButton(
+            text = stringResource(R.string.action_retry),
+            onClick = onRescan,
+            modifier = Modifier.heightIn(min = 48.dp),
+        )
     }
 }
 
@@ -359,7 +379,8 @@ private fun CameraPermissionDenied(
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
         )
         if (permanentlyDenied) {
-            Button(
+            SmartCessPrimaryButton(
+                text = stringResource(R.string.camera_open_settings),
                 onClick = {
                     val intent = Intent(
                         Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
@@ -368,16 +389,18 @@ private fun CameraPermissionDenied(
                     context.startActivity(intent)
                 },
                 modifier = Modifier.heightIn(min = 48.dp),
-            ) {
-                Text(stringResource(R.string.camera_open_settings))
-            }
+            )
         } else {
-            Button(onClick = onAskAgain, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text(stringResource(R.string.camera_grant_permission))
-            }
+            SmartCessPrimaryButton(
+                text = stringResource(R.string.camera_grant_permission),
+                onClick = onAskAgain,
+                modifier = Modifier.heightIn(min = 48.dp),
+            )
         }
-        OutlinedButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
-            Text(stringResource(R.string.action_back))
-        }
+        SmartCessSecondaryButton(
+            text = stringResource(R.string.action_back),
+            onClick = onBack,
+            modifier = Modifier.heightIn(min = 48.dp),
+        )
     }
 }

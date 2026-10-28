@@ -66,8 +66,8 @@ fun OpsCommandBar(
             .semantics { contentDescription?.let { desc -> this.contentDescription = desc } },
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             icon?.let {
@@ -122,7 +122,7 @@ fun OpsHeroAction(
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             icon?.let {
@@ -158,6 +158,7 @@ fun OpsButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     contentDescription: String? = null,
+    leadingContent: @Composable (() -> Unit)? = null,
 ) {
     val extra = SmartCessTheme.extra
     val interaction = remember { MutableInteractionSource() }
@@ -177,13 +178,23 @@ fun OpsButton(
             .opsFocusRing(focused)
             .semantics { contentDescription?.let { desc -> this.contentDescription = desc } },
     ) {
-        Text(text, style = MaterialTheme.typography.titleMedium)
+        leadingContent?.let {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                it()
+                Text(text, style = MaterialTheme.typography.titleMedium)
+            }
+        } ?: Text(text, style = MaterialTheme.typography.titleMedium)
     }
 }
 
 /**
  * Ops queue row: fixed anatomy (mono index + title + meta + mono status word).
- * The status is always words, never color alone.
+ * The status is always words, never color alone. TalkBack hears one merged
+ * announcement — the full sentence, plus the status word only when it adds
+ * information the sentence lacks — so title/meta never double-speak.
  */
 @Composable
 fun OpsQueueRow(
@@ -194,11 +205,19 @@ fun OpsQueueRow(
     statusColor: Color,
     modifier: Modifier = Modifier,
 ) {
+    val announcement = remember(meta, status) {
+        if (status.isNotBlank() && !meta.contains(status, ignoreCase = true)) {
+            "$meta. $status"
+        } else {
+            meta
+        }
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 64.dp)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .semantics(mergeDescendants = true) { contentDescription = announcement }
+            .padding(horizontal = 12.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -209,7 +228,7 @@ fun OpsQueueRow(
         )
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             Text(
@@ -220,6 +239,7 @@ fun OpsQueueRow(
         }
         Text(
             text = status,
+            maxLines = 2,
             style = MaterialTheme.typography.bodyMedium.copy(
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
@@ -249,7 +269,7 @@ fun OpsNotice(
         modifier = modifier.fillMaxWidth().heightIn(min = 64.dp),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

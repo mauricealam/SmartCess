@@ -4,7 +4,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -18,7 +21,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.smartcess.app.R
 
-/** Spec More bottom sheet: Bills / Documents / Appointments / Routines / Settings. */
+/**
+ * Spec More bottom sheet, chunked 3 + 2 + 1: Review (Bills, Documents,
+ * Email), Plan (Appointments, Routines), Settings as a separated utility
+ * footer. Recents-first was rejected: reordering destinations would break
+ * screen-reader spatial memory.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SmartCessMoreSheet(
@@ -58,7 +66,10 @@ fun MoreSheetContent(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxWidth().padding(16.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
@@ -68,6 +79,7 @@ fun MoreSheetContent(
                 .padding(bottom = 8.dp)
                 .semantics { heading() },
         )
+        MoreSectionHead(text = stringResource(R.string.more_section_review))
         SmartCessListItem(
             title = stringResource(R.string.more_bills),
             contentDescription = stringResource(R.string.more_bills),
@@ -79,6 +91,15 @@ fun MoreSheetContent(
             onClick = onDocuments,
         )
         SmartCessListItem(
+            title = stringResource(R.string.more_email),
+            contentDescription = stringResource(R.string.more_email),
+            onClick = onEmail,
+        )
+        MoreSectionHead(
+            text = stringResource(R.string.more_section_plan),
+            modifier = Modifier.padding(top = 12.dp),
+        )
+        SmartCessListItem(
             title = stringResource(R.string.more_appointments),
             contentDescription = stringResource(R.string.more_appointments),
             onClick = onAppointments,
@@ -88,10 +109,9 @@ fun MoreSheetContent(
             contentDescription = stringResource(R.string.more_routines),
             onClick = onRoutines,
         )
-        SmartCessListItem(
-            title = stringResource(R.string.more_email),
-            contentDescription = stringResource(R.string.more_email),
-            onClick = onEmail,
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.outlineVariant,
+            modifier = Modifier.padding(vertical = 12.dp),
         )
         SmartCessListItem(
             title = stringResource(R.string.more_settings),
@@ -99,4 +119,19 @@ fun MoreSheetContent(
             onClick = onSettings,
         )
     }
+}
+
+/** Chunk heading: doubles as a TalkBack heading-navigation target. */
+@Composable
+private fun MoreSectionHead(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleMedium,
+        modifier = modifier
+            .padding(horizontal = 8.dp)
+            .semantics { heading() },
+    )
 }

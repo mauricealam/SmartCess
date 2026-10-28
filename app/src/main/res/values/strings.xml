@@ -6,8 +6,10 @@
     <!-- Home (spec: Talk, Today card, Scan Bill primary, More sheet, Settings) -->
     <string name="home_talk" translatable="true">Talk</string>
     <string name="home_talk_desc" translatable="true">Talk to SmartCess. Double tap and speak your request.</string>
+    <string name="home_talk_hint" translatable="true">Try: “What bills are due this week?”</string>
     <string name="home_today" translatable="true">Today</string>
     <string name="home_today_see_all" translatable="true">See all</string>
+    <string name="home_today_refresh" translatable="true">Refresh</string>
     <string name="home_scan_bill" translatable="true">Scan bill</string>
     <string name="home_scan_bill_desc" translatable="true">Scan a bill. Opens the guided camera.</string>
     <string name="home_more" translatable="true">More</string>
@@ -124,6 +126,7 @@
     <!-- Home -->
     <string name="home_header_desc" translatable="true">SmartCess home</string>
     <string name="home_today_empty" translatable="true">Nothing urgent. Enjoy your day.</string>
+    <string name="home_today_error" translatable="true">Couldn’t load your briefing. Try again.</string>
     <string name="home_today_more" translatable="true">%1$d more in your briefing</string>
     <string name="home_today_overdue" translatable="true">%1$s bill overdue</string>
     <string name="home_today_due_soon" translatable="true">%1$s due %2$s</string>
@@ -139,6 +142,8 @@
 
     <!-- More sheet -->
     <string name="more_title" translatable="true">More</string>
+    <string name="more_section_review" translatable="true">Review</string>
+    <string name="more_section_plan" translatable="true">Plan</string>
     <string name="more_dismiss_desc" translatable="true">Close more options</string>
 
     <!-- Briefing -->

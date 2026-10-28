@@ -94,27 +94,85 @@ internal val DarkScheme = darkColorScheme(
     surfaceTint = SmartCessDarkTokens.Primary,
 )
 
-/** Maximum-contrast overrides for the high-contrast preference. */
-private val LightHighContrastScheme = lightColorScheme(
+/**
+ * Maximum-contrast schemes for the high-contrast preference. Fully specified
+ * like the standard schemes: a skeletal override would leak M3 baseline
+ * defaults into exactly the mode that must guarantee contrast. Ops accents
+ * stay on the Day/Night pairs (already AA-or-better on these grounds, locked
+ * by opsPairs_meetAA); only the scheme roles go pure black/white.
+ */
+internal val LightHighContrastScheme = lightColorScheme(
     primary = Color.Black,
     onPrimary = Color.White,
+    primaryContainer = Color.Black,
+    onPrimaryContainer = Color.White,
+    secondary = Color.Black,
+    onSecondary = Color.White,
+    secondaryContainer = Color.Black,
+    onSecondaryContainer = Color.White,
+    tertiary = Color.Black,
+    onTertiary = Color.White,
+    tertiaryContainer = Color.Black,
+    onTertiaryContainer = Color.White,
     surface = Color.White,
     onSurface = Color.Black,
+    surfaceVariant = Color.White,
+    onSurfaceVariant = Color.Black,
+    surfaceContainerLowest = Color.White,
+    surfaceContainerLow = Color.White,
+    surfaceContainer = Color.White,
+    surfaceContainerHigh = Color.White,
+    surfaceContainerHighest = Color.White,
     background = Color.White,
     onBackground = Color.Black,
     error = Color(0xFF7F1D1D),
     onError = Color.White,
+    errorContainer = Color(0xFF7F1D1D),
+    onErrorContainer = Color.White,
+    outline = Color.Black,
+    outlineVariant = Color.Black,
+    scrim = Color.Black,
+    inverseSurface = Color.Black,
+    inverseOnSurface = Color.White,
+    inversePrimary = Color.White,
+    surfaceTint = Color.Black,
 )
 
-private val DarkHighContrastScheme = darkColorScheme(
+internal val DarkHighContrastScheme = darkColorScheme(
     primary = Color.White,
     onPrimary = Color.Black,
+    primaryContainer = Color.White,
+    onPrimaryContainer = Color.Black,
+    secondary = Color.White,
+    onSecondary = Color.Black,
+    secondaryContainer = Color.White,
+    onSecondaryContainer = Color.Black,
+    tertiary = Color.White,
+    onTertiary = Color.Black,
+    tertiaryContainer = Color.White,
+    onTertiaryContainer = Color.Black,
     surface = Color.Black,
     onSurface = Color.White,
+    surfaceVariant = Color.Black,
+    onSurfaceVariant = Color.White,
+    surfaceContainerLowest = Color.Black,
+    surfaceContainerLow = Color.Black,
+    surfaceContainer = Color.Black,
+    surfaceContainerHigh = Color.Black,
+    surfaceContainerHighest = Color.Black,
     background = Color.Black,
     onBackground = Color.White,
     error = Color(0xFFFFDAD6),
     onError = Color.Black,
+    errorContainer = Color(0xFFFFDAD6),
+    onErrorContainer = Color.Black,
+    outline = Color.White,
+    outlineVariant = Color.White,
+    scrim = Color.Black,
+    inverseSurface = Color.White,
+    inverseOnSurface = Color.Black,
+    inversePrimary = Color.Black,
+    surfaceTint = Color.White,
 )
 
 /** Extra tokens beyond the Material3 palette (status + focus + ops accent). */
