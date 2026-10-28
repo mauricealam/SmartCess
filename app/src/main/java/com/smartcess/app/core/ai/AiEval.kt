@@ -3,17 +3,7 @@ package com.smartcess.app.core.ai
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** AI eval hooks: thresholds per spec; samples recorded for the eval suites. */
-object EvalThresholds {
-    const val FIELDS = 0.90
-    const val DUE_DATE = 0.95
-    const val SUMMARY_USEFUL = 0.80
-    const val INTENT = 0.95
-    const val SCHEMA_VALID = 1.0
-    const val HALLUCINATIONS = 0
-    const val FRAMING = 0.90
-}
-
+/** AI eval hook: samples recorded for the eval suites (M7: unenforced threshold constants removed). */
 data class EvalSample(
     val feature: String,
     val promptVersion: String,

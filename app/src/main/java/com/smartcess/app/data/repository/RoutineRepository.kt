@@ -26,12 +26,12 @@ class RoutineRepository @Inject constructor(private val dao: RoutineDao) {
         return SaveOutcome(dao.upsert(normalized), result)
     }
 
-    /** Marks complete and rolls next-due forward 24h for daily rules; others keep manual reschedule. */
+    /** Marks complete and rolls next-due 24h forward from now for daily rules; stale dues restart from now, others keep manual reschedule. */
     suspend fun complete(id: Long) {
         val routine = dao.getById(id) ?: return
         val now = System.currentTimeMillis()
         val nextDue = if (routine.scheduleRule.startsWith("DAILY")) {
-            (routine.nextDueMillis ?: now) + 24L * 60 * 60 * 1000
+            (routine.nextDueMillis ?: now).coerceAtLeast(now) + 24L * 60 * 60 * 1000
         } else {
             routine.nextDueMillis
         }

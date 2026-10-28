@@ -4,17 +4,12 @@ import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Upsert
 import com.smartcess.app.data.local.entity.ReminderEntity
-import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ReminderDao {
     @Upsert suspend fun upsert(reminder: ReminderEntity): Long
-    @Query("DELETE FROM reminders WHERE id = :id") suspend fun deleteById(id: Long)
     @Query("DELETE FROM reminders") suspend fun deleteAll()
     @Query("SELECT * FROM reminders WHERE id = :id") suspend fun getById(id: Long): ReminderEntity?
-
-    @Query("SELECT * FROM reminders WHERE status = 'SCHEDULED' ORDER BY triggerAtMillis ASC")
-    fun observeScheduled(): Flow<List<ReminderEntity>>
 
     @Query("SELECT * FROM reminders WHERE status = 'SCHEDULED' ORDER BY triggerAtMillis ASC")
     suspend fun scheduled(): List<ReminderEntity>

@@ -32,12 +32,3 @@ class AiConfig @Inject constructor() {
     val timeoutMaxRetries: Int = 1
 }
 
-/** Non-essential AI stays off by default; SAM/Image are post-MVP. */
-data class AiFeatureFlags(
-    val nonEssentialAiEnabled: Boolean = false,
-    val samEnabled: Boolean = false,
-    val imageGenEnabled: Boolean = false,
-) {
-    fun isImageAllowed(): Boolean = nonEssentialAiEnabled && imageGenEnabled
-    fun isSamAllowed(): Boolean = nonEssentialAiEnabled && samEnabled
-}

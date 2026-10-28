@@ -56,6 +56,7 @@ class TravelReminderWorker(context: Context, params: WorkerParameters) : Corouti
             ("travel-$id").hashCode(),
             "Time to leave: ${appointment.title}",
             "Your appointment$where is coming up.",
+            appointmentId = id,
         )
         return Result.success()
     }

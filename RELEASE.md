@@ -93,13 +93,13 @@ Not yet implemented: briefing caching, voice debounce, list pagination.
 
 | Risk | Mitigation |
 |---|---|
-| Meta Model API URL/protocol unspecified (`.invalid` placeholders) | Fail-closed offline mode; override via `local.properties`; swap in real endpoints + frame format when documented |
+| Meta Model API unreachable / key absent | Fail-closed offline mode with labelled drafts; official endpoints + realtime STT protocol verified against dev.meta.ai docs; overrides via env |
 | Invalid AI JSON | Retry once, then safe default + warning; schemas 100% validated; hallucinations = release blocker |
 | Low-confidence extraction | 0.70 gate forces mandatory review + warning banner |
 | No network / no key | Full on-device framing + OCR + TTS, labelled "Offline mode. Please review." |
 | Accidental side effects | Approval-gated tools; banned actions (pay/email-submit/call) have no code path |
 | Medical-advice / crisis content | Refusal + supportive-crisis response via ContentSafety on every AI output |
-| Secret leakage | Keys via `local.properties`/env/EncryptedSharedPreferences; never logged; CI hermetic |
+| Secret leakage | Keys via process env/`local.properties`/`.env` at build time (debug only); release forced keyless; never logged; CI hermetic; debug APKs embed the key — do not distribute them |
 | Regression | Versioned prompts (v1.1.0) + changelog; AI-eval thresholds block release |
 
 ## User feedback hooks

@@ -18,7 +18,8 @@ class InvalidAiResponseException : AiException("The AI answer was unclear. Pleas
 /** Client-side rate limit: max concurrent calls + per-minute budget. */
 @Singleton
 class RateLimiter @Inject constructor() {
-    private val semaphore = Semaphore(2)
+    @Volatile
+    private var semaphore = Semaphore(2)
     private val mutex = Mutex()
     private val windowStart = mutableListOf<Long>()
     private var maxPerMinute = 20
@@ -38,7 +39,12 @@ class RateLimiter @Inject constructor() {
         }
     }
 
+    /**
+     * Applies both limits. Replacing the semaphore only affects calls that
+     * acquire after this returns; in-flight calls keep their permit.
+     */
     fun configure(maxConcurrent: Int, perMinute: Int) {
+        semaphore = Semaphore(maxConcurrent.coerceAtLeast(1))
         maxPerMinute = perMinute
     }
 }

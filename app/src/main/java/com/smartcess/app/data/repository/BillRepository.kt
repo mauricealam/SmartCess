@@ -22,7 +22,6 @@ class BillRepository @Inject constructor(private val dao: BillDao) {
         return dao.dueBetween(today.toString(), today.plusDays(days.toLong()).toString())
     }
 
-    suspend fun byProvider(provider: String): List<BillEntity> = dao.byProvider(provider)
     suspend fun previousFor(provider: String, excludeId: Long): BillEntity? =
         dao.previousFor(provider, excludeId)
 

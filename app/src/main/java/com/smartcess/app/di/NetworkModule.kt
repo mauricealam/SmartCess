@@ -39,7 +39,7 @@ object NetworkModule {
      */
     @Provides
     @Singleton
-    fun provideOkHttp(keys: ApiKeyProvider, config: AiConfig): OkHttpClient =
+    fun provideOkHttp(keys: ApiKeyProvider): OkHttpClient =
         OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(50, TimeUnit.SECONDS)

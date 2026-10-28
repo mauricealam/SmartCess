@@ -5,7 +5,14 @@ import com.smartcess.app.core.serialization.SmartCessJson
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 
-/** Room converters for list columns, serialized as JSON. */
+/**
+ * Room converters for list columns, serialized as JSON.
+ *
+ * M8: reads fail OPEN to emptyList. Only a corrupt row (impossible through
+ * this app's writers, which always emit valid JSON) can trigger the fallback,
+ * and crashing the read would be worse than an empty list. Both paths pinned
+ * by ConvertersTest.
+ */
 class Converters {
 
     private val json = SmartCessJson.instance

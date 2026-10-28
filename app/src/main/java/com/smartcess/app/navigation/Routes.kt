@@ -4,8 +4,6 @@ package com.smartcess.app.navigation
 object Routes {
     const val ONBOARDING = "onboarding"
     const val HOME = "home"
-    /** Kept for back-compat; Home now opens More as a bottom sheet instead. */
-    const val MORE = "more"
     const val DOCUMENTS = "documents"
     const val APPOINTMENTS = "appointments"
     const val ROUTINES = "routines"

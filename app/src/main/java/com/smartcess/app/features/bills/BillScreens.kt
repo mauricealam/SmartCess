@@ -42,6 +42,9 @@ import com.smartcess.app.ui.components.SmartCessTextField
 import com.smartcess.app.ui.components.SmartCessTopBar
 import com.smartcess.app.ui.format.SmartCessFormat
 
+/** Days-before-due choices for bill reminders (M3). */
+private val REMIND_DAY_OPTIONS = listOf(0, 1, 3, 7, 14)
+
 /** Bills list: current + archived, TalkBack-friendly rows. */
 @Composable
 fun BillsScreen(
@@ -115,6 +118,12 @@ fun BillsScreen(
                 }
             }
         }
+        // M2: scanning stays reachable when bills already exist.
+        SmartCessSecondaryButton(
+            text = stringResource(R.string.bills_scan_first),
+            onClick = onScan,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
@@ -345,7 +354,23 @@ fun BillResultScreen(
             confirmText = stringResource(R.string.action_remind),
             onConfirm = { showRemindOptions = false; viewModel.confirmReminder(remindDays) },
             onDismiss = { showRemindOptions = false },
-        )
+        ) {
+            // M3: days-before picker (preselected from Settings default).
+            REMIND_DAY_OPTIONS.forEach { days ->
+                SmartCessListItem(
+                    title = pluralStringResource(R.plurals.bill_remind_days, days, days),
+                    onClick = { remindDays = days },
+                    trailing = {
+                        if (remindDays == days) {
+                            Text(
+                                text = stringResource(R.string.option_selected),
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
+                    },
+                )
+            }
+        }
     }
     if (showDiscardConfirm) {
         SmartCessConfirmDialog(

@@ -11,6 +11,7 @@ import com.smartcess.app.data.local.dao.RoutineDao
 import com.smartcess.app.data.local.dao.UserPreferencesDao
 import com.smartcess.app.data.local.entity.AppointmentEntity
 import com.smartcess.app.data.local.entity.BillEntity
+import com.smartcess.app.data.local.entity.ConversationTurnEntity
 import com.smartcess.app.data.local.entity.DocumentEntity
 import com.smartcess.app.data.local.entity.EmailItemEntity
 import com.smartcess.app.data.local.entity.ReminderEntity
@@ -31,6 +32,8 @@ data class SmartCessExport(
     val emailItems: List<EmailItemEntity>,
     val appointments: List<AppointmentEntity>,
     val routines: List<RoutineEntity>,
+    /** Voice history (H2). Default keeps older exports decodable. */
+    val turns: List<ConversationTurnEntity> = emptyList(),
 )
 
 @Singleton
@@ -54,6 +57,12 @@ class PrivacyManager @Inject constructor(
             } else {
                 value
             }
+
+        /** Voice-history CSV rows (raw cells; [appendSection] escapes them). */
+        fun turnCsvRows(turns: List<ConversationTurnEntity>): List<List<String>> =
+            turns.map {
+                listOf(it.role, it.text, it.intent ?: "", Instant.ofEpochMilli(it.createdAt).toString())
+            }
     }
 
     private val json = SmartCessJson.instance
@@ -69,6 +78,7 @@ class PrivacyManager @Inject constructor(
             emailItems = emails.all(),
             appointments = appointments.all(),
             routines = routines.all(),
+            turns = turns.all(),
         )
         return json.encodeToString(SmartCessExport.serializer(), export)
     }
@@ -121,6 +131,11 @@ class PrivacyManager @Inject constructor(
                 listOf(it.title, it.kind, it.scheduleRule, it.streakCount.toString())
             },
         )
+        appendSection(
+            "turns",
+            listOf("role", "text", "intent", "createdAt"),
+            turnCsvRows(turns.all()),
+        )
     }
 
     private fun StringBuilder.appendSection(name: String, header: List<String>, rows: List<List<String>>) {
@@ -141,8 +156,4 @@ class PrivacyManager @Inject constructor(
         prefs.deleteAll()
     }
 
-    /** Validates an export payload version before a future import/migration path. */
-    fun checkImportVersion(payload: String): Boolean = runCatching {
-        json.decodeFromString(SmartCessExport.serializer(), payload).version <= CURRENT_EXPORT_VERSION
-    }.getOrDefault(false)
 }

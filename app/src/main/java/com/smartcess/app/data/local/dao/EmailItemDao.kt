@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface EmailItemDao {
     @Upsert suspend fun upsert(item: EmailItemEntity): Long
-    @Query("DELETE FROM email_items WHERE id = :id") suspend fun deleteById(id: Long)
     @Query("DELETE FROM email_items") suspend fun deleteAll()
     @Query("SELECT * FROM email_items WHERE id = :id") suspend fun getById(id: Long): EmailItemEntity?
 

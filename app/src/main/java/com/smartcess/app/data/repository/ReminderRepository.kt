@@ -2,7 +2,6 @@ package com.smartcess.app.data.repository
 
 import com.smartcess.app.data.local.dao.ReminderDao
 import com.smartcess.app.data.local.entity.ReminderEntity
-import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -10,7 +9,6 @@ import javax.inject.Singleton
 @Singleton
 class ReminderRepository @Inject constructor(private val dao: ReminderDao) {
 
-    fun observeScheduled(): Flow<List<ReminderEntity>> = dao.observeScheduled()
     suspend fun scheduled(): List<ReminderEntity> = dao.scheduled()
     suspend fun getById(id: Long): ReminderEntity? = dao.getById(id)
     suspend fun scheduledFor(kind: String, referenceId: Long): List<ReminderEntity> =
@@ -50,6 +48,5 @@ class ReminderRepository @Inject constructor(private val dao: ReminderDao) {
     }
     suspend fun complete(id: Long) = dao.setStatus(id, ReminderEntity.STATUS_COMPLETED)
     suspend fun cancel(id: Long) = dao.setStatus(id, ReminderEntity.STATUS_CANCELLED)
-    suspend fun delete(id: Long) = dao.deleteById(id)
     suspend fun deleteAll() = dao.deleteAll()
 }

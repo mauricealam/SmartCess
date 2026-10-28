@@ -125,9 +125,6 @@ fun validateRoutine(title: String, scheduleRule: String): ValidationResult {
     return ValidationResult(issues)
 }
 
-fun normalizeUrgency(value: String?): String =
-    value?.lowercase()?.takeIf { it in EMAIL_URGENCIES } ?: "normal"
-
 fun isValidIsoDate(value: String?): Boolean {
     if (value.isNullOrBlank()) return false
     return try {

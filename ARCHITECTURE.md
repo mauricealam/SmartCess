@@ -50,7 +50,7 @@ flowchart TB
 
     subgraph STORE["Persistence"]
         ROOM[("Room v1<br/>Bill · Reminder · Document<br/>EmailItem · Appointment<br/>Routine · ConversationTurn<br/>UserPreferences")]
-        PREFS[("EncryptedSharedPreferences<br/>API-key override")]
+        PREFS[("EncryptedSharedPreferences<br/>API-key slot (reserved)")]
         WORK["WorkManager<br/>ReminderWorker ·<br/>TravelReminderWorker"]
     end
 
@@ -100,19 +100,24 @@ due<7d, appointments today/tomorrow, urgent email, doc deadlines, routines due �
 Spark composes spoken summary → `Speaker` reads it; offline falls back to cached
 data with the offline label.
 
-**Prepare–confirm–act (safety):** read-only tools (`get_today_data`,
-`get_bill_by_provider/id`) run automatically; all writes (`save_bill`,
-`create/cancel_reminder`, `archive_bill`, `save_document_summary`,
-`create_appointment/routine`, `complete_routine`) require explicit user
-confirmation. Banned actions — pay, send email, submit forms, navigate, call —
-have no tool path at all.
+**Prepare–confirm–act (safety):** every committing action (save, schedule,
+calendar, archive, delete) asks through a confirmation dialog first. The tool
+definitions in `ToolRegistry` are tested data for the agent roadmap; no
+tool-calling loop is wired yet, so nothing executes tools automatically.
+Banned actions — pay, send email, submit forms, navigate, call — have no code
+path at all.
 
 ## Configuration
 
-API key resolution order: EncryptedSharedPreferences override (Settings) →
-`BuildConfig.META_API_KEY` (from `local.properties` or `META_API_KEY` env) →
-absent (offline mode). No hard-coded keys. Endpoints default to `.invalid`
-placeholders that fail closed offline until real Meta Model API URLs are set.
+API key resolution order: EncryptedSharedPreferences entry (no in-app UI
+writes it today; reserved) → `BuildConfig.META_API_KEY` (process env →
+`local.properties` → root `.env`, first non-blank wins) → absent (offline
+mode). No hard-coded keys. Debug builds take the key from the local
+environment; release builds force the key empty and run offline-capable.
+Endpoints default to the official Meta Model API URLs
+(`https://api.meta.ai/v1/`, `wss://api.meta.ai/v1/asr/realtime`), overridable
+via env. With no key or network, every AI entry degrades to labelled offline
+drafts/banners; on-device framing, OCR, and TTS keep working.
 
 ## Decisions & trade-offs
 

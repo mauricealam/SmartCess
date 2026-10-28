@@ -73,7 +73,8 @@ android {
                 "proguard-rules.pro"
             )
             // Distributable APKs are always keyless: release ignores every key
-            // source. Real keys reach release builds only via in-app Settings.
+            // source. No in-app key entry exists, so release builds run
+            // AI-degraded until a secure config story exists.
             buildConfigField("String", "META_API_KEY", "\"\"")
         }
         debug {

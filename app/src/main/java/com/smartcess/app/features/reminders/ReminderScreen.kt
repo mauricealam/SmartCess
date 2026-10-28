@@ -48,6 +48,7 @@ fun ReminderScreen(
     val state by viewModel.state.collectAsState()
     var showConfirm by remember { mutableStateOf(false) }
     var showCancel by remember { mutableStateOf(false) }
+    var showLeadConfirm by remember { mutableStateOf(false) }
     var selectedLead by remember { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(reminderId) { viewModel.load(reminderId) }
@@ -123,7 +124,7 @@ fun ReminderScreen(
             }
             SmartCessSecondaryButton(
                 text = stringResource(R.string.action_confirm),
-                onClick = { selectedLead?.let { viewModel.changeLeadTime(it) } },
+                onClick = { if (selectedLead != null) showLeadConfirm = true },
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -164,6 +165,18 @@ fun ReminderScreen(
             confirmText = stringResource(R.string.action_delete),
             onConfirm = { showCancel = false; viewModel.confirmCancel(onBack) },
             onDismiss = { showCancel = false },
+        )
+    }
+    val leadDays = selectedLead
+    if (showLeadConfirm && reminder != null && leadDays != null) {
+        SmartCessConfirmDialog(
+            title = stringResource(R.string.reminder_lead_confirm_title),
+            message = stringResource(
+                R.string.reminder_lead_confirm_message,
+                pluralStringResource(R.plurals.reminder_lead_days, leadDays, leadDays),
+            ),
+            onConfirm = { showLeadConfirm = false; viewModel.changeLeadTime(leadDays) },
+            onDismiss = { showLeadConfirm = false },
         )
     }
 }

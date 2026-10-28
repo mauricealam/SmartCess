@@ -19,6 +19,8 @@ class NotificationHelper @Inject constructor(
 ) {
     companion object {
         const val CHANNEL_REMINDERS = "smartcess_reminders"
+        /** Keeps travel-action request codes distinct from reminder-action ones. */
+        private const val TRAVEL_REQUEST_OFFSET = 1_000_000
     }
 
     fun ensureChannel() {
@@ -33,11 +35,25 @@ class NotificationHelper @Inject constructor(
     /**
      * Shows a reminder notification; spoken aloud by TalkBack when focused.
      * Fired reminders carry Complete + Snooze actions (spec: SENT -> COMPLETED|SNOOZED).
+     * Content taps deep-link to the reminder or appointment detail (C2/M4/M10);
+     * travel nudges carry Done + Snooze actions instead of reminder actions.
      */
-    fun showReminder(notificationId: Int, title: String, detail: String?, reminderId: Long? = null) {
+    fun showReminder(
+        notificationId: Int,
+        title: String,
+        detail: String?,
+        reminderId: Long? = null,
+        appointmentId: Long? = null,
+    ) {
         ensureChannel()
         val intent = Intent(context, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        if (reminderId != null && reminderId > 0) {
+            intent.putExtra(ReminderActionReceiver.EXTRA_REMINDER_ID, reminderId)
+        }
+        if (appointmentId != null && appointmentId > 0) {
+            intent.putExtra(ReminderActionReceiver.EXTRA_APPOINTMENT_ID, appointmentId)
+        }
         val pending = PendingIntent.getActivity(
             context, notificationId, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
@@ -52,6 +68,9 @@ class NotificationHelper @Inject constructor(
         if (reminderId != null) {
             builder.addAction(completeAction(notificationId, reminderId))
             builder.addAction(snoozeAction(notificationId, reminderId))
+        } else if (appointmentId != null) {
+            builder.addAction(travelDoneAction(notificationId, appointmentId))
+            builder.addAction(travelSnoozeAction(notificationId, appointmentId))
         }
         try {
             NotificationManagerCompat.from(context).notify(notificationId, builder.build())
@@ -83,6 +102,36 @@ class NotificationHelper @Inject constructor(
         }
         val pending = PendingIntent.getBroadcast(
             context, notificationId * 2 + 1, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        return NotificationCompat.Action.Builder(
+            0, context.getString(R.string.notif_snooze), pending,
+        ).build()
+    }
+
+    private fun travelDoneAction(notificationId: Int, appointmentId: Long): NotificationCompat.Action {
+        val intent = Intent(context, ReminderActionReceiver::class.java).apply {
+            action = ReminderActionReceiver.ACTION_TRAVEL_DONE
+            putExtra(ReminderActionReceiver.EXTRA_APPOINTMENT_ID, appointmentId)
+            putExtra(ReminderActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+        }
+        val pending = PendingIntent.getBroadcast(
+            context, notificationId * 2 + TRAVEL_REQUEST_OFFSET, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        return NotificationCompat.Action.Builder(
+            0, context.getString(R.string.notif_complete), pending,
+        ).build()
+    }
+
+    private fun travelSnoozeAction(notificationId: Int, appointmentId: Long): NotificationCompat.Action {
+        val intent = Intent(context, ReminderActionReceiver::class.java).apply {
+            action = ReminderActionReceiver.ACTION_TRAVEL_SNOOZE
+            putExtra(ReminderActionReceiver.EXTRA_APPOINTMENT_ID, appointmentId)
+            putExtra(ReminderActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+        }
+        val pending = PendingIntent.getBroadcast(
+            context, notificationId * 2 + TRAVEL_REQUEST_OFFSET + 1, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         return NotificationCompat.Action.Builder(

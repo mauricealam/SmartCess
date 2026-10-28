@@ -51,9 +51,12 @@ and Muse Spark (structured-output reasoning). See [ARCHITECTURE.md](ARCHITECTURE
    # META_API_BASE_URL=https://...
    # META_STT_URL=wss://...
    ```
-   You can also enter or override the key inside the app: **Settings → API key**
-   (stored in EncryptedSharedPreferences; app-supplied key wins over BuildConfig).
-   CI builds keyless, and release builds never embed a key.
+   There is no in-app key entry: the key reaches debug builds only from the
+   local environment at build time (process env → `local.properties` →
+   root `.env`). CI builds keyless, and release builds force the key empty
+   and run offline-capable (framing, OCR, TTS, local data, reminders).
+   (The EncryptedSharedPreferences key slot exists but no UI writes it yet.)
+   Do not distribute debug APKs: they embed the key in plaintext.
 3. Open the project in Android Studio and let Gradle sync, or build from the CLI:
    ```sh
    ./gradlew :app:assembleDebug

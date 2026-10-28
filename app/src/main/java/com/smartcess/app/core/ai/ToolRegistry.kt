@@ -6,9 +6,11 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * Tool calling: read-only tools run without approval; writes need explicit
- * confirmation via [ApprovalGate]. Prepare-confirm-act: reads/summaries auto,
- * saves/reminders/calendar only after confirmation. Banned actions can never run.
+ * Tool definitions + JSON-schema formats. The schema formats drive structured
+ * output today; the tool list is tested data for the agent roadmap (no caller
+ * yet, so no executor/approval-gate wiring exists). Reads run without approval;
+ * saves/reminders/calendar will need explicit confirmation when wired.
+ * Banned actions can never run.
  */
 data class ToolDefinition(
     val name: String,
@@ -16,15 +18,6 @@ data class ToolDefinition(
     val parameters: JsonObject,
     val requiresApproval: Boolean,
 )
-
-interface ApprovalGate {
-    /** Returns true only after explicit user confirmation of this exact call. */
-    suspend fun requestApproval(toolName: String, argumentsJson: String): Boolean
-}
-
-interface ToolExecutor {
-    suspend fun execute(toolName: String, argumentsJson: String): String
-}
 
 object ToolRegistry {
     /** Actions the app must never perform automatically (also blocked from tools). */

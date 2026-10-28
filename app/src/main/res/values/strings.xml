@@ -397,6 +397,8 @@
         <item quantity="other">%1$d days before</item>
     </plurals>
     <string name="reminder_lead_updated" translatable="true">Reminder time updated.</string>
+    <string name="reminder_lead_confirm_title" translatable="true">Change reminder time?</string>
+    <string name="reminder_lead_confirm_message" translatable="true">Remind you %1$s before the due date?</string>
     <string name="notif_snooze" translatable="true">Snooze 10 min</string>
     <string name="notif_complete" translatable="true">Mark done</string>
     <string name="routine_missed" translatable="true">Missed — still needs doing</string>

@@ -1,5 +1,6 @@
 package com.smartcess.app
 
+import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -10,10 +11,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
+import com.smartcess.app.core.work.ReminderActionReceiver
 import com.smartcess.app.data.repository.PreferencesRepository
 import com.smartcess.app.navigation.SmartCessNavGraph
+import com.smartcess.app.navigation.deepLinkRoute
 import com.smartcess.app.ui.theme.SmartCessTheme
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.compose.ui.Modifier
@@ -27,6 +31,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var prefs: PreferencesRepository
 
+    /** Pending notification deep-link route; consumed once by the nav graph. */
+    private val pendingDeepLink = mutableStateOf<String?>(null)
+
     private companion object {
         /** Minimum splash visibility so the brand reveal reads (in budget). */
         const val SPLASH_MIN_MILLIS = 750L
@@ -35,6 +42,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
+        consumeDeepLink(intent)
         // Brand moment: hold the splash just long enough for the reveal to
         // read (it overlaps real cold-start init; total stays in budget).
         // Reduced motion skips the wait and the exit fade entirely.
@@ -74,9 +82,28 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.onBackground,
                 ) {
-                    SmartCessNavGraph()
+                    SmartCessNavGraph(
+                        deepLinkRoute = pendingDeepLink.value,
+                        onDeepLinkConsumed = { pendingDeepLink.value = null },
+                    )
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        consumeDeepLink(intent)
+    }
+
+    private fun consumeDeepLink(intent: Intent?) {
+        val reminderId = intent
+            ?.getLongExtra(ReminderActionReceiver.EXTRA_REMINDER_ID, -1)
+            ?.takeIf { it > 0 }
+        val appointmentId = intent
+            ?.getLongExtra(ReminderActionReceiver.EXTRA_APPOINTMENT_ID, -1)
+            ?.takeIf { it > 0 }
+        pendingDeepLink.value = deepLinkRoute(reminderId, appointmentId)
     }
 }

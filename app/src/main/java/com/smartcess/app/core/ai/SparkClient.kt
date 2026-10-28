@@ -122,55 +122,6 @@ class SparkClient @Inject constructor(
             fallback = { BriefingResult() },
         )
 
-    /**
-     * Tool-calling loop (max 2 rounds). Read-only tools run directly; approval-gated
-     * tools go through [gate]; banned actions always throw.
-     */
-    suspend fun chatWithTools(
-        messages: List<SparkMessage>,
-        executor: ToolExecutor,
-        gate: ApprovalGate,
-        maxRounds: Int = 2,
-    ): String = limiter.guard {
-        val working = messages.toMutableList()
-        repeat(maxRounds) {
-            val response = callWithFallback(
-                SparkRequest(
-                    model = config.sparkModel,
-                    messages = working,
-                    tools = ToolRegistry.toWireFormat(),
-                    tool_choice = "auto",
-                ),
-                config.briefingTimeoutMillis,
-            )
-            val message = response.choices.firstOrNull()?.message
-                ?: throw InvalidAiResponseException()
-            val calls = message.tool_calls.orEmpty()
-            if (calls.isEmpty()) return@guard contentText(message.content)
-            working += message
-            calls.forEach { call ->
-                val name = call.function.name
-                if (ToolRegistry.isBanned(name)) throw AiException("That action is not allowed.")
-                val def = ToolRegistry.find(name) ?: throw AiException("Unknown assistant action.")
-                if (def.requiresApproval && !gate.requestApproval(name, call.function.arguments)) {
-                    throw AiException("Action cancelled. Nothing was changed.")
-                }
-                val output = executor.execute(name, call.function.arguments)
-                working += SparkMessage(
-                    role = "tool",
-                    content = JsonPrimitive(output),
-                    tool_call_id = call.id,
-                    name = name,
-                )
-            }
-        }
-        val final = callWithFallback(
-            SparkRequest(model = config.sparkModel, messages = working),
-            config.briefingTimeoutMillis,
-        )
-        contentText(final.choices.firstOrNull()?.message?.content ?: JsonNull)
-    }
-
     // Internals
 
     private suspend fun <T> completeJson(
@@ -182,12 +133,22 @@ class SparkClient @Inject constructor(
         fallback: () -> T,
         imageBase64: String? = null,
     ): T = limiter.guard {
-        val cacheKey = cache.key(feature, schemaName, prompt, imageBase64?.take(64) ?: "")
+        // H1: hash the FULL image bytes. Truncating to a prefix lets two
+        // different images share a cache key (same JPEG header bytes).
+        val cacheKey = cache.key(feature, schemaName, prompt, imageBase64 ?: "")
         cache.get(cacheKey)?.let { cached ->
             return@guard runCatching { parser(cached) }.getOrElse { fallback() }
         }
         val started = System.currentTimeMillis()
         var success = false
+        var promptTokens = 0
+        var completionTokens = 0
+        fun accumulate(response: SparkResponse) {
+            response.usage?.let {
+                promptTokens += it.prompt_tokens
+                completionTokens += it.completion_tokens
+            }
+        }
         try {
             val raw = retries.withRetry(
                 transientRetries = config.transientMaxRetries,
@@ -201,6 +162,7 @@ class SparkClient @Inject constructor(
                     ),
                     timeoutMillis,
                 )
+                accumulate(response)
                 val content = response.choices.firstOrNull()?.message?.content
                     ?: throw InvalidAiResponseException()
                 contentText(content)
@@ -216,6 +178,7 @@ class SparkClient @Inject constructor(
                         ),
                         timeoutMillis,
                     )
+                    accumulate(retry)
                     parser(contentText(retry.choices.firstOrNull()?.message?.content ?: JsonNull))
                 }.getOrElse { throw InvalidAiResponseException() }
             cache.put(cacheKey, raw)
@@ -223,7 +186,7 @@ class SparkClient @Inject constructor(
             parsed
         } finally {
             val latency = System.currentTimeMillis() - started
-            usage.record(feature, latency, success)
+            usage.record(feature, latency, success, promptTokens, completionTokens)
             eval.log(EvalSample(feature, SparkPrompts.VERSION, success, latency))
         }
     }

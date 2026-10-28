@@ -11,8 +11,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
  * API key handling. No hard-coded keys anywhere.
  *
  * Resolution order:
- * 1. User-supplied key stored in EncryptedSharedPreferences (set via Settings).
- * 2. BuildConfig.META_API_KEY from local.properties / META_API_KEY env var (dev/CI).
+ * 1. Key stored in EncryptedSharedPreferences (no in-app entry exists now).
+ * 2. BuildConfig.META_API_KEY from process env / local.properties / .env (debug only; release forces empty).
  * 3. Null when neither is present (features must degrade to offline mode).
  */
 interface ApiKeyProvider {

@@ -1,6 +1,7 @@
 package com.smartcess.app.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
@@ -19,7 +20,6 @@ import com.smartcess.app.features.documents.DocumentResultScreen
 import com.smartcess.app.features.documents.DocumentsScreen
 import com.smartcess.app.features.email.EmailScreen
 import com.smartcess.app.features.home.HomeScreen
-import com.smartcess.app.features.more.MoreScreen
 import com.smartcess.app.features.onboarding.OnboardingScreen
 import com.smartcess.app.features.onboarding.isOnboardingDone
 import com.smartcess.app.features.reminders.ReminderScreen
@@ -30,10 +30,19 @@ import com.smartcess.app.features.voice.VoiceScreen
 
 /** Root navigation graph: onboarding → Home (progressive disclosure) → modules. */
 @Composable
-fun SmartCessNavGraph() {
+fun SmartCessNavGraph(
+    deepLinkRoute: String? = null,
+    onDeepLinkConsumed: () -> Unit = {},
+) {
     val navController = rememberNavController()
     val context = LocalContext.current
     val start = remember { if (isOnboardingDone(context)) Routes.HOME else Routes.ONBOARDING }
+    LaunchedEffect(deepLinkRoute) {
+        if (deepLinkRoute != null) {
+            navController.navigate(deepLinkRoute)
+            onDeepLinkConsumed()
+        }
+    }
     NavHost(navController = navController, startDestination = start) {
         composable(Routes.ONBOARDING) {
             OnboardingScreen(
@@ -61,17 +70,6 @@ fun SmartCessNavGraph() {
                 onRoutines = { navController.navigate(Routes.ROUTINES) },
                 onEmail = { navController.navigate(Routes.EMAIL) },
                 onSettings = { navController.navigate(Routes.SETTINGS) },
-            )
-        }
-        composable(Routes.MORE) {
-            MoreScreen(
-                onBills = { navController.navigate(Routes.BILLS) },
-                onDocuments = { navController.navigate(Routes.DOCUMENTS) },
-                onAppointments = { navController.navigate(Routes.APPOINTMENTS) },
-                onRoutines = { navController.navigate(Routes.ROUTINES) },
-                onEmail = { navController.navigate(Routes.EMAIL) },
-                onSettings = { navController.navigate(Routes.SETTINGS) },
-                onBack = { navController.popBackStack() },
             )
         }
         composable(Routes.VOICE) {
