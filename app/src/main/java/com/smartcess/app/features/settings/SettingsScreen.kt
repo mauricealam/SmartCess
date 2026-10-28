@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -49,15 +50,15 @@ import com.smartcess.app.R
 import com.smartcess.app.ui.components.SmartCessBanner
 import com.smartcess.app.ui.components.SmartCessCard
 import com.smartcess.app.ui.components.SmartCessConfirmDialog
-import com.smartcess.app.ui.components.SmartCessPrimaryButton
 import com.smartcess.app.ui.components.SmartCessSecondaryButton
 import com.smartcess.app.ui.components.SmartCessTextField
 import com.smartcess.app.ui.components.SmartCessTopBar
 import com.smartcess.app.ui.components.BannerKind
 
 /**
- * Settings + About: API key, speech speed, reminder defaults, appearance,
- * privacy controls, data export/delete, and logo branding.
+ * Settings + About: AI status, speech speed, reminder defaults, appearance,
+ * privacy controls, data export/delete, and version info. API keys are
+ * configured via build config / environment, never typed in-app.
  */
 @Composable
 fun SettingsScreen(
@@ -80,6 +81,7 @@ fun SettingsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .navigationBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -90,25 +92,6 @@ fun SettingsScreen(
         }
 
         SettingsSection(title = stringResource(R.string.settings_section_speech)) {
-            SmartCessTextField(
-                value = state.apiKeyInput,
-                onValueChange = viewModel::onApiKeyInput,
-                label = stringResource(R.string.settings_api_key_label),
-                hint = stringResource(R.string.settings_api_key_hint),
-                isPassword = true,
-            )
-            SmartCessPrimaryButton(
-                text = stringResource(R.string.action_save),
-                onClick = viewModel::saveApiKey,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (state.hasApiKey) {
-                SmartCessSecondaryButton(
-                    text = stringResource(R.string.action_clear),
-                    onClick = viewModel::clearApiKey,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
             Text(
                 text = stringResource(
                     if (state.hasApiKey) R.string.settings_meta_on else R.string.settings_meta_off,

@@ -97,7 +97,6 @@
     <string name="action_skip" translatable="true">Skip</string>
     <string name="action_get_started" translatable="true">Get started</string>
     <string name="action_done" translatable="true">Done</string>
-    <string name="action_clear" translatable="true">Clear</string>
     <string name="status_loading" translatable="true">Loading…</string>
     <string name="option_selected" translatable="true">Selected</string>
     <string name="banner_error_title" translatable="true">Something needs your attention</string>
@@ -303,10 +302,6 @@
     <string name="settings_section_appearance" translatable="true">Appearance</string>
     <string name="settings_section_privacy" translatable="true">Privacy</string>
     <string name="settings_section_data" translatable="true">Your data</string>
-    <string name="settings_api_key_label" translatable="true">Meta API key</string>
-    <string name="settings_api_key_hint" translatable="true">Paste your key, or leave empty for offline mode</string>
-    <string name="settings_api_key_saved" translatable="true">Key saved securely on this device.</string>
-    <string name="settings_api_key_cleared" translatable="true">Key removed. Offline mode is on.</string>
     <string name="settings_tts_rate" translatable="true">Speech speed</string>
     <string name="settings_tts_rate_value" translatable="true">%1$.1f× speed</string>
     <string name="settings_bill_reminder_days" translatable="true">Remind me about bills</string>

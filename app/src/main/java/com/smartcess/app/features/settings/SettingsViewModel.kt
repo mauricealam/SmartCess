@@ -24,7 +24,6 @@ import java.time.Instant
 import javax.inject.Inject
 
 data class SettingsUiState(
-    val apiKeyInput: String = "",
     val hasApiKey: Boolean = false,
     val messageRes: Int? = null,
     val exportPayload: String? = null,
@@ -50,32 +49,6 @@ class SettingsViewModel @Inject constructor(
             _state.value = _state.value.copy(hasApiKey = apiKeys.hasMetaApiKey())
             speaker.setRate(prefs.get().ttsRate)
         }
-    }
-
-    fun onApiKeyInput(value: String) {
-        _state.value = _state.value.copy(apiKeyInput = value, messageRes = null, exportPayload = null)
-    }
-
-    fun saveApiKey() {
-        val key = _state.value.apiKeyInput.trim()
-        if (key.isEmpty()) {
-            apiKeys.clearMetaApiKey()
-            _state.value = _state.value.copy(
-                apiKeyInput = "", hasApiKey = false, messageRes = R.string.settings_api_key_cleared,
-            )
-        } else {
-            apiKeys.setMetaApiKey(key)
-            _state.value = _state.value.copy(
-                apiKeyInput = "", hasApiKey = true, messageRes = R.string.settings_api_key_saved,
-            )
-        }
-    }
-
-    fun clearApiKey() {
-        apiKeys.clearMetaApiKey()
-        _state.value = _state.value.copy(
-            apiKeyInput = "", hasApiKey = false, messageRes = R.string.settings_api_key_cleared,
-        )
     }
 
     fun setTtsRate(rate: Float) {

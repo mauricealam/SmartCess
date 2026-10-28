@@ -1,5 +1,6 @@
 package com.smartcess.app.ui.components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,8 +17,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 /**
- * Spec card: 12dp radius, 8dp inner padding, single-column full width.
- * Tonal separation (container on background) instead of wireframe borders.
+ * Spec card: 12dp radius, 8dp inner padding, 12dp inner rhythm, 1dp tonal
+ * elevation, single-column full width. Separation comes from tone plus a
+ * whisper of elevation — grouped items never read as one clump.
  */
 @Composable
 fun SmartCessCard(
@@ -35,22 +37,31 @@ fun SmartCessCard(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
     )
+    val elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     if (onClick != null) {
         Card(
             onClick = onClick,
             shape = RoundedCornerShape(12.dp),
             colors = colors,
+            elevation = elevation,
             modifier = modifier.fillMaxWidth().then(semantics),
         ) {
-            Column(modifier = Modifier.padding(8.dp)) { content() }
+            Column(
+                modifier = Modifier.padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) { content() }
         }
     } else {
         Card(
             shape = RoundedCornerShape(12.dp),
             colors = colors,
-            modifier = modifier.fillMaxWidth().then(semantics),
+            elevation = elevation,
+            modifier = Modifier.fillMaxWidth().then(semantics),
         ) {
-            Column(modifier = Modifier.padding(8.dp)) { content() }
+            Column(
+                modifier = Modifier.padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) { content() }
         }
     }
 }
