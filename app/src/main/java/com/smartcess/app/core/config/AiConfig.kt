@@ -24,7 +24,9 @@ class AiConfig @Inject constructor() {
     val extractionTimeoutMillis: Long = 30_000
     val documentTimeoutMillis: Long = 45_000
     val briefingTimeoutMillis: Long = 10_000
-    val intentTimeoutMillis: Long = 3_000
+    // Must exceed the backend Meta-retry span (~3.6s for 3 tries), or the
+    // app would cut off retries during model flaps and fail needlessly.
+    val intentTimeoutMillis: Long = 10_000
 
     /** Rate limits: max concurrent AI calls and calls per minute (client-side guard). */
     val maxConcurrentCalls: Int = 2
