@@ -22,10 +22,9 @@ import androidx.compose.ui.unit.dp
 import com.smartcess.app.R
 
 /**
- * Spec More bottom sheet, chunked 3 + 2 + 1: Review (Bills, Documents,
- * Email), Plan (Appointments, Routines), Settings as a separated utility
- * footer. Recents-first was rejected: reordering destinations would break
- * screen-reader spatial memory.
+ * Spec More bottom sheet: one unified stack — Bills, Documents, Email
+ * briefing, Appointments, Routines — with Settings as a separated utility
+ * footer. Fixed order protects screen-reader spatial memory.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,7 +78,6 @@ fun MoreSheetContent(
                 .padding(bottom = 8.dp)
                 .semantics { heading() },
         )
-        MoreSectionHead(text = stringResource(R.string.more_section_review))
         SmartCessListItem(
             title = stringResource(R.string.more_bills),
             contentDescription = stringResource(R.string.more_bills),
@@ -94,10 +92,6 @@ fun MoreSheetContent(
             title = stringResource(R.string.more_email),
             contentDescription = stringResource(R.string.more_email),
             onClick = onEmail,
-        )
-        MoreSectionHead(
-            text = stringResource(R.string.more_section_plan),
-            modifier = Modifier.padding(top = 12.dp),
         )
         SmartCessListItem(
             title = stringResource(R.string.more_appointments),
@@ -119,19 +113,4 @@ fun MoreSheetContent(
             onClick = onSettings,
         )
     }
-}
-
-/** Chunk heading: doubles as a TalkBack heading-navigation target. */
-@Composable
-private fun MoreSectionHead(
-    text: String,
-    modifier: Modifier = Modifier,
-) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleMedium,
-        modifier = modifier
-            .padding(horizontal = 8.dp)
-            .semantics { heading() },
-    )
 }

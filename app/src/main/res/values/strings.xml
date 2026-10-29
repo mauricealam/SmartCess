@@ -136,13 +136,11 @@
     <string name="queue_status_overdue" translatable="true">OVERDUE</string>
     <string name="queue_status_due_soon" translatable="true">DUE SOON</string>
     <string name="queue_status_queued" translatable="true">QUEUED</string>
-    <string name="home_more_desc" translatable="true">More options. Opens Bills, Documents, Appointments, Routines, and Settings.</string>
-    <string name="home_greeting" translatable="true">Good day. Here is what needs you.</string>
+    <string name="home_more_desc" translatable="true">More options. Opens Bills, Documents, Email briefing, Appointments, Routines, and Settings.</string>
+    <string name="home_greeting" translatable="true">Good day. Here is your daily overview.</string>
 
     <!-- More sheet -->
     <string name="more_title" translatable="true">More</string>
-    <string name="more_section_review" translatable="true">Review</string>
-    <string name="more_section_plan" translatable="true">Plan</string>
     <string name="more_dismiss_desc" translatable="true">Close more options</string>
 
     <!-- Briefing -->

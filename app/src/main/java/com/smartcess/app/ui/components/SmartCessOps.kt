@@ -39,8 +39,8 @@ import com.smartcess.app.ui.theme.SmartCessTheme
 private val OpsShape = RoundedCornerShape(20.dp)
 
 /**
- * Night Ops command bar: the secondary decision (Talk). Tonal container
- * fill with ops-accent icon and arrow. 72dp minimum target.
+ * Night Ops command bar: one half of the dual-action group (Talk and
+ * Scan Bill). Tonal fill with ops-accent icon and arrow. 72dp target.
  */
 @Composable
 fun OpsCommandBar(
@@ -88,59 +88,6 @@ fun OpsCommandBar(
                 contentDescription = null,
                 tint = extra.ops,
                 modifier = Modifier.size(24.dp),
-            )
-        }
-    }
-}
-
-/**
- * Night Ops hero action: the single monumental decision per surface (Scan).
- * Filled ops accent, 88dp minimum target.
- */
-@Composable
-fun OpsHeroAction(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    icon: ImageVector? = null,
-    contentDescription: String? = null,
-) {
-    val extra = SmartCessTheme.extra
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
-    Surface(
-        onClick = onClick,
-        interactionSource = interaction,
-        shape = OpsShape,
-        color = extra.ops,
-        contentColor = extra.onOps,
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = 88.dp)
-            .opsFocusRing(focused)
-            .semantics { contentDescription?.let { desc -> this.contentDescription = desc } },
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            icon?.let {
-                Icon(
-                    imageVector = it,
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp),
-                )
-            }
-            Text(
-                text = text,
-                style = MaterialTheme.typography.displayLarge,
-                modifier = Modifier.weight(1f),
-            )
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = null,
-                modifier = Modifier.size(32.dp),
             )
         }
     }

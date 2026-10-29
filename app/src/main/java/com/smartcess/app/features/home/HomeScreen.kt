@@ -49,7 +49,6 @@ import com.smartcess.app.R
 import com.smartcess.app.ui.components.BannerKind
 import com.smartcess.app.ui.components.OpsButton
 import com.smartcess.app.ui.components.OpsCommandBar
-import com.smartcess.app.ui.components.OpsHeroAction
 import com.smartcess.app.ui.components.OpsQueueRow
 import com.smartcess.app.ui.components.SmartCessBanner
 import com.smartcess.app.ui.components.SmartCessCard
@@ -62,7 +61,7 @@ import com.smartcess.app.ui.theme.SmartCessTheme
 
 /**
  * Home with progressive disclosure ONLY: brand, one Today card (max 3 urgent
- * + See all) up top; Talk, one primary Scan Bill action, More bottom sheet,
+ * + See all) up top; Talk, Scan Bill dual-action pair, More bottom sheet,
  * and Settings pinned to the bottom thumb-reach zone. No module-button grid.
  * TalkBack order follows the visual order: brand, greeting, Today queue,
  * Talk, Scan, More, Settings.
@@ -74,7 +73,7 @@ import com.smartcess.app.ui.theme.SmartCessTheme
  * Composition order always matches visual order in both directions.
  *
  * Night Ops expression: the screen is a console — numbered Today queue with
- * status words, Talk command bar, one monumental Scan hero. Day Ops light
+ * status words, matched Talk + Scan command bars. Day Ops light
  * mode carries the same system on paper grounds.
  */
 @Composable
@@ -156,7 +155,7 @@ private fun isWideWindow(): Boolean {
 
 /**
  * Portrait: zoned rhythm (never uniform) — 8dp binds the header pair, 12dp
- * sections the Today region, a 20dp break sets off the pinned cluster.
+ * sections the Today region, a 12dp break sets off the pinned cluster.
  */
 @Composable
 private fun HomePortrait(
@@ -201,7 +200,7 @@ private fun HomePortrait(
             onRefresh = onRefresh,
             modifier = Modifier.weight(1f),
         )
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(12.dp))
         ActionCluster(
             onTalk = onTalk,
             onScanBill = onScanBill,
@@ -370,7 +369,7 @@ private fun TodayPanel(
     }
 }
 
-/** Thumb-zone cluster: Talk + hint, monumental Scan, More, Settings. */
+/** Thumb-zone cluster: matched Talk + hint and Scan pair, More, Settings. */
 @Composable
 private fun ActionCluster(
     onTalk: () -> Unit,
@@ -394,14 +393,14 @@ private fun ActionCluster(
                 modifier = Modifier.padding(horizontal = 8.dp),
             )
         }
-        Spacer(Modifier.height(12.dp))
-        OpsHeroAction(
+        Spacer(Modifier.height(8.dp))
+        OpsCommandBar(
             text = stringResource(R.string.home_scan_bill),
             contentDescription = stringResource(R.string.home_scan_bill_desc),
             icon = Icons.Filled.PhotoCamera,
             onClick = onScanBill,
         )
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(8.dp))
         SmartCessSecondaryButton(
             text = stringResource(R.string.home_more),
             contentDescription = stringResource(R.string.home_more_desc),
