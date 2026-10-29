@@ -125,6 +125,44 @@ def test_chat_meta_busy_maps(monkeypatch):
     assert response.json()["error"]["code"] == "ai_busy"
 
 
+def test_chat_retries_flapping_meta(monkeypatch):
+    calls = []
+
+    def flapping(request):
+        calls.append(1)
+        if len(calls) < 3:
+            return httpx.Response(404, json={"error": {"code": "model_not_found"}})
+        return _chat_ok(request)
+
+    _use_meta(monkeypatch, flapping)
+    response = client.post(
+        "/api/ai/chat",
+        json={"messages": [{"role": "user", "content": "hi"}]},
+        headers=_auth(),
+    )
+    assert response.status_code == 200
+    assert response.json()["choices"][0]["message"]["content"] == "hi"
+    assert len(calls) == 3
+
+
+def test_chat_gives_up_after_retries(monkeypatch):
+    calls = []
+
+    def missing(request):
+        calls.append(1)
+        return httpx.Response(404, json={"error": {"code": "model_not_found"}})
+
+    _use_meta(monkeypatch, missing)
+    response = client.post(
+        "/api/ai/chat",
+        json={"messages": [{"role": "user", "content": "hi"}]},
+        headers=_auth(),
+    )
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "ai_unavailable"
+    assert len(calls) == 3
+
+
 def test_chat_meta_error_body_never_forwarded(monkeypatch):
     _use_meta(
         monkeypatch,

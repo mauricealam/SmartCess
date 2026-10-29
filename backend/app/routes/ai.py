@@ -4,6 +4,7 @@
 existing response parsing unchanged; only the base URL and auth change.
 """
 
+import asyncio
 import json
 import logging
 import time
@@ -75,10 +76,32 @@ def _check_rate(sub: str, bucket: str, limit: int) -> None:
         raise rate_limited()
 
 
+# Meta's model resolution flaps: a model can 404 model_not_found for
+# minutes and then 200 again, so 404 joins 5xx as retryable (3 tries).
+RETRYABLE_META = frozenset({404, 500, 502, 503, 504})
+META_RETRY_SLEEPS = (1.0, 2.0)
+
+
 async def _post_chat(payload: dict) -> httpx.Response:
     try:
         async with build_meta_client() as client:
-            return await client.post("/chat/completions", json=payload, headers=_headers())
+            last: httpx.Response | None = None
+            for attempt, sleep in enumerate((0.0, *META_RETRY_SLEEPS)):
+                if sleep:
+                    await asyncio.sleep(sleep)
+                response = await client.post(
+                    "/chat/completions", json=payload, headers=_headers()
+                )
+                if response.status_code not in RETRYABLE_META:
+                    return response
+                last = response
+                logger.warning(
+                    "meta chat status=%s attempt=%d",
+                    response.status_code,
+                    attempt + 1,
+                )
+            assert last is not None
+            return last
     except httpx.TimeoutException:
         raise ai_timeout()
     except httpx.HTTPError as e:

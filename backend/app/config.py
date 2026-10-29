@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     meta_base_url: str = "https://api.meta.ai/v1"
     meta_stt_url: str = "wss://api.meta.ai/v1/asr/realtime"
     stt_model: str = "muse-voice-transcribe-1.0"
-    allowed_models: str = "muse-spark-1.3,muse-spark-1.1"
+    allowed_models: str = "muse-spark-1.3"
     default_model: str = "muse-spark-1.3"
 
     jwt_secret: str = "dev-only-change-me"
