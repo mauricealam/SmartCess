@@ -195,9 +195,15 @@ class SparkClient @Inject constructor(
         var attempt = 0
         var lastError: Exception? = null
         while (true) {
-            val model = ModelFallback.modelForAttempt(route, attempt) ?: throw (
-                lastError ?: AiException("The AI service is unavailable.")
-                )
+            // Normalize to the AiException contract: a raw retrofit error here
+            // would bypass RetryPolicy (it only handles AiException-family,
+            // TimeoutException, and IOException) and fail without retrying.
+            // Timeouts stay raw so they consume the timeout retry budget.
+            val model = ModelFallback.modelForAttempt(route, attempt) ?: throw when (val err = lastError) {
+                null -> AiException("The AI service is unavailable.")
+                is TimeoutException -> err
+                else -> AiException("The AI service is unavailable.", err)
+            }
             try {
                 return withTimeout(timeoutMillis) { api.complete(request.copy(model = model)) }
             } catch (e: TimeoutCancellationException) {
