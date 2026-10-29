@@ -1,8 +1,10 @@
 package com.smartcess.app.features.auth
 
 import android.app.Activity
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.smartcess.app.BuildConfig
 import com.smartcess.app.R
 import com.smartcess.app.core.session.SessionManager
 import com.smartcess.app.core.session.SessionSignInException
@@ -53,13 +55,19 @@ class SignInViewModel @Inject constructor(
             sessions.signInWithGoogle(idToken)
             SignInUiState(signedIn = true)
         } catch (e: SessionSignInException) {
+            if (BuildConfig.DEBUG) Log.w(TAG, "exchange: rejected ${e.message}")
             SignInUiState(errorRes = R.string.sign_in_failed)
         } catch (e: Exception) {
+            if (BuildConfig.DEBUG) Log.w(TAG, "exchange failed: ${e.javaClass.simpleName}: ${e.message}")
             SignInUiState(errorRes = R.string.sign_in_failed)
         }
     }
 
     fun clearError() {
         _state.value = _state.value.copy(errorRes = null)
+    }
+
+    private companion object {
+        const val TAG = "SmartCessAuth"
     }
 }
