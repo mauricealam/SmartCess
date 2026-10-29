@@ -23,7 +23,7 @@ IDs, truncated user hashes, endpoints, latency, status, and token counts only.
 
 ## Render free-tier configuration
 
-One web service, Docker runtime, free plan — see [render.yaml](render.yaml):
+One web service, Docker runtime, free plan — see [render.yaml](../render.yaml):
 
 - Build: `pip install -r requirements.txt` (from the Dockerfile).
 - Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.

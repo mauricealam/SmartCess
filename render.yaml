@@ -3,6 +3,9 @@ services:
     name: smartcess-backend
     runtime: docker
     plan: free
+    rootDir: backend
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
     healthCheckPath: /health
     envVars:
       - key: META_API_KEY
