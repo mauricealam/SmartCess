@@ -154,11 +154,12 @@ class SparkClient @Inject constructor(
                 transientRetries = config.transientMaxRetries,
                 timeoutRetries = config.timeoutMaxRetries,
             ) {
+                // No response_format: Meta rejects schemaless json_schema with 400,
+                // and prompts already demand JSON-only (invalid JSON retries below).
                 val response = callWithFallback(
                     SparkRequest(
                         model = config.sparkModel,
                         messages = listOf(userMessage(prompt, imageBase64)),
-                        response_format = ToolRegistry.jsonSchemaFormat(schemaName),
                     ),
                     timeoutMillis,
                 )
@@ -174,7 +175,6 @@ class SparkClient @Inject constructor(
                         SparkRequest(
                             model = config.sparkModel,
                             messages = listOf(userMessage("$prompt\nReturn valid JSON only.", imageBase64)),
-                            response_format = ToolRegistry.jsonSchemaFormat(schemaName),
                         ),
                         timeoutMillis,
                     )

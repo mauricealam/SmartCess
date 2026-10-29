@@ -24,7 +24,7 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
-import okio.ByteString
+import okio.ByteString.Companion.toByteString
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Named
@@ -89,6 +89,69 @@ object SttAudioSpec {
     const val ENCODING = AudioFormat.ENCODING_PCM_16BIT
 }
 
+/**
+ * Energy-based end-of-utterance detector. Fed the peak amplitude of each
+ * mic buffer with a monotonic timestamp; returns true once the utterance
+ * is over (speech followed by [endSilenceMs] of quiet), nothing was said
+ * within [noSpeechTimeoutMs], or [maxListenMs] elapsed. Thresholds are
+ * conservative on purpose: 16-bit peaks under ~700 are room noise on
+ * phone mics, while conversational speech peaks in the thousands.
+ */
+internal class SpeechEndpointDetector(
+    private val speechThreshold: Int = 700,
+    private val speechConfirmMs: Long = 300,
+    private val endSilenceMs: Long = 2000,
+    private val noSpeechTimeoutMs: Long = 8000,
+    private val maxListenMs: Long = 60000,
+) {
+    private var startMs = -1L
+    private var lastMs = -1L
+    private var speechMs = 0L
+    private var silenceStartMs = -1L
+    private var endpoint = false
+
+    fun onFrame(peak: Int, nowMs: Long): Boolean {
+        if (endpoint) return true
+        if (startMs < 0) {
+            startMs = nowMs
+            lastMs = nowMs
+        }
+        val dt = (nowMs - lastMs).coerceAtLeast(0)
+        lastMs = nowMs
+        if (nowMs - startMs >= maxListenMs) {
+            endpoint = true
+            return true
+        }
+        if (peak >= speechThreshold) {
+            speechMs += dt
+            silenceStartMs = -1
+        } else if (speechMs >= speechConfirmMs) {
+            if (silenceStartMs < 0) silenceStartMs = nowMs
+            if (nowMs - silenceStartMs >= endSilenceMs) {
+                endpoint = true
+                return true
+            }
+        } else if (nowMs - startMs >= noSpeechTimeoutMs) {
+            endpoint = true
+            return true
+        }
+        return false
+    }
+}
+
+/** Peak absolute sample of 16-bit little-endian PCM in [buf] (first [len] bytes). */
+internal fun pcmPeak(buf: ByteArray, len: Int): Int {
+    var peak = 0
+    var i = 0
+    while (i + 1 < len) {
+        val sample = (buf[i].toInt() and 0xFF) or (buf[i + 1].toInt() shl 8)
+        val abs = if (sample == Short.MIN_VALUE.toInt()) Short.MAX_VALUE.toInt() else kotlin.math.abs(sample)
+        if (abs > peak) peak = abs
+        i += 2
+    }
+    return peak
+}
+
 /** Grace period after endStream for final transcripts before forcing close. */
 private const val END_STREAM_GRACE_MILLIS = 10_000L
 /** Backend relay close code when the session token is rejected. */
@@ -105,6 +168,7 @@ class MuseVoiceTranscriberImpl @Inject constructor(
     @Volatile private var socket: WebSocket? = null
     @Volatile private var recorder: AudioRecord? = null
     @Volatile private var running = false
+    private val endStreamSent = java.util.concurrent.atomic.AtomicBoolean(false)
 
     override fun transcribe(): Flow<TranscriptEvent> = callbackFlow {
         // Production: backend relay with the session token. Developer override:
@@ -185,13 +249,19 @@ class MuseVoiceTranscriberImpl @Inject constructor(
                 close()
             }
         })
+        endStreamSent.set(false)
         record.startRecording()
+        val endpoint = SpeechEndpointDetector()
         val pump = Thread {
             val buf = ByteArray(bufferSize)
             while (running) {
                 val read = record.read(buf, 0, buf.size)
                 if (read > 0) {
-                    socket?.send(ByteString.of(*buf.copyOf(read)))
+                    socket?.send(buf.toByteString(0, read))
+                    // Auto end-of-utterance: no manual Stop needed.
+                    if (endpoint.onFrame(pcmPeak(buf, read), android.os.SystemClock.elapsedRealtime())) {
+                        stop()
+                    }
                 } else if (read < 0) {
                     break
                 }
@@ -212,6 +282,9 @@ class MuseVoiceTranscriberImpl @Inject constructor(
 
     override fun stop() {
         running = false
+        // endStream goes out once no matter how stop was reached
+        // (manual Stop, auto endpoint, cancel) racing on threads.
+        if (!endStreamSent.compareAndSet(false, true)) return
         val ws = socket
         // End input but keep reading: the server sends final transcripts,
         // then closes with 1000 (onClosed ends the flow).

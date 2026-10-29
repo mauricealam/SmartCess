@@ -172,10 +172,6 @@ def _bill_messages(image_b64: str, ocr_hint: str | None, retry: bool) -> list[di
     ]
 
 
-def _bill_format() -> dict:
-    return {"type": "json_schema", "json_schema": {"name": "bill", "strict": True}}
-
-
 @router.post("/bill-extract")
 async def bill_extract(
     body: BillExtractRequest, sub: str = Depends(current_sub)
@@ -190,13 +186,14 @@ async def bill_extract(
     started = time.monotonic()
     last_error: AppError = ai_unclear()
     for attempt in range(2):
+        # No response_format: Meta rejects schemaless json_schema with 400.
+        # The prompt already demands JSON-only; bad JSON retries below.
         response = await _post_chat(
             {
                 "model": settings.default_model,
                 "messages": _bill_messages(
                     body.image_base64, body.ocr_hint, retry=attempt > 0
                 ),
-                "response_format": _bill_format(),
             }
         )
         if response.status_code == 429:

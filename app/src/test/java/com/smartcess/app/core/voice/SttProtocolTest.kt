@@ -40,6 +40,11 @@ class SttProtocolTest {
     }
 
     @Test
+    fun audioProgress_isIgnored() {
+        assertNull(parseServerEvent("""{"type":"audioProgress","audioProcessedMs":640}"""))
+    }
+
+    @Test
     fun malformedFrame_returnsNull() {
         assertNull(parseServerEvent("final:not json"))
         assertNull(parseServerEvent("""{"type":"transcript"}"""))

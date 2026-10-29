@@ -74,6 +74,8 @@ class VoiceViewModel @Inject constructor(
     val navigate: SharedFlow<String> = _navigate.asSharedFlow()
 
     private var listenJob: Job? = null
+    /** True after manual Stop while finals from the server may still arrive. */
+    private var finishing = false
 
     init {
         viewModelScope.launch { speaker.setRate(prefs.get().ttsRate) }
@@ -81,6 +83,7 @@ class VoiceViewModel @Inject constructor(
 
     fun startListening() {
         if (_state.value.listening) return
+        finishing = false
         _state.update {
             it.copy(listening = true, processing = false, errorRes = null, message = null, messageRes = null)
         }
@@ -91,24 +94,45 @@ class VoiceViewModel @Inject constructor(
                     when (event) {
                         is TranscriptEvent.Partial -> _state.update { it.copy(partial = event.text) }
                         is TranscriptEvent.Final -> {
+                            finishing = false
                             _state.update { it.copy(listening = false, transcript = event.text) }
-                            classify(event.text)
+                            classify(event.text, fromVoice = true)
                         }
                         is TranscriptEvent.Error -> onTranscriberError(event.message)
                     }
                 }
                 // The stream ended with no Final or Error (server closed
-                // silently): report no-speech instead of staying "Listening".
-                if (_state.value.listening) {
-                    fail(fallbackRes())
+                // silently): report no-speech instead of staying silent.
+                if (_state.value.listening || finishing) {
+                    finishing = false
+                    if (_state.value.transcript.isBlank()) {
+                        fail(fallbackRes())
+                    }
                 }
             } catch (e: CancellationException) {
-                throw e // stopListening()/cancel() own the state update.
+                throw e // abandonListening() owns the state update.
             }
         }
     }
 
+    /**
+     * Manual Stop: end input but keep reading, so finals arriving after
+     * endStream still get answered. Errors still surface (never silent).
+     */
     fun stopListening() {
+        if (!_state.value.listening) return
+        transcriber.stop()
+        if (listenJob?.isActive == true) {
+            finishing = true
+            _state.update { it.copy(listening = false, processing = true) }
+        } else {
+            _state.update { it.copy(listening = false) }
+        }
+    }
+
+    /** Abandon voice entirely (typed send, cancel, fresh start). */
+    private fun abandonListening() {
+        finishing = false
         listenJob?.cancel()
         listenJob = null
         transcriber.stop()
@@ -116,7 +140,7 @@ class VoiceViewModel @Inject constructor(
     }
 
     fun cancel() {
-        stopListening()
+        abandonListening()
         speaker.stop()
         _state.value = VoiceUiState()
     }
@@ -127,10 +151,13 @@ class VoiceViewModel @Inject constructor(
 
     fun submitTyped() {
         val text = _state.value.typed.trim()
-        if (text.isEmpty() || _state.value.processing) return
-        stopListening()
+        if (text.isEmpty()) return
+        // Block double-send while classifying, but allow taking over
+        // from a voice stream that is still finishing.
+        if (_state.value.processing && !finishing) return
+        abandonListening()
         _state.update { it.copy(transcript = text) }
-        classify(text)
+        classify(text, fromVoice = false)
     }
 
     fun speak(text: String) = speaker.speak(text)
@@ -154,7 +181,7 @@ class VoiceViewModel @Inject constructor(
             R.string.voice_not_clear
         }
 
-    private fun classify(text: String) {
+    private fun classify(text: String, fromVoice: Boolean) {
         viewModelScope.launch {
             _state.update { it.copy(processing = true, errorRes = null, message = null, messageRes = null) }
             try {
@@ -183,23 +210,30 @@ class VoiceViewModel @Inject constructor(
                     }
                 }
             } catch (e: OfflineModeException) {
-                fail(R.string.voice_api_unavailable)
+                fail(R.string.voice_api_unavailable, fromVoice)
             } catch (e: SessionExpiredException) {
-                fail(R.string.auth_sign_in_required)
+                fail(R.string.auth_sign_in_required, fromVoice)
             } catch (e: RateLimitedException) {
-                fail(R.string.error_rate_limit)
+                fail(R.string.error_rate_limit, fromVoice)
             } catch (e: TimeoutException) {
-                fail(R.string.voice_timeout)
+                fail(R.string.voice_timeout, fromVoice)
             } catch (e: AiException) {
-                fail(R.string.voice_not_clear)
+                fail(R.string.voice_not_clear, fromVoice)
             } catch (e: Exception) {
-                fail(R.string.error_generic)
+                fail(R.string.error_generic, fromVoice)
             }
         }
     }
 
-    private fun fail(@StringRes res: Int) {
-        _state.update { it.copy(processing = false, listening = false, errorRes = res) }
+    private fun fail(@StringRes res: Int, fromVoice: Boolean = true) {
+        finishing = false
+        // Hearing-flavored errors make no sense for typed input.
+        val shown = if (!fromVoice && (res == R.string.voice_no_speech || res == R.string.voice_not_clear)) {
+            R.string.error_generic
+        } else {
+            res
+        }
+        _state.update { it.copy(processing = false, listening = false, errorRes = shown) }
         viewModelScope.launch {
             analytics.log(AnalyticsEvent.ERROR_SHOWN, mapOf("error_type" to "voice", "screen" to "voice"))
         }

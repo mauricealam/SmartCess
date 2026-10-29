@@ -1,7 +1,6 @@
 package com.smartcess.app.core.ai
 
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -67,11 +66,4 @@ object ToolRegistry {
         }
     }
 
-    fun jsonSchemaFormat(name: String): JsonObject = buildJsonObject {
-        put("type", "json_schema")
-        put("json_schema", buildJsonObject {
-            put("name", JsonPrimitive(name))
-            put("strict", JsonPrimitive(true))
-        })
-    }
 }

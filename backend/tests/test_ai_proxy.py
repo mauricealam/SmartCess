@@ -173,7 +173,7 @@ def _bill_ok(request):
     import json as jsonlib
 
     payload = jsonlib.loads(request.content.decode())
-    assert payload["response_format"]["json_schema"]["name"] == "bill"
+    assert "response_format" not in payload  # Meta 400s schemaless json_schema
     content = payload["messages"][0]["content"]
     assert content[0]["type"] == "text"
     assert content[1]["type"] == "image_url"
