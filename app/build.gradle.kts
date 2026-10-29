@@ -50,6 +50,8 @@ val metaSttUrl: String =
 // SmartCess backend (Render free). Public URL, safe to default; override per env.
 val backendBaseUrl: String =
     configValue("BACKEND_URL").takeIf { it.isNotBlank() } ?: "https://smartcess-backend.onrender.com/"
+// Google Sign-In server (Web) client ID: public identifier, safe to embed.
+val googleServerClientId: String = configValue("GOOGLE_SERVER_CLIENT_ID")
 
 android {
     namespace = "com.smartcess.app"
@@ -66,6 +68,7 @@ android {
         buildConfigField("String", "META_API_BASE_URL", "\"$metaApiBaseUrl\"")
         buildConfigField("String", "META_STT_URL", "\"$metaSttUrl\"")
         buildConfigField("String", "BACKEND_URL", "\"$backendBaseUrl\"")
+        buildConfigField("String", "GOOGLE_SERVER_CLIENT_ID", "\"$googleServerClientId\"")
     }
 
     buildTypes {
@@ -87,6 +90,7 @@ android {
             buildConfigField("String", "META_API_BASE_URL", "\"$metaApiBaseUrl\"")
             buildConfigField("String", "META_STT_URL", "\"$metaSttUrl\"")
         buildConfigField("String", "BACKEND_URL", "\"$backendBaseUrl\"")
+        buildConfigField("String", "GOOGLE_SERVER_CLIENT_ID", "\"$googleServerClientId\"")
         }
     }
 

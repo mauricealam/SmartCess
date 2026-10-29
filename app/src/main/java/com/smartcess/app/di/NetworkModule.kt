@@ -138,11 +138,13 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    @Named("backendPlain")
     fun provideBackendAuthApi(@Named("backendPlain") retrofit: Retrofit): BackendAuthApi =
         retrofit.create(BackendAuthApi::class.java)
 
     @Provides
     @Singleton
+    @Named("backendAuthed")
     fun provideBackendChatApi(@Named("backendAuthed") retrofit: Retrofit): BackendChatApi =
         retrofit.create(BackendChatApi::class.java)
 

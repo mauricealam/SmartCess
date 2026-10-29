@@ -38,6 +38,8 @@ class SignInViewModel @Inject constructor(
                         _state.value = SignInUiState()
                     GoogleIdTokenProvider.Failure.NO_ACCOUNTS ->
                         _state.value = SignInUiState(errorRes = R.string.sign_in_no_accounts)
+                    GoogleIdTokenProvider.Failure.NOT_CONFIGURED ->
+                        _state.value = SignInUiState(errorRes = R.string.sign_in_not_configured)
                     GoogleIdTokenProvider.Failure.INTERRUPTED,
                     GoogleIdTokenProvider.Failure.FAILED
                     -> _state.value = SignInUiState(errorRes = R.string.sign_in_failed)

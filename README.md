@@ -42,15 +42,19 @@ and Muse Spark (structured-output reasoning). See [ARCHITECTURE.md](ARCHITECTURE
    ```
 2. Set up the backend (one free Render service; full guide in `backend/README.md`):
    - Deploy `backend/` to Render with `META_API_KEY`, `JWT_SECRET`, and
-     `GOOGLE_ANDROID_CLIENT_ID` as environment secrets.
+     `GOOGLE_SERVER_CLIENT_ID` as environment secrets.
    - The app defaults to `https://smartcess-backend.onrender.com/`. To point
      at staging or a local tunnel instead, set `BACKEND_URL` (process env,
      `local.properties`, or root `.env` — first non-blank wins).
-3. Register Google Sign-In (one-time, Google Cloud Console):
+3. Register Google Sign-In (one-time, Google Cloud Console, one project):
    - Create an OAuth client ID of type **Android** for package
      `com.smartcess.app` with your keystore SHA-1 (debug keystore for dev,
-     release keystore for production), and put the client ID in the backend's
-     `GOOGLE_ANDROID_CLIENT_ID`. No `google-services.json` is needed.
+     release keystore for production). This registers the app with Google.
+   - Create an OAuth client ID of type **Web application** in the same
+     project. Its client-ID string is the server client ID: put it in the
+     backend's `GOOGLE_SERVER_CLIENT_ID` (Render) and in the app's
+     `GOOGLE_SERVER_CLIENT_ID` (root `.env`, `local.properties`, or process
+     env at build time). No `google-services.json` is needed.
 4. (Developers only) Direct-Meta fallback: with no dev key, the app uses the
    backend. To bypass it, enter a key once in the hidden developer screen
    (Settings → tap Version 7 times). A Meta key in the local environment at

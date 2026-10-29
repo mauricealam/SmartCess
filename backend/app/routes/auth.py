@@ -37,7 +37,7 @@ def _pair(sub: str) -> dict:
 def exchange(body: GoogleExchange) -> dict:
     try:
         sub = verify_google_id_token(
-            body.id_token, get_settings().google_android_client_id
+            body.id_token, get_settings().google_server_client_id
         )
     except ValueError:
         raise AppError(

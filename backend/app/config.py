@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     jwt_access_minutes: int = 15
     jwt_refresh_days: int = 7
 
-    google_android_client_id: str = ""
+    google_server_client_id: str = ""
 
     chat_timeout_s: float = 25.0
     chat_per_minute: int = 20

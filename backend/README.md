@@ -37,7 +37,7 @@ One web service, Docker runtime, free plan — see [render.yaml](../render.yaml)
 |---|---|---|
 | `META_API_KEY` | yes | Meta Model API key, added server-side to Meta calls |
 | `JWT_SECRET` | yes | HMAC secret for session tokens (Render `generateValue`) |
-| `GOOGLE_ANDROID_CLIENT_ID` | yes | OAuth client ID; `aud` must match or exchange fails |
+| `GOOGLE_SERVER_CLIENT_ID` | yes | Web OAuth client ID; token `aud` must match or exchange fails |
 | `META_BASE_URL` | no | Default `https://api.meta.ai/v1` |
 | `META_STT_URL` | no | Default `wss://api.meta.ai/v1/asr/realtime` |
 | `STT_MODEL` | no | Default `muse-voice-transcribe-1.0` |

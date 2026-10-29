@@ -13,12 +13,13 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.security.MessageDigest
 import java.util.UUID
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 /** Google ID-token acquisition seam (Credential Manager in prod, fake in tests). */
 interface GoogleIdTokenProvider {
 
-    enum class Failure { CANCELLED, NO_ACCOUNTS, INTERRUPTED, FAILED }
+    enum class Failure { CANCELLED, NO_ACCOUNTS, INTERRUPTED, NOT_CONFIGURED, FAILED }
 
     sealed interface Result {
         data class Token(val idToken: String) : Result
@@ -31,22 +32,27 @@ interface GoogleIdTokenProvider {
 @Singleton
 class CredentialManagerIdTokenProvider @Inject constructor(
     @ApplicationContext private val context: Context,
+    @Named("googleServerClientId") private val serverClientId: String,
 ) : GoogleIdTokenProvider {
 
     private val manager by lazy { CredentialManager.create(context) }
 
     override suspend fun requestIdToken(activity: Activity): GoogleIdTokenProvider.Result {
-        // No serverClientId: the token's audience is this app's Android OAuth
-        // client, which the backend verifies (GOOGLE_ANDROID_CLIENT_ID).
-        val option = GetGoogleIdOption.Builder()
-            .setFilterByAuthorizedAccounts(false)
-            .setAutoSelectEnabled(false)
-            .setNonce(sha256Hex(UUID.randomUUID().toString()))
-            .build()
-        val request = GetCredentialRequest.Builder()
-            .addCredentialOption(option)
-            .build()
+        // Blank ID (build without GOOGLE_SERVER_CLIENT_ID) must surface as an
+        // error state: GetGoogleIdOption.build() throws on empty serverClientId.
+        if (serverClientId.isBlank()) {
+            return GoogleIdTokenProvider.Result.Error(GoogleIdTokenProvider.Failure.NOT_CONFIGURED)
+        }
         return try {
+            val option = GetGoogleIdOption.Builder()
+                .setFilterByAuthorizedAccounts(false)
+                .setAutoSelectEnabled(false)
+                .setServerClientId(serverClientId)
+                .setNonce(sha256Hex(UUID.randomUUID().toString()))
+                .build()
+            val request = GetCredentialRequest.Builder()
+                .addCredentialOption(option)
+                .build()
             val credential = manager.getCredential(activity, request).credential
             if (credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                 return GoogleIdTokenProvider.Result.Error(GoogleIdTokenProvider.Failure.FAILED)
@@ -60,6 +66,8 @@ class CredentialManagerIdTokenProvider @Inject constructor(
         } catch (e: GetCredentialInterruptedException) {
             GoogleIdTokenProvider.Result.Error(GoogleIdTokenProvider.Failure.INTERRUPTED)
         } catch (e: Exception) {
+            // Covers option-building (IllegalArgumentException), parsing, and
+            // transport failures: tapping sign-in must never crash the app.
             GoogleIdTokenProvider.Result.Error(GoogleIdTokenProvider.Failure.FAILED)
         }
     }

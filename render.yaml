@@ -11,5 +11,5 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
-      - key: GOOGLE_ANDROID_CLIENT_ID
+      - key: GOOGLE_SERVER_CLIENT_ID
         sync: false

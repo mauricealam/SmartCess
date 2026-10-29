@@ -327,6 +327,10 @@
     <string name="sign_in_button" translatable="true">Continue with Google</string>
     <string name="sign_in_failed" translatable="true">Sign-in failed. Please try again.</string>
     <string name="sign_in_no_accounts" translatable="true">No Google accounts found on this device. Add one in Android Settings, then try again.</string>
+    <string name="sign_in_not_configured" translatable="true">Sign-in is not configured in this build. Add GOOGLE_SERVER_CLIENT_ID and rebuild.</string>
+    <string name="sign_in_google_button" translatable="false">Sign in with Google</string>
+    <string name="sign_in_signing_in" translatable="true">Signing in…</string>
+    <string name="sign_in_privacy_note" translatable="true">Your account is used only to sign you in.</string>
     <string name="auth_sign_in_required" translatable="true">Please sign in to continue.</string>
     <string name="auth_signed_in" translatable="true">Signed in</string>
     <string name="auth_signed_out" translatable="true">Not signed in</string>
