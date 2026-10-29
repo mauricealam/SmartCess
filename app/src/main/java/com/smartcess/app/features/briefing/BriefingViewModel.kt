@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.smartcess.app.R
 import com.smartcess.app.core.ai.OfflineModeException
+import com.smartcess.app.core.ai.SessionExpiredException
 import com.smartcess.app.core.ai.SparkClient
 import com.smartcess.app.core.ai.Speaker
 import com.smartcess.app.data.local.entity.AppointmentEntity
@@ -22,6 +23,7 @@ import javax.inject.Inject
 data class BriefingUiState(
     val loading: Boolean = true,
     val offline: Boolean = false,
+    val signInRequired: Boolean = false,
     val aiBriefing: String? = null,
     val overdueBills: List<BillEntity> = emptyList(),
     val billsDueSoon: List<BillEntity> = emptyList(),
@@ -60,6 +62,7 @@ class BriefingViewModel @Inject constructor(
             }
             var aiBriefing: String? = null
             var offline = false
+            var signIn = false
             if (!data.isEmpty) {
                 aiBriefing = runCatching {
                     spark.dailyBriefing(
@@ -72,12 +75,14 @@ class BriefingViewModel @Inject constructor(
                     ).briefing.ifBlank { null }
                 }.getOrElse { e ->
                     if (e is OfflineModeException) offline = true
+                    if (e is SessionExpiredException) signIn = true
                     null
                 }
             }
             _state.value = BriefingUiState(
                 loading = false,
                 offline = offline,
+                signInRequired = signIn,
                 aiBriefing = aiBriefing,
                 overdueBills = data.overdueBills,
                 billsDueSoon = data.billsDueSoon,

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.smartcess.app.R
 import com.smartcess.app.core.ai.OfflineModeException
+import com.smartcess.app.core.ai.SessionExpiredException
 import com.smartcess.app.core.ai.Speaker
 import com.smartcess.app.core.ai.SparkClient
 import com.smartcess.app.core.work.ReminderScheduler
@@ -26,6 +27,7 @@ import javax.inject.Inject
 data class EmailUiState(
     val briefing: String? = null,
     val offline: Boolean = false,
+    val signInRequired: Boolean = false,
     val messageRes: Int? = null,
     val errorRes: Int? = null,
 )
@@ -69,9 +71,11 @@ class EmailViewModel @Inject constructor(
             }.toString()
             val result = runCatching { spark.briefEmails(json) }
             val briefing = result.getOrNull()?.briefing?.ifBlank { null }
+            val signIn = result.exceptionOrNull() is SessionExpiredException
             _state.value = _state.value.copy(
                 briefing = briefing,
                 offline = result.exceptionOrNull() is OfflineModeException,
+                signInRequired = signIn,
             )
         }
     }

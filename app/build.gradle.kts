@@ -47,6 +47,9 @@ val metaApiBaseUrl: String =
         .takeIf { it.isNotBlank() } ?: "https://api.meta.ai/v1/"
 val metaSttUrl: String =
     configValue("META_STT_URL").takeIf { it.isNotBlank() } ?: "wss://api.meta.ai/v1/asr/realtime"
+// SmartCess backend (Render free). Public URL, safe to default; override per env.
+val backendBaseUrl: String =
+    configValue("BACKEND_URL").takeIf { it.isNotBlank() } ?: "https://smartcess-backend.onrender.com/"
 
 android {
     namespace = "com.smartcess.app"
@@ -62,6 +65,7 @@ android {
         buildConfigField("String", "META_API_KEY", "\"$metaApiKey\"")
         buildConfigField("String", "META_API_BASE_URL", "\"$metaApiBaseUrl\"")
         buildConfigField("String", "META_STT_URL", "\"$metaSttUrl\"")
+        buildConfigField("String", "BACKEND_URL", "\"$backendBaseUrl\"")
     }
 
     buildTypes {
@@ -82,6 +86,7 @@ android {
             buildConfigField("String", "META_API_KEY", "\"$metaApiKey\"")
             buildConfigField("String", "META_API_BASE_URL", "\"$metaApiBaseUrl\"")
             buildConfigField("String", "META_STT_URL", "\"$metaSttUrl\"")
+        buildConfigField("String", "BACKEND_URL", "\"$backendBaseUrl\"")
         }
     }
 
@@ -154,10 +159,14 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.kotlinx.serialization)
     implementation(libs.okhttp)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
+    testImplementation(libs.mockwebserver)
     testImplementation(libs.androidx.core.testing)
     testImplementation(libs.kotlinx.coroutines.core)
     testImplementation(libs.work.testing)

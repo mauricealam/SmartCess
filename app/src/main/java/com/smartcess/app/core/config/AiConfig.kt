@@ -16,6 +16,8 @@ class AiConfig @Inject constructor() {
     val sparkFallbackModel: String = "muse-spark-1.1"
     val sttUrl: String = BuildConfig.META_STT_URL
     val sttModel: String = "muse-voice-transcribe-1.0"
+    /** SmartCess backend base URL (Render). All production AI traffic goes here. */
+    val backendBaseUrl: String = BuildConfig.BACKEND_URL
 
     /** Per-call timeouts (spec budgets: capture->result <30s, doc <45s, briefing <10s). */
     val extractionTimeoutMillis: Long = 30_000

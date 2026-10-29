@@ -16,6 +16,7 @@ import com.smartcess.app.core.ai.AiException
 import com.smartcess.app.core.ai.OcrEngine
 import com.smartcess.app.core.ai.OfflineDrafts
 import com.smartcess.app.core.ai.OfflineModeException
+import com.smartcess.app.core.ai.SessionExpiredException
 import com.smartcess.app.core.ai.Speaker
 import com.smartcess.app.core.ai.SparkClient
 import com.google.mlkit.vision.common.InputImage
@@ -279,6 +280,8 @@ class CameraViewModel @Inject constructor(
                     _uiState.update { it.copy(phase = CameraPhase.FRAMING) }
                 } catch (e: OfflineModeException) {
                     saveOfflineDraft(outFile)
+                } catch (e: SessionExpiredException) {
+                    saveOfflineDraft(outFile, announceRes = R.string.auth_sign_in_required)
                 } catch (e: AiException) {
                     fail(R.string.error_extraction_failed, speak = true)
                 } catch (e: Exception) {
@@ -293,7 +296,10 @@ class CameraViewModel @Inject constructor(
      * low-confidence draft for review, and say so honestly. Framing already
      * worked offline; only the Spark step was skipped.
      */
-    private suspend fun saveOfflineDraft(outFile: File?) {
+    private suspend fun saveOfflineDraft(
+        outFile: File?,
+        @StringRes announceRes: Int = R.string.banner_offline,
+    ) {
         val ocrText = runCatching {
             if (outFile != null) {
                 ocr.recognizeText(InputImage.fromFilePath(context, Uri.fromFile(outFile)))
@@ -318,13 +324,13 @@ class CameraViewModel @Inject constructor(
         val savedId = outcome.savedId
         if (savedId == null) {
             _uiState.update { it.copy(phase = CameraPhase.FRAMING, isOffline = true) }
-            announce(R.string.banner_offline)
+            announce(announceRes)
             return
         }
         analytics.log(AnalyticsEvent.BILL_SCAN_COMPLETE, mapOf("saved" to "draft", "offline" to "true"))
         _captured.emit(savedId)
         _uiState.update { it.copy(phase = CameraPhase.FRAMING, isOffline = true) }
-        announce(R.string.banner_offline)
+        announce(announceRes)
     }
 
     private fun fail(@StringRes res: Int, speak: Boolean) {

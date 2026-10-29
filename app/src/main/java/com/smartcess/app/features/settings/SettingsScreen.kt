@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.height
@@ -50,6 +51,7 @@ import com.smartcess.app.R
 import com.smartcess.app.ui.components.SmartCessBanner
 import com.smartcess.app.ui.components.SmartCessCard
 import com.smartcess.app.ui.components.SmartCessConfirmDialog
+import com.smartcess.app.ui.components.SmartCessPrimaryButton
 import com.smartcess.app.ui.components.SmartCessSecondaryButton
 import com.smartcess.app.ui.components.SmartCessTextField
 import com.smartcess.app.ui.components.SmartCessTopBar
@@ -63,6 +65,8 @@ import com.smartcess.app.ui.components.BannerKind
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onSignIn: () -> Unit,
+    onDev: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -71,6 +75,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var feedbackText by remember { mutableStateOf("") }
+    var devTaps by remember { mutableStateOf(0) }
     val jsonExportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
     ) { uri -> uri?.let { viewModel.writeExportFile(it, csv = false) } }
@@ -94,7 +99,7 @@ fun SettingsScreen(
         SettingsSection(title = stringResource(R.string.settings_section_speech)) {
             Text(
                 text = stringResource(
-                    if (state.hasApiKey) R.string.settings_meta_on else R.string.settings_meta_off,
+                    if (state.signedIn) R.string.auth_signed_in else R.string.auth_signed_out,
                 ),
                 style = MaterialTheme.typography.bodyMedium,
             )
@@ -106,6 +111,22 @@ fun SettingsScreen(
                 valueRange = 0.5f..2.0f,
                 steps = 5,
             )
+        }
+
+        SettingsSection(title = stringResource(R.string.settings_section_account)) {
+            if (state.signedIn) {
+                SmartCessSecondaryButton(
+                    text = stringResource(R.string.auth_sign_out),
+                    onClick = viewModel::signOut,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                SmartCessPrimaryButton(
+                    text = stringResource(R.string.sign_in_button),
+                    onClick = onSignIn,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
 
         SettingsSection(title = stringResource(R.string.settings_section_reminders)) {
@@ -224,6 +245,13 @@ fun SettingsScreen(
             Text(
                 text = stringResource(R.string.settings_version, BuildConfig.VERSION_NAME),
                 style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.clickable {
+                    devTaps++
+                    if (devTaps >= 7) {
+                        devTaps = 0
+                        onDev()
+                    }
+                },
             )
         }
     }

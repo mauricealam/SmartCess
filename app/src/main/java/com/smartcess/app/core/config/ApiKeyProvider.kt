@@ -17,6 +17,13 @@ import dagger.hilt.android.qualifiers.ApplicationContext
  */
 interface ApiKeyProvider {
     fun getMetaApiKey(): String?
+
+    /**
+     * Developer-override key from encrypted storage ONLY (hidden dev screen).
+     * Null in the production flow: transport selection must use this, never
+     * [getMetaApiKey] (which also sees build-time config).
+     */
+    fun getStoredKey(): String?
     fun setMetaApiKey(key: String)
     fun clearMetaApiKey()
     fun hasMetaApiKey(): Boolean = getMetaApiKey() != null
@@ -38,9 +45,12 @@ class ApiKeyProviderImpl(
     }
 
     override fun getMetaApiKey(): String? {
-        prefs.getString(KEY_META_API_KEY, null)?.takeIf { it.isNotBlank() }?.let { return it }
+        getStoredKey()?.let { return it }
         return BuildConfig.META_API_KEY.takeIf { it.isNotBlank() }
     }
+
+    override fun getStoredKey(): String? =
+        prefs.getString(KEY_META_API_KEY, null)?.takeIf { it.isNotBlank() }
 
     override fun setMetaApiKey(key: String) {
         prefs.edit().putString(KEY_META_API_KEY, key.trim()).apply()

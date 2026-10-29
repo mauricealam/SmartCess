@@ -3,7 +3,9 @@ package com.smartcess.app.features.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.smartcess.app.R
-import com.smartcess.app.core.config.ApiKeyProvider
+import com.smartcess.app.core.session.BackendHealthMonitor
+import com.smartcess.app.core.session.HealthState
+import com.smartcess.app.core.session.SessionManager
 import com.smartcess.app.data.repository.BriefingRepository
 import com.smartcess.app.data.repository.TodayData
 import com.smartcess.app.ui.format.SmartCessFormat
@@ -28,7 +30,7 @@ data class HomeUiState(
     val extraCount: Int = 0,
     /** True when the briefing read failed: render the error branch, never calm empty. */
     val loadFailed: Boolean = false,
-    /** True when no Meta key is set: AI features degraded (matches sibling screens). */
+    /** True when signed out: AI features degraded (matches sibling screens). */
     val aiOffline: Boolean = false,
 )
 
@@ -77,10 +79,14 @@ fun buildHomePreview(data: TodayData): HomeUiState {
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val briefing: BriefingRepository,
-    private val apiKeys: ApiKeyProvider,
+    private val sessions: SessionManager,
+    monitor: BackendHealthMonitor,
 ) : ViewModel() {
     private val _state = MutableStateFlow(HomeUiState())
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
+
+    /** Backend warm-up state for the "Preparing SmartCess…" banner. */
+    val health: StateFlow<HealthState> = monitor.state
     private var loadJob: Job? = null
 
     init {
@@ -95,7 +101,7 @@ class HomeViewModel @Inject constructor(
         loadJob = viewModelScope.launch {
             _state.value = HomeUiState(loading = true)
             val data = runCatching { briefing.getTodayData() }.getOrNull()
-            val offline = !apiKeys.hasMetaApiKey()
+            val offline = !sessions.isSignedIn()
             _state.value = if (data == null) {
                 HomeUiState(loading = false, loadFailed = true, aiOffline = offline)
             } else {

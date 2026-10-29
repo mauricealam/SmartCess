@@ -21,3 +21,9 @@ captures/
 .externalNativeBuild/
 .cxx/
 *.hprof
+
+# Python backend (local env + caches; .env already ignored above)
+backend/.venv/
+__pycache__/
+.pytest_cache/
+*.pyc

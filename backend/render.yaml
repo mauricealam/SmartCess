@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: smartcess-backend
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: META_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: GOOGLE_ANDROID_CLIENT_ID
+        sync: false

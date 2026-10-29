@@ -6,8 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.smartcess.app.R
 import com.smartcess.app.core.ai.Speaker
-import com.smartcess.app.core.config.ApiKeyProvider
 import com.smartcess.app.core.privacy.PrivacyManager
+import com.smartcess.app.core.session.SessionManager
 import com.smartcess.app.data.local.entity.UserPreferencesEntity
 import com.smartcess.app.data.repository.PreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -24,7 +24,7 @@ import java.time.Instant
 import javax.inject.Inject
 
 data class SettingsUiState(
-    val hasApiKey: Boolean = false,
+    val signedIn: Boolean = false,
     val messageRes: Int? = null,
     val exportPayload: String? = null,
 )
@@ -32,7 +32,7 @@ data class SettingsUiState(
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val prefs: PreferencesRepository,
-    private val apiKeys: ApiKeyProvider,
+    private val sessions: SessionManager,
     private val privacy: PrivacyManager,
     private val speaker: Speaker,
     @ApplicationContext private val context: Context,
@@ -46,8 +46,15 @@ class SettingsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            _state.value = _state.value.copy(hasApiKey = apiKeys.hasMetaApiKey())
+            _state.value = _state.value.copy(signedIn = sessions.isSignedIn())
             speaker.setRate(prefs.get().ttsRate)
+        }
+    }
+
+    fun signOut() {
+        viewModelScope.launch {
+            sessions.signOut()
+            _state.value = _state.value.copy(signedIn = false)
         }
     }
 

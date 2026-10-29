@@ -3,6 +3,7 @@ package com.smartcess.app.features.routines
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.smartcess.app.R
+import com.smartcess.app.core.ai.SessionExpiredException
 import com.smartcess.app.core.ai.SparkClient
 import com.smartcess.app.core.work.ReminderScheduler
 import com.smartcess.app.data.local.entity.ReminderEntity
@@ -57,9 +58,15 @@ class RoutinesViewModel @Inject constructor(
         val text = _form.value.describeText
         if (text.isBlank()) return
         viewModelScope.launch {
-            val help = runCatching { spark.routineHelp(text) }.getOrNull()
+            val result = runCatching { spark.routineHelp(text) }
+            val help = result.getOrNull()
             if (help == null) {
-                _form.value = _form.value.copy(errorRes = R.string.banner_offline)
+                val res = if (result.exceptionOrNull() is SessionExpiredException) {
+                    R.string.auth_sign_in_required
+                } else {
+                    R.string.banner_offline
+                }
+                _form.value = _form.value.copy(errorRes = res)
                 return@launch
             }
             _form.value = _form.value.copy(

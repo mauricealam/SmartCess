@@ -3,6 +3,8 @@ package com.smartcess.app.navigation
 /** All navigation destinations (spec screen list). Module agents implement each screen. */
 object Routes {
     const val ONBOARDING = "onboarding"
+    const val SIGNIN = "signin"
+    const val DEV = "dev"
     const val HOME = "home"
     const val DOCUMENTS = "documents"
     const val APPOINTMENTS = "appointments"

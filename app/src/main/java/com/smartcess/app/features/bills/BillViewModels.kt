@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.smartcess.app.R
 import com.smartcess.app.core.ai.Speaker
+import com.smartcess.app.core.ai.SessionExpiredException
 import com.smartcess.app.core.ai.SparkClient
 import com.smartcess.app.core.work.ReminderScheduler
 import com.smartcess.app.data.local.entity.BillEntity
@@ -226,6 +227,7 @@ data class ComparisonUiState(
     val recommendation: String? = null,
     val reasons: List<String> = emptyList(),
     val offline: Boolean = false,
+    val signInRequired: Boolean = false,
     val errorRes: Int? = null,
 )
 
@@ -250,19 +252,22 @@ class ComparisonViewModel @Inject constructor(
                 _state.value = ComparisonUiState(loading = false, current = current)
                 return@launch
             }
-            val ai = runCatching {
+            val result = runCatching {
                 spark.compareBills(
                     currentJson = current.toString(),
                     previousJson = previous.toString(),
                 )
-            }.getOrNull()
+            }
+            val ai = result.getOrNull()
+            val signIn = result.exceptionOrNull() is SessionExpiredException
             _state.value = ComparisonUiState(
                 loading = false,
                 current = current,
                 previous = previous,
                 recommendation = ai?.recommendation?.ifBlank { null },
                 reasons = ai?.possible_reasons ?: emptyList(),
-                offline = ai == null,
+                offline = ai == null && !signIn,
+                signInRequired = signIn,
             )
         }
     }

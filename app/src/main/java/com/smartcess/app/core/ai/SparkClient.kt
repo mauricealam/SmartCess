@@ -203,6 +203,7 @@ class SparkClient @Inject constructor(
             } catch (e: TimeoutCancellationException) {
                 lastError = TimeoutException(e.message)
             } catch (e: retrofit2.HttpException) {
+                if (e.code() == 401) throw SessionExpiredException()
                 if (e.code() == 429) throw RateLimitedException()
                 if (e.code() !in 500..599) throw AiException("The AI request failed. Please try again.", e)
                 lastError = e

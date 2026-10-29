@@ -57,6 +57,7 @@ import com.smartcess.app.ui.components.SmartCessHomeHeader
 import com.smartcess.app.ui.components.SmartCessMoreSheet
 import com.smartcess.app.ui.components.SmartCessSecondaryButton
 import com.smartcess.app.ui.components.SmartCessTextAction
+import com.smartcess.app.core.session.HealthState
 import com.smartcess.app.ui.theme.SmartCessTheme
 
 /**
@@ -91,6 +92,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    val health by viewModel.health.collectAsState()
     var showMore by remember { mutableStateOf(false) }
     val wide = isWideWindow()
 
@@ -104,6 +106,7 @@ fun HomeScreen(
         if (wide) {
             HomeWide(
                 state = state,
+                health = health,
                 onTalk = onTalk,
                 onToday = onToday,
                 onScanBill = onScanBill,
@@ -118,6 +121,7 @@ fun HomeScreen(
         } else {
             HomePortrait(
                 state = state,
+                health = health,
                 onTalk = onTalk,
                 onToday = onToday,
                 onScanBill = onScanBill,
@@ -157,6 +161,7 @@ private fun isWideWindow(): Boolean {
 @Composable
 private fun HomePortrait(
     state: HomeUiState,
+    health: HealthState,
     onTalk: () -> Unit,
     onToday: () -> Unit,
     onScanBill: () -> Unit,
@@ -175,6 +180,14 @@ private fun HomePortrait(
         Spacer(Modifier.height(12.dp))
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Spacer(Modifier.height(12.dp))
+        if (health == HealthState.WAKING) {
+            SmartCessBanner(message = stringResource(R.string.backend_warming), kind = BannerKind.INFO)
+            Spacer(Modifier.height(12.dp))
+        }
+        if (health == HealthState.DOWN) {
+            SmartCessBanner(message = stringResource(R.string.backend_down), kind = BannerKind.ERROR)
+            Spacer(Modifier.height(12.dp))
+        }
         if (state.aiOffline) {
             SmartCessBanner(
                 message = stringResource(R.string.banner_offline),
@@ -206,6 +219,7 @@ private fun HomePortrait(
 @Composable
 private fun HomeWide(
     state: HomeUiState,
+    health: HealthState,
     onTalk: () -> Unit,
     onToday: () -> Unit,
     onScanBill: () -> Unit,
@@ -228,6 +242,14 @@ private fun HomeWide(
             Spacer(Modifier.height(12.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Spacer(Modifier.height(12.dp))
+            if (health == HealthState.WAKING) {
+                SmartCessBanner(message = stringResource(R.string.backend_warming), kind = BannerKind.INFO)
+                Spacer(Modifier.height(12.dp))
+            }
+            if (health == HealthState.DOWN) {
+                SmartCessBanner(message = stringResource(R.string.backend_down), kind = BannerKind.ERROR)
+                Spacer(Modifier.height(12.dp))
+            }
             if (state.aiOffline) {
                 SmartCessBanner(
                     message = stringResource(R.string.banner_offline),

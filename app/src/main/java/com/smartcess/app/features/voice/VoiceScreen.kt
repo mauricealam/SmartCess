@@ -37,6 +37,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.smartcess.app.R
+import com.smartcess.app.core.session.HealthState
 import com.smartcess.app.ui.components.BannerKind
 import com.smartcess.app.ui.components.SmartCessBanner
 import com.smartcess.app.ui.components.SmartCessPrimaryButton
@@ -60,6 +61,7 @@ fun VoiceScreen(
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsState()
+    val health by viewModel.health.collectAsState()
     var hasMic by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
@@ -105,6 +107,19 @@ fun VoiceScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         SmartCessTopBar(title = stringResource(R.string.voice_title), onBack = goBack)
+
+        if (health == HealthState.WAKING) {
+            SmartCessBanner(
+                message = stringResource(R.string.backend_warming),
+                kind = BannerKind.INFO,
+            )
+        }
+        if (health == HealthState.DOWN) {
+            SmartCessBanner(
+                message = stringResource(R.string.backend_down),
+                kind = BannerKind.ERROR,
+            )
+        }
 
         if (!hasMic) {
             MicPermissionCard(

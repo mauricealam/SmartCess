@@ -323,6 +323,25 @@
     <string name="settings_about_body" translatable="true">SmartCess turns inaccessible life admin into independent action. Built with co-designer Hillarry for blind and low-vision users.</string>
     <string name="settings_version" translatable="true">Version %1$s</string>
 
+    <!-- Auth + backend -->
+    <string name="sign_in_title" translatable="true">Sign in to SmartCess</string>
+    <string name="sign_in_body" translatable="true">Sign in with Google to use Talk, Scan Bill, and Reminders. SmartCess never sees your password.</string>
+    <string name="sign_in_button" translatable="true">Continue with Google</string>
+    <string name="sign_in_failed" translatable="true">Sign-in failed. Please try again.</string>
+    <string name="sign_in_no_accounts" translatable="true">No Google accounts found on this device. Add one in Android Settings, then try again.</string>
+    <string name="auth_sign_in_required" translatable="true">Please sign in to continue.</string>
+    <string name="auth_signed_in" translatable="true">Signed in</string>
+    <string name="auth_signed_out" translatable="true">Not signed in</string>
+    <string name="auth_sign_out" translatable="true">Sign out</string>
+    <string name="backend_warming" translatable="true">Preparing SmartCess… Please wait a moment.</string>
+    <string name="backend_down" translatable="true">Can\'t reach SmartCess. Check your connection and try again.</string>
+    <string name="settings_section_account" translatable="true">Account</string>
+    <string name="dev_title" translatable="true">Developer options</string>
+    <string name="dev_key_label" translatable="true">Meta API key (developer only)</string>
+    <string name="dev_key_hint" translatable="true">Bypasses the SmartCess backend. Never for production use.</string>
+    <string name="dev_key_saved" translatable="true">Developer key saved. AI now talks to Meta directly.</string>
+    <string name="dev_key_cleared" translatable="true">Developer key cleared. AI now uses the SmartCess backend.</string>
+
     <!-- Voice -->
     <string name="voice_listening" translatable="true">Listening… speak now.</string>
     <string name="voice_transcript_label" translatable="true">What I heard</string>
@@ -333,7 +352,7 @@
     <string name="voice_listen_again" translatable="true">Listen again</string>
     <string name="voice_no_speech" translatable="true">I did not hear you. Tap Talk and try again.</string>
     <string name="voice_not_clear" translatable="true">Sorry, I could not hear that clearly.</string>
-    <string name="voice_api_unavailable" translatable="true">SmartCess cannot reach Meta AI right now.</string>
+    <string name="voice_api_unavailable" translatable="true">SmartCess cannot reach its AI service right now.</string>
     <string name="voice_timeout" translatable="true">That is taking too long. Please try again.</string>
     <string name="voice_help" translatable="true">I can help with bills, email, documents, appointments, and routines. What do you need?</string>
     <string name="error_rate_limit" translatable="true">Too many requests. Please try again shortly.</string>
@@ -417,8 +436,8 @@
     <string name="bill_discard_confirm_message" translatable="true">“%1$s” will be removed from this device.</string>
 
     <!-- Settings extras -->
-    <string name="settings_meta_on" translatable="true">Meta AI: connected</string>
-    <string name="settings_meta_off" translatable="true">Meta AI: offline mode</string>
+
+
     <string name="settings_reminder_time" translatable="true">Daily routine time</string>
     <string name="settings_hour" translatable="true">Hour</string>
     <string name="settings_hour_value" translatable="true">%1$02d</string>

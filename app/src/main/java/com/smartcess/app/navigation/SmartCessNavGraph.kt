@@ -19,12 +19,14 @@ import com.smartcess.app.features.camera.CameraScreen
 import com.smartcess.app.features.documents.DocumentResultScreen
 import com.smartcess.app.features.documents.DocumentsScreen
 import com.smartcess.app.features.email.EmailScreen
+import com.smartcess.app.features.auth.SignInScreen
 import com.smartcess.app.features.home.HomeScreen
 import com.smartcess.app.features.onboarding.OnboardingScreen
 import com.smartcess.app.features.onboarding.isOnboardingDone
 import com.smartcess.app.features.reminders.ReminderScreen
 import com.smartcess.app.features.routines.RoutineDetailScreen
 import com.smartcess.app.features.routines.RoutinesScreen
+import com.smartcess.app.features.settings.DevScreen
 import com.smartcess.app.features.settings.SettingsScreen
 import com.smartcess.app.features.voice.VoiceScreen
 
@@ -47,7 +49,7 @@ fun SmartCessNavGraph(
         composable(Routes.ONBOARDING) {
             OnboardingScreen(
                 onDone = {
-                    navController.navigate(Routes.HOME) {
+                    navController.navigate(Routes.SIGNIN) {
                         popUpTo(Routes.ONBOARDING) { inclusive = true }
                     }
                 },
@@ -184,7 +186,24 @@ fun SmartCessNavGraph(
             )
         }
         composable(Routes.SETTINGS) {
-            SettingsScreen(onBack = { navController.popBackStack() })
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onSignIn = { navController.navigate(Routes.SIGNIN) },
+                onDev = { navController.navigate(Routes.DEV) },
+            )
+        }
+        composable(Routes.SIGNIN) {
+            SignInScreen(
+                onDone = {
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                    }
+                },
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable(Routes.DEV) {
+            DevScreen(onBack = { navController.popBackStack() })
         }
     }
 }

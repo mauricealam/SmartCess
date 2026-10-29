@@ -40,24 +40,22 @@ and Muse Spark (structured-output reasoning). See [ARCHITECTURE.md](ARCHITECTURE
    git clone https://github.com/<your-org>/SmartCess.git
    cd SmartCess
    ```
-2. Create your local API-key file (git-ignored, never commit it):
-   ```sh
-   cp local.properties.example local.properties
-   ```
-   Then edit `local.properties`:
-   ```properties
-   META_API_KEY=<your-meta-model-api-key>
-   # Optional endpoint overrides (defaults are the official Meta endpoints):
-   # META_API_BASE_URL=https://...
-   # META_STT_URL=wss://...
-   ```
-   There is no in-app key entry: the key reaches debug builds only from the
-   local environment at build time (process env → `local.properties` →
-   root `.env`). CI builds keyless, and release builds force the key empty
-   and run offline-capable (framing, OCR, TTS, local data, reminders).
-   (The EncryptedSharedPreferences key slot exists but no UI writes it yet.)
-   Do not distribute debug APKs: they embed the key in plaintext.
-3. Open the project in Android Studio and let Gradle sync, or build from the CLI:
+2. Set up the backend (one free Render service; full guide in `backend/README.md`):
+   - Deploy `backend/` to Render with `META_API_KEY`, `JWT_SECRET`, and
+     `GOOGLE_ANDROID_CLIENT_ID` as environment secrets.
+   - The app defaults to `https://smartcess-backend.onrender.com/`. To point
+     at staging or a local tunnel instead, set `BACKEND_URL` (process env,
+     `local.properties`, or root `.env` — first non-blank wins).
+3. Register Google Sign-In (one-time, Google Cloud Console):
+   - Create an OAuth client ID of type **Android** for package
+     `com.smartcess.app` with your keystore SHA-1 (debug keystore for dev,
+     release keystore for production), and put the client ID in the backend's
+     `GOOGLE_ANDROID_CLIENT_ID`. No `google-services.json` is needed.
+4. (Developers only) Direct-Meta fallback: with no dev key, the app uses the
+   backend. To bypass it, enter a key once in the hidden developer screen
+   (Settings → tap Version 7 times). A Meta key in the local environment at
+   build time also embeds into debug APKs — never distribute those APKs.
+5. Open the project in Android Studio and let Gradle sync, or build from the CLI:
    ```sh
    ./gradlew :app:assembleDebug
    ```

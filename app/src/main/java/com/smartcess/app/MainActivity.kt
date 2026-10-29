@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
+import com.smartcess.app.core.session.BackendHealthMonitor
 import com.smartcess.app.core.work.ReminderActionReceiver
 import com.smartcess.app.data.repository.PreferencesRepository
 import com.smartcess.app.navigation.SmartCessNavGraph
@@ -30,6 +31,7 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
 
     @Inject lateinit var prefs: PreferencesRepository
+    @Inject lateinit var healthMonitor: BackendHealthMonitor
 
     /** Pending notification deep-link route; consumed once by the nav graph. */
     private val pendingDeepLink = mutableStateOf<String?>(null)
@@ -43,6 +45,8 @@ class MainActivity : ComponentActivity() {
         val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
         consumeDeepLink(intent)
+        // Wake the free-tier backend early; screens show "Preparing" meanwhile.
+        healthMonitor.warmup()
         // Brand moment: hold the splash just long enough for the reveal to
         // read (it overlaps real cold-start init; total stays in budget).
         // Reduced motion skips the wait and the exit fade entirely.

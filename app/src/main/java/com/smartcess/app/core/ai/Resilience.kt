@@ -14,6 +14,8 @@ open class AiException(message: String, cause: Throwable? = null) : IOException(
 class RateLimitedException : AiException("The AI service is busy. Please try again in a moment.")
 class OfflineModeException : AiException("You are offline. Showing what is saved on this device.")
 class InvalidAiResponseException : AiException("The AI answer was unclear. Please try again.")
+/** Backend session missing or refresh failed: the user must sign in again. Never retried. */
+class SessionExpiredException : AiException("Please sign in again.")
 
 /** Client-side rate limit: max concurrent calls + per-minute budget. */
 @Singleton
@@ -66,6 +68,8 @@ class RetryPolicy @Inject constructor() {
             } catch (e: RateLimitedException) {
                 throw e
             } catch (e: OfflineModeException) {
+                throw e
+            } catch (e: SessionExpiredException) {
                 throw e
             } catch (e: TimeoutException) {
                 if (timeoutLeft-- <= 0) throw AiException("The AI service timed out. Please try again.", e)

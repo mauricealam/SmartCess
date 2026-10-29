@@ -425,6 +425,9 @@ fun ComparisonScreen(
         if (state.offline) {
             SmartCessBanner(message = stringResource(R.string.banner_offline), kind = BannerKind.OFFLINE)
         }
+        if (state.signInRequired) {
+            SmartCessBanner(message = stringResource(R.string.auth_sign_in_required), kind = BannerKind.ERROR)
+        }
         SmartCessCard(heading = stringResource(R.string.comparison_current)) {
             SmartCessListItem(
                 title = stringResource(R.string.comparison_current),

@@ -15,6 +15,7 @@ import com.smartcess.app.core.ai.ContentSafety
 import com.smartcess.app.core.ai.DocumentSummary
 import com.smartcess.app.core.ai.OcrEngine
 import com.smartcess.app.core.ai.Speaker
+import com.smartcess.app.core.ai.SessionExpiredException
 import com.smartcess.app.core.ai.SparkClient
 import com.smartcess.app.core.work.ReminderScheduler
 import com.smartcess.app.data.local.entity.DocumentEntity
@@ -42,6 +43,7 @@ data class DocumentsUiState(
     val messageRes: Int? = null,
     val errorRes: Int? = null,
     val offline: Boolean = false,
+    val signInRequired: Boolean = false,
 )
 
 @HiltViewModel
@@ -78,7 +80,8 @@ class DocumentsViewModel @Inject constructor(
                 _state.value = DocumentsUiState(errorRes = res)
                 return@launch
             }
-            val summary = runCatching { spark.summarizeDocument(text, null) }.getOrNull()
+            val result = runCatching { spark.summarizeDocument(text, null) }
+            val summary = result.getOrNull()
             if (summary == null) {
                 _state.value = DocumentsUiState(
                     draft = DocumentSummary(
@@ -89,6 +92,7 @@ class DocumentsViewModel @Inject constructor(
                     ),
                     draftSource = uri.toString(),
                     offline = true,
+                    signInRequired = result.exceptionOrNull() is SessionExpiredException,
                     messageRes = read?.noteRes,
                 )
             } else {

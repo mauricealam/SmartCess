@@ -7,10 +7,13 @@ import com.smartcess.app.R
 import com.smartcess.app.core.ai.AiException
 import com.smartcess.app.core.ai.OfflineModeException
 import com.smartcess.app.core.ai.RateLimitedException
+import com.smartcess.app.core.ai.SessionExpiredException
 import com.smartcess.app.core.ai.Speaker
 import com.smartcess.app.core.ai.SparkClient
 import com.smartcess.app.core.privacy.AnalyticsEvent
 import com.smartcess.app.core.privacy.AnalyticsLogger
+import com.smartcess.app.core.session.BackendHealthMonitor
+import com.smartcess.app.core.session.HealthState
 import com.smartcess.app.core.voice.MuseVoiceTranscriber
 import com.smartcess.app.core.voice.TranscriptEvent
 import com.smartcess.app.data.local.dao.ConversationTurnDao
@@ -56,10 +59,14 @@ class VoiceViewModel @Inject constructor(
     private val turns: ConversationTurnDao,
     private val prefs: PreferencesRepository,
     private val analytics: AnalyticsLogger,
+    monitor: BackendHealthMonitor,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(VoiceUiState())
     val state: StateFlow<VoiceUiState> = _state.asStateFlow()
+
+    /** Backend warm-up state for the "Preparing SmartCess…" banner. */
+    val health: StateFlow<HealthState> = monitor.state
 
     /** Emits a [Routes] destination once an intent is classified. */
     private val _navigate = MutableSharedFlow<String>(extraBufferCapacity = 1)
@@ -121,6 +128,7 @@ class VoiceViewModel @Inject constructor(
     private fun onTranscriberError(message: String) {
         val res = when {
             message.contains("Microphone permission", ignoreCase = true) -> R.string.perm_mic_rationale
+            message.contains("sign in", ignoreCase = true) -> R.string.auth_sign_in_required
             message.contains("API key", ignoreCase = true) -> R.string.voice_api_unavailable
             message.contains("busy", ignoreCase = true) -> R.string.error_rate_limit
             _state.value.partial.isBlank() && _state.value.transcript.isBlank() -> R.string.voice_no_speech
@@ -159,6 +167,8 @@ class VoiceViewModel @Inject constructor(
                 }
             } catch (e: OfflineModeException) {
                 fail(R.string.voice_api_unavailable)
+            } catch (e: SessionExpiredException) {
+                fail(R.string.auth_sign_in_required)
             } catch (e: RateLimitedException) {
                 fail(R.string.error_rate_limit)
             } catch (e: TimeoutException) {

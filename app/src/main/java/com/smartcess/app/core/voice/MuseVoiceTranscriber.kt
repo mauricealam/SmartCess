@@ -4,9 +4,11 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import com.smartcess.app.core.ai.RateLimitedException
+import com.smartcess.app.core.ai.SessionExpiredException
 import com.smartcess.app.core.config.AiConfig
 import com.smartcess.app.core.config.ApiKeyProvider
 import com.smartcess.app.core.serialization.SmartCessJson
+import com.smartcess.app.core.session.SessionManager
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -25,6 +27,7 @@ import okhttp3.WebSocketListener
 import okio.ByteString
 import java.util.UUID
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 /**
@@ -88,12 +91,15 @@ object SttAudioSpec {
 
 /** Grace period after endStream for final transcripts before forcing close. */
 private const val END_STREAM_GRACE_MILLIS = 10_000L
+/** Backend relay close code when the session token is rejected. */
+private const val BACKEND_AUTH_CLOSE = 4401
 
 @Singleton
 class MuseVoiceTranscriberImpl @Inject constructor(
-    private val http: OkHttpClient,
+    @Named("backendPlain") private val http: OkHttpClient,
     private val keys: ApiKeyProvider,
     private val config: AiConfig,
+    private val sessions: SessionManager,
 ) : MuseVoiceTranscriber {
 
     @Volatile private var socket: WebSocket? = null
@@ -101,11 +107,19 @@ class MuseVoiceTranscriberImpl @Inject constructor(
     @Volatile private var running = false
 
     override fun transcribe(): Flow<TranscriptEvent> = callbackFlow {
-        val key = keys.getMetaApiKey()
-        if (key.isNullOrBlank()) {
-            trySend(TranscriptEvent.Error("No API key. Offline mode: please type instead."))
-            close()
-            return@callbackFlow
+        // Production: backend relay with the session token. Developer override:
+        // direct Meta socket when a dev key is stored (hidden dev screen).
+        val directKey = keys.getStoredKey()
+        val backendToken = if (directKey == null) {
+            try {
+                sessions.validAccessToken()
+            } catch (e: SessionExpiredException) {
+                trySend(TranscriptEvent.Error("Please sign in to use voice."))
+                close()
+                return@callbackFlow
+            }
+        } else {
+            null
         }
         val bufferSize = AudioRecord.getMinBufferSize(
             SttAudioSpec.SAMPLE_RATE, SttAudioSpec.CHANNEL, SttAudioSpec.ENCODING,
@@ -123,15 +137,25 @@ class MuseVoiceTranscriberImpl @Inject constructor(
         }
         recorder = record
         val sessionId = "stream-${UUID.randomUUID()}"
+        val useDirect = directKey != null
         val separator = if (config.sttUrl.contains("?")) "&" else "?"
-        val request = Request.Builder()
-            .url("${config.sttUrl}${separator}sessionId=$sessionId")
-            .build()
+        val url = if (useDirect) {
+            "${config.sttUrl}${separator}sessionId=$sessionId"
+        } else {
+            "${config.backendBaseUrl}api/voice/realtime?sessionId=$sessionId"
+        }
+        val builder = Request.Builder().url(url)
+        if (backendToken != null) {
+            builder.addHeader("Authorization", "Bearer $backendToken")
+        }
         running = true
-        socket = http.newWebSocket(request, object : WebSocketListener() {
+        socket = http.newWebSocket(builder.build(), object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                // Handshake must be the first frame (within 10s per the docs).
-                webSocket.send(handshakeFrame(key, config.sttModel))
+                // Direct Meta path needs the credential handshake first
+                // (within 10s per the docs); the backend relay needs none.
+                if (useDirect) {
+                    webSocket.send(handshakeFrame(directKey!!, config.sttModel))
+                }
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -144,6 +168,10 @@ class MuseVoiceTranscriberImpl @Inject constructor(
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 // Server closed (normally 1000 after endStream): end the flow,
                 // which releases the recorder and socket in awaitClose.
+                // 4401 = backend rejected the session mid-stream.
+                if (code == BACKEND_AUTH_CLOSE) {
+                    trySend(TranscriptEvent.Error("Session expired. Please sign in again."))
+                }
                 close()
             }
 

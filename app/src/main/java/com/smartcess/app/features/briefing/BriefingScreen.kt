@@ -78,6 +78,9 @@ fun BriefingScreen(
         if (state.offline) {
             SmartCessBanner(message = stringResource(R.string.banner_offline), kind = BannerKind.OFFLINE)
         }
+        if (state.signInRequired) {
+            SmartCessBanner(message = stringResource(R.string.auth_sign_in_required), kind = BannerKind.ERROR)
+        }
         if (state.isEmpty) {
             Text(text = stringResource(R.string.briefing_empty), style = MaterialTheme.typography.bodyLarge)
             SmartCessSecondaryButton(
