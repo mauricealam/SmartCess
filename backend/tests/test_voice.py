@@ -144,6 +144,24 @@ def test_missing_key_closes(meta_key, clean_active, monkeypatch):
         assert exc.value.code == voice_routes.WS_UNAVAILABLE_CLOSE
 
 
+def test_meta_closes_before_any_transcript_sends_error(meta_key, clean_active, monkeypatch):
+    """Meta dropping the stream pre-transcript must surface, not go silent."""
+    fake = FakeMeta([FakeClosed()])
+
+    async def connect(url):
+        return fake
+
+    monkeypatch.setattr(voice_routes, "connect_meta", connect)
+    with client.websocket_connect(f"/api/voice/realtime?token={_token()}") as ws:
+        frame = ws.receive_text()
+        assert json.loads(frame)["type"] == "error"
+        assert TEST_KEY not in frame
+        with pytest.raises(WebSocketDisconnect) as exc:
+            ws.receive_text()
+        assert exc.value.code == 1000
+    assert fake.closed
+
+
 def test_idle_timeout_closes(meta_key, clean_active, monkeypatch):
     fake = FakeMeta(["HANG"])
 

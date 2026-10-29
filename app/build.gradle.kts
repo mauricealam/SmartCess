@@ -173,6 +173,7 @@ dependencies {
     testImplementation(libs.mockwebserver)
     testImplementation(libs.androidx.core.testing)
     testImplementation(libs.kotlinx.coroutines.core)
+    testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.work.testing)
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.ext.junit)

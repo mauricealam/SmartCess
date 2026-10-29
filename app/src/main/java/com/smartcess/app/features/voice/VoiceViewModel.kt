@@ -21,6 +21,7 @@ import com.smartcess.app.data.local.entity.ConversationTurnEntity
 import com.smartcess.app.data.repository.PreferencesRepository
 import com.smartcess.app.navigation.Routes
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -85,15 +86,24 @@ class VoiceViewModel @Inject constructor(
         }
         listenJob?.cancel()
         listenJob = viewModelScope.launch {
-            transcriber.transcribe().collect { event ->
-                when (event) {
-                    is TranscriptEvent.Partial -> _state.update { it.copy(partial = event.text) }
-                    is TranscriptEvent.Final -> {
-                        _state.update { it.copy(listening = false, transcript = event.text) }
-                        classify(event.text)
+            try {
+                transcriber.transcribe().collect { event ->
+                    when (event) {
+                        is TranscriptEvent.Partial -> _state.update { it.copy(partial = event.text) }
+                        is TranscriptEvent.Final -> {
+                            _state.update { it.copy(listening = false, transcript = event.text) }
+                            classify(event.text)
+                        }
+                        is TranscriptEvent.Error -> onTranscriberError(event.message)
                     }
-                    is TranscriptEvent.Error -> onTranscriberError(event.message)
                 }
+                // The stream ended with no Final or Error (server closed
+                // silently): report no-speech instead of staying "Listening".
+                if (_state.value.listening) {
+                    fail(fallbackRes())
+                }
+            } catch (e: CancellationException) {
+                throw e // stopListening()/cancel() own the state update.
             }
         }
     }
@@ -131,11 +141,18 @@ class VoiceViewModel @Inject constructor(
             message.contains("sign in", ignoreCase = true) -> R.string.auth_sign_in_required
             message.contains("API key", ignoreCase = true) -> R.string.voice_api_unavailable
             message.contains("busy", ignoreCase = true) -> R.string.error_rate_limit
-            _state.value.partial.isBlank() && _state.value.transcript.isBlank() -> R.string.voice_no_speech
-            else -> R.string.voice_not_clear
+            else -> fallbackRes()
         }
         fail(res)
     }
+
+    /** No-speech vs not-clear from what (if anything) was heard so far. */
+    private fun fallbackRes(): Int =
+        if (_state.value.partial.isBlank() && _state.value.transcript.isBlank()) {
+            R.string.voice_no_speech
+        } else {
+            R.string.voice_not_clear
+        }
 
     private fun classify(text: String) {
         viewModelScope.launch {

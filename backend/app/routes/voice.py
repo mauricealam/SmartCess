@@ -134,6 +134,7 @@ async def _relay(client: WebSocket, sub: str) -> None:
     logger.info("stt relay open sub=%s", sub[:8])
     deadline = time.monotonic() + settings.ws_max_s
     input_open = True
+    forwarded_any = False
     # Persistent one-message tasks per side: a side's task is recreated only
     # after its message is consumed, so the loser's arrival is never dropped.
     meta_task = asyncio.ensure_future(_next_meta(meta))
@@ -154,10 +155,23 @@ async def _relay(client: WebSocket, sub: str) -> None:
                 try:
                     msg = task.result()
                 except _Closed:
+                    if task is meta_task and not forwarded_any:
+                        # Meta dropped the stream before any transcript: tell the
+                        # app so Talk shows an error instead of going silent.
+                        logger.warning(
+                            "meta stt closed before any transcript sub=%s", sub[:8]
+                        )
+                        try:
+                            await client.send_text(
+                                '{"type":"error","message":"stt_unavailable"}'
+                            )
+                        except Exception:
+                            pass
                     return
                 if task is meta_task:
                     if isinstance(msg, str):
                         await client.send_text(msg)
+                        forwarded_any = True
                     # Binary Meta frames are unexpected; ignored.
                     meta_task = asyncio.ensure_future(_next_meta(meta))
                 else:
