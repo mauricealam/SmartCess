@@ -251,8 +251,13 @@ def _bill_ok(request):
     assert schema["type"] == "object"
     assert "amount" in schema["properties"]
     assert "provider" in schema["required"]
-    content = payload["messages"][0]["content"]
+    messages = payload["messages"]
+    assert messages[0]["role"] == "developer"
+    assert "Extract exactly this JSON" in messages[0]["content"]
+    assert messages[1]["role"] == "user"
+    content = messages[1]["content"]
     assert content[0]["type"] == "text"
+    assert "TNB" in content[0]["text"]
     assert content[1]["type"] == "image_url"
     assert content[1]["image_url"]["url"].startswith("data:image/jpeg;base64,")
     return httpx.Response(

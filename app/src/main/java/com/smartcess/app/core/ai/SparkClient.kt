@@ -54,7 +54,7 @@ class SparkClient @Inject constructor(
         completeJson(
             feature = "bill_extract",
             schemaName = "bill",
-            prompt = SparkPrompts.BILL + (ocrHint?.let { "\nOCR hint: $it" } ?: ""),
+            prompt = SparkPrompts.bill(ocrHint),
             imageBase64 = imageBase64,
             timeoutMillis = config.extractionTimeoutMillis,
             parser = { raw -> json.decodeFromString(BillExtraction.serializer(), raw) },
@@ -85,7 +85,7 @@ class SparkClient @Inject constructor(
         completeJson(
             feature = "doc_summary",
             schemaName = "document",
-            prompt = SparkPrompts.DOCUMENT + (text?.let { "\nText: $it" } ?: ""),
+            prompt = SparkPrompts.document(text),
             imageBase64 = imageBase64,
             timeoutMillis = config.documentTimeoutMillis,
             parser = { raw -> json.decodeFromString(DocumentSummary.serializer(), raw) },
@@ -127,7 +127,7 @@ class SparkClient @Inject constructor(
     private suspend fun <T> completeJson(
         feature: String,
         schemaName: String,
-        prompt: String,
+        prompt: SparkPrompt,
         timeoutMillis: Long,
         parser: (String) -> T,
         fallback: () -> T,
@@ -135,7 +135,7 @@ class SparkClient @Inject constructor(
     ): T = limiter.guard {
         // H1: hash the FULL image bytes. Truncating to a prefix lets two
         // different images share a cache key (same JPEG header bytes).
-        val cacheKey = cache.key(feature, schemaName, prompt, imageBase64 ?: "")
+        val cacheKey = cache.key(feature, schemaName, prompt.instruction + "\n" + prompt.input, imageBase64 ?: "")
         cache.get(cacheKey)?.let { cached ->
             return@guard runCatching { parser(cached) }.getOrElse { fallback() }
         }
@@ -157,7 +157,10 @@ class SparkClient @Inject constructor(
                 val response = callWithFallback(
                     SparkRequest(
                         model = config.sparkModel,
-                        messages = listOf(userMessage(prompt, imageBase64)),
+                        messages = listOf(
+                            developerMessage(prompt.instruction),
+                            userMessage(prompt.input, imageBase64),
+                        ),
                         response_format = ToolRegistry.jsonSchemaFormat(schemaName),
                     ),
                     timeoutMillis,
@@ -173,7 +176,10 @@ class SparkClient @Inject constructor(
                     val retry = callWithFallback(
                         SparkRequest(
                             model = config.sparkModel,
-                            messages = listOf(userMessage("$prompt\nReturn valid JSON only.", imageBase64)),
+                            messages = listOf(
+                                developerMessage(prompt.instruction + "\nReturn valid JSON only."),
+                                userMessage(prompt.input, imageBase64),
+                            ),
                             response_format = ToolRegistry.jsonSchemaFormat(schemaName),
                         ),
                         timeoutMillis,
@@ -217,6 +223,9 @@ class SparkClient @Inject constructor(
             if (++attempt > 1) throw AiException("The AI service is unavailable.", lastError)
         }
     }
+
+    private fun developerMessage(instruction: String): SparkMessage =
+        SparkMessage(role = "developer", content = JsonPrimitive(instruction))
 
     private fun userMessage(prompt: String, imageBase64: String?): SparkMessage {
         val content: JsonElement = if (imageBase64 == null) {

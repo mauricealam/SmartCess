@@ -30,7 +30,10 @@ from ..ratelimit import limits
 logger = logging.getLogger("smartcess.ai")
 router = APIRouter()
 
-BILL_PROMPT = (
+# Standing rules ride in a `developer` message (highest precedence); the OCR
+# hint / photo pointer goes in `user`, so untrusted data can never override
+# the instructions. Mirrors the app's "bill" SparkPrompt instruction.
+BILL_INSTRUCTION = (
     "You read a photographed bill for a blind user. Extract exactly this JSON "
     "object and nothing else: {provider: string, amount: number, currency: "
     "3-letter code, due_date: YYYY-MM-DD or empty string, account_reference: "
@@ -178,22 +181,24 @@ async def chat(body: ChatRequest, sub: str = Depends(current_sub)) -> dict:
 
 
 def _bill_messages(image_b64: str, ocr_hint: str | None, retry: bool) -> list[dict]:
-    prompt = BILL_PROMPT
-    if ocr_hint:
-        prompt += f"\nOCR hint: {ocr_hint[:2000]}"
+    instruction = BILL_INSTRUCTION
     if retry:
-        prompt += "\nReturn valid JSON only."
+        instruction += "\nReturn valid JSON only."
+    user_text = (
+        f"OCR hint: {ocr_hint[:2000]}" if ocr_hint else "See attached bill photo."
+    )
     return [
+        {"role": "developer", "content": instruction},
         {
             "role": "user",
             "content": [
-                {"type": "text", "text": prompt},
+                {"type": "text", "text": user_text},
                 {
                     "type": "image_url",
                     "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"},
                 },
             ],
-        }
+        },
     ]
 
 
