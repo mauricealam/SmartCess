@@ -178,6 +178,25 @@ def test_chat_failure_logs_model(monkeypatch, caplog):
     assert "model=muse-spark-1.3" in caplog.text
 
 
+def test_chat_failure_logs_meta_error(monkeypatch, caplog):
+    import logging
+
+    def missing(request):
+        return httpx.Response(
+            404, json={"error": {"code": "model_not_found", "message": "no such model"}}
+        )
+
+    _use_meta(monkeypatch, missing)
+    with caplog.at_level(logging.WARNING, logger="smartcess.ai"):
+        response = client.post(
+            "/api/ai/chat",
+            json={"messages": [{"role": "user", "content": "hi"}]},
+            headers=_auth(),
+        )
+    assert response.status_code == 502
+    assert "model_not_found" in caplog.text
+
+
 def test_chat_gives_up_after_retries(monkeypatch):
     calls = []
 

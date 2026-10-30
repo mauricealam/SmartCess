@@ -112,6 +112,17 @@ async def _post_chat(payload: dict) -> httpx.Response:
         raise ai_unavailable()
 
 
+def _meta_error_snippet(response: httpx.Response, limit: int = 300) -> str:
+    """Truncated Meta error body for logs. Envelopes are small JSON
+    ({"error": {...}}) with no prompt echo; truncate defensively."""
+    try:
+        text = response.text
+    except Exception:
+        return "<unreadable>"
+    text = " ".join(text.split())
+    return text[:limit] if text else "<empty>"
+
+
 def _first_content(body: dict) -> tuple[str, str | None, dict]:
     try:
         choice = body["choices"][0]
@@ -154,7 +165,10 @@ async def chat(body: ChatRequest, sub: str = Depends(current_sub)) -> dict:
         raise ai_busy()
     if response.status_code != 200:
         logger.warning(
-            "meta chat status=%s model=%s", response.status_code, model
+            "meta chat status=%s model=%s meta_error=%s",
+            response.status_code,
+            model,
+            _meta_error_snippet(response),
         )
         raise map_meta_http(response.status_code)
     try:
@@ -261,7 +275,12 @@ async def bill_extract(
         if response.status_code == 429:
             raise ai_busy()
         if response.status_code != 200:
-            logger.warning("meta bill status=%s", response.status_code)
+            logger.warning(
+                "meta bill status=%s model=%s meta_error=%s",
+                response.status_code,
+                settings.default_model,
+                _meta_error_snippet(response),
+            )
             raise map_meta_http(response.status_code)
         try:
             content, _, _ = _first_content(response.json())
