@@ -104,6 +104,19 @@ def test_chat_expired_session(monkeypatch):
     assert response.json()["error"]["code"] == "expired_session"
 
 
+def test_chat_accepts_fallback_model(monkeypatch):
+    _use_meta(monkeypatch, _chat_ok)
+    response = client.post(
+        "/api/ai/chat",
+        json={
+            "model": "muse-spark-1.2",
+            "messages": [{"role": "user", "content": "hi"}],
+        },
+        headers=_auth(),
+    )
+    assert response.status_code == 200
+
+
 def test_chat_rejects_unknown_model(monkeypatch):
     _use_meta(monkeypatch, _chat_ok)
     response = client.post(

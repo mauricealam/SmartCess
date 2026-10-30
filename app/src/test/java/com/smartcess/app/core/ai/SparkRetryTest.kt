@@ -1,6 +1,8 @@
 package com.smartcess.app.core.ai
 
 import com.smartcess.app.core.config.AiConfig
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
@@ -16,9 +18,9 @@ import retrofit2.Response
  */
 class SparkRetryTest {
 
-    private fun client(api: SparkApi) = SparkClient(
+    private fun client(api: SparkApi, config: AiConfig = AiConfig()) = SparkClient(
         api = api,
-        config = AiConfig(),
+        config = config,
         limiter = RateLimiter(),
         retries = RetryPolicy(),
         cache = ResponseCache(),
@@ -57,6 +59,26 @@ class SparkRetryTest {
     }
 
     @Test
+    fun primary502_fallsOverToFallbackInOrder(): Unit = runBlocking {
+        val config = mockk<AiConfig>(relaxed = true)
+        every { config.sparkModel } returns "muse-spark-1.3"
+        every { config.sparkFallbackModel } returns "muse-spark-1.2"
+        every { config.intentTimeoutMillis } returns 10_000
+        val seen = mutableListOf<String>()
+        val api = object : SparkApi {
+            override suspend fun complete(request: SparkRequest): SparkResponse {
+                seen.add(request.model)
+                if (request.model == "muse-spark-1.3") throw httpError(502)
+                return intentResponse("general_question")
+            }
+        }
+        val testClient = client(api, config)
+        val result = testClient.classifyIntent("hello")
+        assertEquals("general_question", result.intent)
+        assertEquals(listOf("muse-spark-1.3", "muse-spark-1.2"), seen)
+    }
+
+    @Test
     fun backendAlways502_throwsAiException(): Unit = runBlocking {
         var calls = 0
         val api = object : SparkApi {
@@ -69,8 +91,8 @@ class SparkRetryTest {
             client(api).classifyIntent("hello")
             throw AssertionError("expected AiException")
         } catch (e: AiException) {
-            // Initial try + 2 transient retries.
-            assertEquals(3, calls)
+            // 2 models per block, initial try + 2 transient retries.
+            assertEquals(6, calls)
         }
     }
 }

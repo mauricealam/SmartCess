@@ -13,8 +13,8 @@ import javax.inject.Singleton
 class AiConfig @Inject constructor() {
     val sparkBaseUrl: String = BuildConfig.META_API_BASE_URL
     val sparkModel: String = "muse-spark-1.3"
-    /** No second model: single spec model, resilience comes from retries. */
-    val sparkFallbackModel: String? = null
+    /** Fallback when Meta cannot serve the primary (same Muse Spark family). */
+    val sparkFallbackModel: String? = "muse-spark-1.2"
     val sttUrl: String = BuildConfig.META_STT_URL
     val sttModel: String = "muse-voice-transcribe-1.0"
     /** SmartCess backend base URL (Render). All production AI traffic goes here. */
