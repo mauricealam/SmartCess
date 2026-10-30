@@ -64,6 +64,17 @@ def _is_end_stream(text: str) -> bool:
         return False
 
 
+def _transcript_kind(text: str) -> str | None:
+    """Classifies a Meta frame for counting only; content never logged."""
+    try:
+        frame = json.loads(text)
+    except ValueError:
+        return None
+    if not isinstance(frame, dict) or frame.get("type") != "transcript":
+        return None
+    return "final" if frame.get("final") else "partial"
+
+
 async def _next_client(client: WebSocket):
     try:
         msg = await client.receive()
@@ -142,6 +153,8 @@ async def _relay(client: WebSocket, sub: str) -> None:
     # the idle timeout bounds the wait even if it never comes.
     meta_acked = False
     pending: collections.deque = collections.deque(maxlen=128)
+    partials = 0
+    finals = 0
     # Persistent one-message tasks per side: a side's task is recreated only
     # after its message is consumed, so the loser's arrival is never dropped.
     meta_task = asyncio.ensure_future(_next_meta(meta))
@@ -184,6 +197,11 @@ async def _relay(client: WebSocket, sub: str) -> None:
                                     await meta.send(pending.popleft())
                                 except Exception:
                                     return
+                        frame_kind = _transcript_kind(msg)
+                        if frame_kind == "final":
+                            finals += 1
+                        elif frame_kind == "partial":
+                            partials += 1
                         await client.send_text(msg)
                         forwarded_any = True
                     # Binary Meta frames are unexpected; ignored.
@@ -220,4 +238,9 @@ async def _relay(client: WebSocket, sub: str) -> None:
             await client.close(code=1000)
         except Exception:
             pass
-        logger.info("stt relay closed sub=%s", sub[:8])
+        logger.info(
+            "stt relay closed sub=%s partials=%d finals=%d",
+            sub[:8],
+            partials,
+            finals,
+        )

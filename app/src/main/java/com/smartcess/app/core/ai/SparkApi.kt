@@ -37,7 +37,9 @@ data class SparkRequest(
     val response_format: JsonObject? = null,
     val tools: List<JsonObject>? = null,
     val tool_choice: String? = null,
-    val max_tokens: Int = 1024,
+    // 4096: Spark reasons (~1k tokens) inside the same budget as the
+    // constrained output; 1024 starves schema calls into length cutoffs.
+    val max_tokens: Int = 4096,
     val temperature: Double = 0.2,
 )
 

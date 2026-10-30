@@ -140,6 +140,30 @@ def test_audio_held_until_meta_ack(meta_key, clean_active, monkeypatch):
     assert fake.closed
 
 
+def test_relay_close_logs_transcript_counts(meta_key, clean_active, monkeypatch, caplog):
+    import logging
+
+    fake = FakeMeta(
+        [
+            '{"type":"transcript","transcript":"hi","final":false}',
+            '{"type":"transcript","transcript":"hi there","final":true}',
+            FakeClosed(),
+        ]
+    )
+
+    async def connect(url):
+        return fake
+
+    monkeypatch.setattr(voice_routes, "connect_meta", connect)
+    with caplog.at_level(logging.INFO, logger="smartcess.voice"):
+        with client.websocket_connect(f"/api/voice/realtime?token={_token()}") as ws:
+            ws.receive_text()
+            ws.receive_text()
+            with pytest.raises(WebSocketDisconnect):
+                ws.receive_text()
+    assert "partials=1 finals=1" in caplog.text
+
+
 def test_rejects_bad_token(meta_key, clean_active, monkeypatch):
     connected = []
 

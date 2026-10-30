@@ -150,7 +150,9 @@ async def chat(body: ChatRequest, sub: str = Depends(current_sub)) -> dict:
     if response.status_code == 429:
         raise ai_busy()
     if response.status_code != 200:
-        logger.warning("meta chat status=%s", response.status_code)
+        logger.warning(
+            "meta chat status=%s model=%s", response.status_code, model
+        )
         raise map_meta_http(response.status_code)
     try:
         content, finish_reason, usage = _first_content(response.json())
@@ -195,6 +197,34 @@ def _bill_messages(image_b64: str, ocr_hint: str | None, retry: bool) -> list[di
     ]
 
 
+BILL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "provider": {"type": "string"},
+        "amount": {"type": "number"},
+        "currency": {"type": "string"},
+        "due_date": {"type": "string"},
+        "account_reference": {"type": "string"},
+        "billing_period_start": {"type": "string"},
+        "billing_period_end": {"type": "string"},
+        "required_action": {"type": "string"},
+        "confidence": {"type": "number"},
+        "missing_fields": {"type": "array", "items": {"type": "string"}},
+        "summary": {"type": "string"},
+    },
+    "required": [
+        "provider",
+        "amount",
+        "currency",
+        "due_date",
+        "required_action",
+        "confidence",
+        "missing_fields",
+        "summary",
+    ],
+}
+
+
 @router.post("/bill-extract")
 async def bill_extract(
     body: BillExtractRequest, sub: str = Depends(current_sub)
@@ -209,14 +239,18 @@ async def bill_extract(
     started = time.monotonic()
     last_error: AppError = ai_unclear()
     for attempt in range(2):
-        # No response_format: Meta rejects schemaless json_schema with 400.
-        # The prompt already demands JSON-only; bad JSON retries below.
+        # Structured output with the real bill schema (mirrors the app's
+        # "bill" schema; keep both in sync with BillExtraction fields).
         response = await _post_chat(
             {
                 "model": settings.default_model,
                 "messages": _bill_messages(
                     body.image_base64, body.ocr_hint, retry=attempt > 0
                 ),
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {"name": "bill", "schema": BILL_SCHEMA},
+                },
             }
         )
         if response.status_code == 429:

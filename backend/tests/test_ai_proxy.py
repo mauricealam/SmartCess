@@ -158,6 +158,26 @@ def test_chat_retries_flapping_meta(monkeypatch):
     assert len(calls) == 3
 
 
+def test_chat_failure_logs_model(monkeypatch, caplog):
+    import logging
+
+    def missing(request):
+        return httpx.Response(404, json={"error": {"code": "model_not_found"}})
+
+    _use_meta(monkeypatch, missing)
+    with caplog.at_level(logging.WARNING, logger="smartcess.ai"):
+        response = client.post(
+            "/api/ai/chat",
+            json={
+                "model": "muse-spark-1.3",
+                "messages": [{"role": "user", "content": "hi"}],
+            },
+            headers=_auth(),
+        )
+    assert response.status_code == 502
+    assert "model=muse-spark-1.3" in caplog.text
+
+
 def test_chat_gives_up_after_retries(monkeypatch):
     calls = []
 
@@ -224,7 +244,13 @@ def _bill_ok(request):
     import json as jsonlib
 
     payload = jsonlib.loads(request.content.decode())
-    assert "response_format" not in payload  # Meta 400s schemaless json_schema
+    fmt = payload["response_format"]
+    assert fmt["type"] == "json_schema"
+    assert fmt["json_schema"]["name"] == "bill"
+    schema = fmt["json_schema"]["schema"]
+    assert schema["type"] == "object"
+    assert "amount" in schema["properties"]
+    assert "provider" in schema["required"]
     content = payload["messages"][0]["content"]
     assert content[0]["type"] == "text"
     assert content[1]["type"] == "image_url"
