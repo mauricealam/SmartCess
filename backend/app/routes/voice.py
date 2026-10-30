@@ -6,6 +6,7 @@ finals stream back, normal 1000 close at the end.
 """
 
 import asyncio
+import collections
 import json
 import logging
 import time
@@ -135,6 +136,12 @@ async def _relay(client: WebSocket, sub: str) -> None:
     deadline = time.monotonic() + settings.ws_max_s
     input_open = True
     forwarded_any = False
+    # Docs: wait for Meta's handshake ack before sending audio, or early
+    # frames are dropped. Hold client audio/endStream until the first Meta
+    # text frame, then flush in order. Bounded: the ack lands in ms, and
+    # the idle timeout bounds the wait even if it never comes.
+    meta_acked = False
+    pending: collections.deque = collections.deque(maxlen=128)
     # Persistent one-message tasks per side: a side's task is recreated only
     # after its message is consumed, so the loser's arrival is never dropped.
     meta_task = asyncio.ensure_future(_next_meta(meta))
@@ -170,6 +177,13 @@ async def _relay(client: WebSocket, sub: str) -> None:
                     return
                 if task is meta_task:
                     if isinstance(msg, str):
+                        if not meta_acked:
+                            meta_acked = True
+                            while pending:
+                                try:
+                                    await meta.send(pending.popleft())
+                                except Exception:
+                                    return
                         await client.send_text(msg)
                         forwarded_any = True
                     # Binary Meta frames are unexpected; ignored.
@@ -177,17 +191,23 @@ async def _relay(client: WebSocket, sub: str) -> None:
                 else:
                     if input_open:
                         if msg.get("bytes") is not None:
-                            try:
-                                await meta.send(msg["bytes"])
-                            except Exception:
-                                return
+                            if meta_acked:
+                                try:
+                                    await meta.send(msg["bytes"])
+                                except Exception:
+                                    return
+                            else:
+                                pending.append(msg["bytes"])
                         elif msg.get("text") is not None and _is_end_stream(
                             msg["text"]
                         ):
-                            try:
-                                await meta.send(msg["text"])
-                            except Exception:
-                                return
+                            if meta_acked:
+                                try:
+                                    await meta.send(msg["text"])
+                                except Exception:
+                                    return
+                            else:
+                                pending.append(msg["text"])
                             input_open = False
                         # Other client text frames are ignored.
                     client_task = asyncio.ensure_future(_next_client(client))

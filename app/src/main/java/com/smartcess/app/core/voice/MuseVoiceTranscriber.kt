@@ -26,6 +26,7 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString.Companion.toByteString
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
@@ -139,6 +140,29 @@ internal class SpeechEndpointDetector(
     }
 }
 
+/** Per-stream lifecycle state. One instance per transcribe() call, so one
+ *  stream's teardown can never flip another stream's flags on rapid restart. */
+internal class StreamState {
+    val running = AtomicBoolean(true)
+    val endStreamSent = AtomicBoolean(false)
+
+    @Volatile var socket: WebSocket? = null
+}
+
+/** Tracks the current live stream for stop(). Identity-checked: a stale
+ *  teardown never clears or touches a newer stream. */
+internal class StreamTracker {
+    @Volatile private var current: StreamState? = null
+
+    fun begin(): StreamState = StreamState().also { current = it }
+
+    fun current(): StreamState? = current
+
+    fun end(state: StreamState) {
+        if (current === state) current = null
+    }
+}
+
 /** Peak absolute sample of 16-bit little-endian PCM in [buf] (first [len] bytes). */
 internal fun pcmPeak(buf: ByteArray, len: Int): Int {
     var peak = 0
@@ -165,10 +189,7 @@ class MuseVoiceTranscriberImpl @Inject constructor(
     private val sessions: SessionManager,
 ) : MuseVoiceTranscriber {
 
-    @Volatile private var socket: WebSocket? = null
-    @Volatile private var recorder: AudioRecord? = null
-    @Volatile private var running = false
-    private val endStreamSent = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val streams = StreamTracker()
 
     override fun transcribe(): Flow<TranscriptEvent> = callbackFlow {
         // Production: backend relay with the session token. Developer override:
@@ -199,7 +220,7 @@ class MuseVoiceTranscriberImpl @Inject constructor(
             close()
             return@callbackFlow
         }
-        recorder = record
+        val state = streams.begin()
         val sessionId = "stream-${UUID.randomUUID()}"
         val useDirect = directKey != null
         val separator = if (config.sttUrl.contains("?")) "&" else "?"
@@ -212,8 +233,7 @@ class MuseVoiceTranscriberImpl @Inject constructor(
         if (backendToken != null) {
             builder.addHeader("Authorization", "Bearer $backendToken")
         }
-        running = true
-        socket = http.newWebSocket(builder.build(), object : WebSocketListener() {
+        state.socket = http.newWebSocket(builder.build(), object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 // Direct Meta path needs the credential handshake first
                 // (within 10s per the docs); the backend relay needs none.
@@ -249,15 +269,14 @@ class MuseVoiceTranscriberImpl @Inject constructor(
                 close()
             }
         })
-        endStreamSent.set(false)
         record.startRecording()
         val endpoint = SpeechEndpointDetector()
         val pump = Thread {
             val buf = ByteArray(bufferSize)
-            while (running) {
+            while (state.running.get()) {
                 val read = record.read(buf, 0, buf.size)
                 if (read > 0) {
-                    socket?.send(buf.toByteString(0, read))
+                    state.socket?.send(buf.toByteString(0, read))
                     // Auto end-of-utterance: no manual Stop needed.
                     if (endpoint.onFrame(pcmPeak(buf, read), android.os.SystemClock.elapsedRealtime())) {
                         stop()
@@ -268,35 +287,37 @@ class MuseVoiceTranscriberImpl @Inject constructor(
             }
         }.apply { isDaemon = true; start() }
         awaitClose {
-            running = false
+            state.running.set(false)
             try { pump.join(500) } catch (_: InterruptedException) { }
             runCatching { record.stop() }
             record.release()
             // Final cleanup: end input if stop() was never called, then close.
-            runCatching { socket?.send("""{"type":"endStream"}""") }
-            socket?.close(1000, "done")
-            socket = null
-            recorder = null
+            runCatching { state.socket?.send("""{"type":"endStream"}""") }
+            state.socket?.close(1000, "done")
+            state.socket = null
+            streams.end(state)
         }
     }
 
     override fun stop() {
-        running = false
+        val state = streams.current() ?: return
+        state.running.set(false)
         // endStream goes out once no matter how stop was reached
         // (manual Stop, auto endpoint, cancel) racing on threads.
-        if (!endStreamSent.compareAndSet(false, true)) return
-        val ws = socket
+        if (!state.endStreamSent.compareAndSet(false, true)) return
+        val ws = state.socket
         // End input but keep reading: the server sends final transcripts,
         // then closes with 1000 (onClosed ends the flow).
         runCatching { ws?.send("""{"type":"endStream"}""") }
         // Grace close if the server never closes the session itself.
+        // ws belongs to this stream only; a newer stream is never touched.
         Thread {
             try {
                 Thread.sleep(END_STREAM_GRACE_MILLIS)
             } catch (_: InterruptedException) {
                 return@Thread
             }
-            if (socket === ws) ws?.close(1000, "endstream-timeout")
+            ws?.close(1000, "endstream-timeout")
         }.apply { isDaemon = true; start() }
     }
 }
