@@ -10,14 +10,19 @@ API. The Meta key lives here (environment variable) and never reaches phones.
   subset in and out; unknown fields rejected).
 - `POST /api/ai/bill-extract` — server-composed bill prompt over an uploaded
   image; returns `BillExtraction` JSON, retries once on malformed JSON.
-- `WS /api/voice/realtime` — PCM audio up, transcript JSON down, `endStream`
-  to finish input, normal `1000` close at the end.
+- `POST /api/voice/transcribe` — push-to-talk upload: multipart WAV bytes
+  (`audio` part, ≤4 MB) in, `{transcript, audio_duration_ms, turns}` out.
+  One in-flight transcription per user (second gets 429); 10/min.
+- `WS /api/voice/realtime` — DEFERRED realtime relay (kept for the future
+  live-interim milestone; Talk does not use it today). PCM audio up,
+  transcript JSON down, `endStream` to finish input, normal `1000` close.
 - `GET /health` — `{status:"ok", version}` for deploys, monitoring, and app
   warm-up. No auth.
 
 Sessions are stateless signed JWTs (15-min access, 7-day refresh). v1 has no
 database: sign-out is client-side wipe, and rate limits are in-memory
-(20 chat/min, 10 bill/min, 1 live voice session per user). Nothing spoken,
+(20 chat/min, 10 bill/min, 10 transcriptions/min, 1 live voice op per
+user). Nothing spoken,
 photographed, or transcribed is written to disk or logs; logs carry request
 IDs, truncated user hashes, endpoints, latency, status, and token counts only.
 
@@ -41,6 +46,9 @@ One web service, Docker runtime, free plan — see [render.yaml](../render.yaml)
 | `META_BASE_URL` | no | Default `https://api.meta.ai/v1` |
 | `META_STT_URL` | no | Default `wss://api.meta.ai/v1/asr/realtime` |
 | `STT_MODEL` | no | Default `muse-voice-transcribe-1.0` |
+| `STT_TIMEOUT_S` | no | Meta file-transcription timeout (default 30s) |
+| `MAX_AUDIO_BYTES` | no | Upload cap (default 4000000) |
+| `STT_PER_MINUTE` | no | Transcription rate limit (default 10) |
 
 Local runs copy `.env.example` to `.env` (git-ignored).
 

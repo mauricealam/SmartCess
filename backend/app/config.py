@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     chat_timeout_s: float = 25.0
     chat_per_minute: int = 20
     bill_per_minute: int = 10
+    stt_per_minute: int = 10
+    stt_timeout_s: float = 30.0
+    max_audio_bytes: int = 4_000_000
     max_image_b64_chars: int = 3_000_000
     ws_idle_s: float = 60.0
     ws_max_s: float = 300.0

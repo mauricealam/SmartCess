@@ -1,4 +1,10 @@
-"""WebSocket relay: app audio in, Meta transcripts out. Nothing is persisted.
+"""Voice routes: push-to-talk HTTPS upload (live) + realtime relay (DEFERRED).
+
+DEFERRED, not removed: the WebSocket relay below stays for the future
+live-interim-transcription milestone. Talk currently uses POST /transcribe
+because Meta 404s realtime/chat serving from this host's egress.
+
+WebSocket relay: app audio in, Meta transcripts out. Nothing is persisted.
 
 Protocol mirrors the app's existing transcriber: binary PCM frames up,
 JSON transcript frames down, {"type":"endStream"} to finish input while
@@ -12,10 +18,15 @@ import logging
 import time
 import uuid
 
+import httpx
 import jwt
-from fastapi import APIRouter, WebSocket
+from fastapi import APIRouter, Depends, File, UploadFile, WebSocket
 
 from ..config import get_settings
+from ..deps import current_sub
+from ..errors import AppError, ai_busy, ai_timeout, ai_unclear, ai_unavailable, map_meta_http, rate_limited
+from ..meta import build_meta_client
+from ..ratelimit import limits
 from ..sessions import decode_access
 
 logger = logging.getLogger("smartcess.voice")
@@ -26,6 +37,123 @@ WS_BUSY_CLOSE = 4429
 WS_UNAVAILABLE_CLOSE = 4502
 
 active: set[str] = set()
+
+STT_META_PATH = "/asr/transcribe"
+# Meta's model resolution flaps the same way as chat (404 joins 5xx as
+# retryable). Two tries: failed transcriptions are not billed.
+STT_RETRYABLE = frozenset({404, 500, 502, 503, 504})
+STT_RETRY_SLEEPS = (1.0,)
+
+
+def _is_wav(data: bytes) -> bool:
+    """RIFF/WAVE magic only; Meta validates the PCM details (mono 16-bit)."""
+    return len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WAVE"
+
+
+def _meta_error_snippet(response: httpx.Response, limit: int = 200) -> str:
+    try:
+        text = response.text
+    except Exception:
+        return "<unreadable>"
+    text = " ".join(text.split())
+    return text[:limit] if text else "<empty>"
+
+
+async def _meta_transcribe(wav: bytes, settings) -> httpx.Response:
+    payload = {
+        "mode": "PUSH_TO_TALK",
+        "model": settings.stt_model,
+        "audioEncoding": "WAV",
+    }
+    files = {
+        "request": (None, json.dumps(payload), "application/json"),
+        "audio": ("talk.wav", wav, "audio/wav"),
+    }
+    try:
+        async with build_meta_client(settings.stt_timeout_s) as client:
+            last: httpx.Response | None = None
+            for sleep in (0.0, *STT_RETRY_SLEEPS):
+                if sleep:
+                    await asyncio.sleep(sleep)
+                response = await client.post(
+                    STT_META_PATH,
+                    files=files,
+                    headers={"Authorization": f"Bearer {settings.meta_api_key}"},
+                )
+                if response.status_code not in STT_RETRYABLE:
+                    return response
+                last = response
+                logger.warning("meta stt status=%s", response.status_code)
+            assert last is not None
+            return last
+    except httpx.TimeoutException:
+        raise ai_timeout()
+    except httpx.HTTPError as e:
+        logger.warning("meta unreachable: %s", type(e).__name__)
+        raise ai_unavailable()
+
+
+@router.post("/transcribe")
+async def transcribe(
+    audio: UploadFile = File(...), sub: str = Depends(current_sub)
+) -> dict:
+    """Push-to-talk: WAV bytes in, transcript out. Nothing is persisted;
+    audio and transcripts are never logged (sizes/counts only)."""
+    settings = get_settings()
+    if not limits.allow(f"stt:{sub}", settings.stt_per_minute, 60.0):
+        raise rate_limited()
+    if sub in active:
+        raise ai_busy()
+    if not settings.meta_api_key:
+        logger.error("META_API_KEY is not configured")
+        raise ai_unavailable()
+    data = await audio.read(settings.max_audio_bytes + 1)
+    if len(data) > settings.max_audio_bytes:
+        raise AppError(
+            "too_large",
+            "That recording is too long. Please try a shorter one.",
+            413,
+        )
+    if not _is_wav(data):
+        raise AppError("bad_request", "Something went wrong. Please try again.", 400)
+    active.add(sub)
+    started = time.monotonic()
+    try:
+        response = await _meta_transcribe(data, settings)
+    finally:
+        active.discard(sub)
+    if response.status_code == 429:
+        raise ai_busy()
+    if response.status_code != 200:
+        logger.warning(
+            "meta stt status=%s meta_error=%s",
+            response.status_code,
+            _meta_error_snippet(response),
+        )
+        raise map_meta_http(response.status_code)
+    try:
+        body = response.json()
+        transcript = body.get("transcript", "")
+        turns = body.get("turns", [])
+        duration_ms = int(body.get("audioDurationMs", 0))
+    except (ValueError, TypeError, AttributeError):
+        raise ai_unclear()
+    if not isinstance(transcript, str) or not transcript.strip():
+        raise ai_unclear()
+    turn_count = len(turns) if isinstance(turns, list) else 0
+    logger.info(
+        "stt file sub=%s bytes=%d ms=%d turns=%d %.0fms",
+        sub[:8],
+        len(data),
+        duration_ms,
+        turn_count,
+        (time.monotonic() - started) * 1000,
+    )
+    return {
+        "transcript": transcript.strip(),
+        "audio_duration_ms": duration_ms,
+        "turns": turn_count,
+    }
 
 
 class _Closed(Exception):

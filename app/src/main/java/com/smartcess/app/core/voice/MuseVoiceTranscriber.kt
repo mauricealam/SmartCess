@@ -32,6 +32,11 @@ import javax.inject.Named
 import javax.inject.Singleton
 
 /**
+ * DEFERRED (not removed): realtime speech-to-text over WebSocket.
+ * Talk currently uses push-to-talk HTTPS upload (TalkRecorder +
+ * POST /api/voice/transcribe) because Meta 404s realtime serving from our
+ * host's egress. Kept for the live-interim-transcription milestone.
+ *
  * Muse Voice Transcribe: realtime speech-to-text over WebSocket.
  * Audio: mono 16-bit PCM @ 24kHz. Mantra: Transcribe listens, Spark thinks.
  *

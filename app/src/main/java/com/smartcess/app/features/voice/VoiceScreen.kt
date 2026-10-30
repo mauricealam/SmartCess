@@ -47,10 +47,10 @@ import com.smartcess.app.ui.components.SmartCessTextField
 import com.smartcess.app.ui.components.SmartCessTopBar
 
 /**
- * Talk screen: listening indicator, live transcript, typed fallback, Stop,
- * Cancel, and spoken errors (spec screen inventory). Classified intents
- * navigate to the owning module; nothing is acted on without confirmation
- * downstream.
+ * Talk screen (push-to-talk): recording indicator, transcript, typed
+ * fallback, Stop, Cancel, and spoken answers/errors. Only the short status
+ * heading is a live region; AI text and errors are spoken by our TTS, so
+ * TalkBack never announces the same words twice.
  */
 @Composable
 fun VoiceScreen(
@@ -83,7 +83,7 @@ fun VoiceScreen(
     LaunchedEffect(hasMic) {
         if (hasMic && !autoStarted) {
             autoStarted = true
-            viewModel.startListening()
+            viewModel.startTalk()
         }
     }
     // Errors and static messages are both visible and spoken (spec).
@@ -130,27 +130,26 @@ fun VoiceScreen(
 
         Text(
             text = when {
-                state.listening -> stringResource(R.string.voice_listening)
-                state.processing -> stringResource(R.string.status_loading)
+                state.recording -> stringResource(R.string.talk_recording)
+                state.processing -> stringResource(R.string.talk_understanding)
+                state.speaking -> stringResource(R.string.talk_speaking)
                 else -> stringResource(R.string.voice_transcript_label)
             },
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.semantics { heading(); liveRegion = LiveRegionMode.Polite },
         )
-        val liveText = state.partial.ifBlank { state.transcript }
-        if (liveText.isNotBlank()) {
+        if (state.transcript.isNotBlank()) {
             Text(
-                text = liveText,
+                text = state.transcript,
                 style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
 
         state.message?.let { message ->
+            // Displayed, not announced: our TTS already speaks it.
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
             SmartCessSecondaryButton(
                 text = stringResource(R.string.action_listen),
@@ -159,13 +158,14 @@ fun VoiceScreen(
             )
         }
         messageRes?.let {
-            SmartCessBanner(message = stringResource(it), kind = BannerKind.INFO)
+            SmartCessBanner(message = stringResource(it), kind = BannerKind.INFO, announce = false)
         }
         errorRes?.let {
             SmartCessBanner(
                 title = stringResource(R.string.banner_error_title),
                 message = stringResource(it),
                 kind = BannerKind.ERROR,
+                announce = false,
             )
         }
 
@@ -181,16 +181,16 @@ fun VoiceScreen(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        if (state.listening) {
+        if (state.recording) {
             SmartCessSecondaryButton(
                 text = stringResource(R.string.voice_stop),
-                onClick = viewModel::stopListening,
+                onClick = viewModel::stopTalk,
                 modifier = Modifier.fillMaxWidth(),
             )
         } else if (hasMic) {
             SmartCessSecondaryButton(
                 text = stringResource(R.string.voice_listen_again),
-                onClick = viewModel::startListening,
+                onClick = viewModel::startTalk,
                 modifier = Modifier.fillMaxWidth(),
             )
         }

@@ -24,7 +24,9 @@ enum class BannerKind { INFO, WARNING, ERROR, OFFLINE }
 
 /**
  * Spec banner for offline mode, low confidence, and errors.
- * Always a live region so TalkBack announces it; icon + words, never color-only.
+ * A live region by default so TalkBack announces it; icon + words, never
+ * color-only. Pass [announce] = false when the app's own TTS already speaks
+ * the text (Talk screen), so the two voices never overlap.
  */
 @Composable
 fun SmartCessBanner(
@@ -32,6 +34,7 @@ fun SmartCessBanner(
     modifier: Modifier = Modifier,
     kind: BannerKind = BannerKind.INFO,
     title: String? = null,
+    announce: Boolean = true,
 ) {
     val container = when (kind) {
         BannerKind.INFO -> MaterialTheme.colorScheme.primaryContainer
@@ -47,7 +50,9 @@ fun SmartCessBanner(
         shape = RoundedCornerShape(12.dp),
         color = container,
         contentColor = content,
-        modifier = modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
+        modifier = modifier.fillMaxWidth().semantics {
+            if (announce) liveRegion = LiveRegionMode.Polite
+        },
     ) {
         Row(
             modifier = Modifier.padding(12.dp),

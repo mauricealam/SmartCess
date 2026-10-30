@@ -18,12 +18,31 @@ Never give medical, legal, or financial advice."""
     const val NO_ADVICE_RULE = "Never give medical, legal, or financial advice. " +
         "For health questions, suggest asking a trusted person or professional."
 
-    fun intent(text: String): SparkPrompt = SparkPrompt(
+    fun qa(question: String, context: String?): SparkPrompt = SparkPrompt(
+        instruction = """Answer the user's question in at most two short sentences,
+plain spoken language for a blind listener. No lists, no preamble.
+$NO_ADVICE_RULE""",
+        input = if (context.isNullOrBlank()) {
+            """Question: "$question""""
+        } else {
+            """Conversation so far:
+$context
+Question: "$question""""
+        },
+    )
+
+    fun intent(text: String, context: String? = null): SparkPrompt = SparkPrompt(
         instruction = """Classify the voice command into one intent:
 daily_briefing, scan_bill, read_document, email_briefing, ask_bill_question,
 create_reminder, cancel_reminder, archive_bill, add_appointment, add_routine, general_question.
 $GLOBAL_RULES""",
-        input = """Command: "$text"""",
+        input = if (context.isNullOrBlank()) {
+            """Command: "$text""""
+        } else {
+            """Conversation so far:
+$context
+Command: "$text""""
+        },
     )
 
     fun bill(ocrHint: String?): SparkPrompt = SparkPrompt(

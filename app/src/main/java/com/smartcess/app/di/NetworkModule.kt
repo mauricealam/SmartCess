@@ -14,6 +14,11 @@ import com.smartcess.app.core.serialization.SmartCessJson
 import com.smartcess.app.core.session.BackendAuthApi
 import com.smartcess.app.core.session.BackendChatApi
 import com.smartcess.app.core.session.BackendSparkAdapter
+import com.smartcess.app.core.session.BackendVoiceApi
+import com.smartcess.app.core.voice.TalkCues
+import com.smartcess.app.core.voice.TalkCuesImpl
+import com.smartcess.app.core.voice.TalkRecorder
+import com.smartcess.app.core.voice.TalkRecorderImpl
 import com.smartcess.app.core.session.EncryptedSessionStore
 import com.smartcess.app.core.session.SessionAuthenticator
 import com.smartcess.app.core.session.SessionTokenStore
@@ -24,6 +29,8 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -145,6 +152,12 @@ object NetworkModule {
     @Provides
     @Singleton
     @Named("backendAuthed")
+    fun provideBackendVoiceApi(@Named("backendAuthed") retrofit: Retrofit): BackendVoiceApi =
+        retrofit.create(BackendVoiceApi::class.java)
+
+    @Provides
+    @Singleton
+    @Named("backendAuthed")
     fun provideBackendChatApi(@Named("backendAuthed") retrofit: Retrofit): BackendChatApi =
         retrofit.create(BackendChatApi::class.java)
 
@@ -167,6 +180,18 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideTranscriber(impl: MuseVoiceTranscriberImpl): MuseVoiceTranscriber = impl
+
+    @Provides
+    @Singleton
+    fun provideTalkRecorder(impl: TalkRecorderImpl): TalkRecorder = impl
+
+    @Provides
+    @Singleton
+    fun provideTalkCues(impl: TalkCuesImpl): TalkCues = impl
+
+    @Provides
+    @Named("io")
+    fun provideIoDispatcher(): CoroutineDispatcher = Dispatchers.IO
 
     @Provides
     @Singleton

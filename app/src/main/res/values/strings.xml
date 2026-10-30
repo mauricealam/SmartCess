@@ -345,13 +345,24 @@
     <string name="dev_key_cleared" translatable="true">Developer key cleared. AI now uses the SmartCess backend.</string>
 
     <!-- Voice -->
-    <string name="voice_listening" translatable="true">Listening… speak now.</string>
+    <string name="talk_recording" translatable="true">Recording. Speak now.</string>
+    <string name="talk_understanding" translatable="true">Understanding.</string>
+    <string name="talk_speaking" translatable="true">Speaking.</string>
+    <string name="talk_recording_too_long" translatable="true">That recording is too long. Please try a shorter one.</string>
+    <string name="talk_opening" translatable="true">Opening that now.</string>
+    <string name="talk_open_briefing" translatable="true">Opening your daily briefing.</string>
+    <string name="talk_open_camera" translatable="true">Opening the camera.</string>
+    <string name="talk_open_documents" translatable="true">Opening your documents.</string>
+    <string name="talk_open_email" translatable="true">Opening your email briefing.</string>
+    <string name="talk_open_bills" translatable="true">Opening your bills.</string>
+    <string name="talk_open_appointments" translatable="true">Opening your appointments.</string>
+    <string name="talk_open_routines" translatable="true">Opening your routines.</string>
     <string name="voice_transcript_label" translatable="true">What I heard</string>
     <string name="voice_type_label" translatable="true">Or type your request</string>
     <string name="voice_type_hint" translatable="true">For example: what needs my attention today?</string>
     <string name="voice_send" translatable="true">Send</string>
-    <string name="voice_stop" translatable="true">Stop listening</string>
-    <string name="voice_listen_again" translatable="true">Listen again</string>
+    <string name="voice_stop" translatable="true">Stop recording</string>
+    <string name="voice_listen_again" translatable="true">Talk again</string>
     <string name="voice_no_speech" translatable="true">I did not hear you. Tap Talk and try again.</string>
     <string name="voice_not_clear" translatable="true">Sorry, I could not hear that clearly.</string>
     <string name="voice_api_unavailable" translatable="true">SmartCess cannot reach its AI service right now.</string>

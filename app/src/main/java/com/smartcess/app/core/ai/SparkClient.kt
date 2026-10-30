@@ -41,14 +41,23 @@ class SparkClient @Inject constructor(
 
     // Public API
 
-    suspend fun classifyIntent(text: String): IntentResult =
+    suspend fun classifyIntent(text: String, context: String? = null): IntentResult =
         completeJson(
             feature = "intent",
             schemaName = "intent",
-            prompt = SparkPrompts.intent(text),
+            prompt = SparkPrompts.intent(text, context),
             timeoutMillis = config.intentTimeoutMillis,
             parser = { raw -> json.decodeFromString(IntentResult.serializer(), raw) },
             fallback = { IntentResult(intent = "general_question", confidence = 0.0) },
+        )
+
+    /** Short spoken answer for Talk (free text, no schema). */
+    suspend fun answer(question: String, context: String? = null): String =
+        completeText(
+            feature = "answer",
+            prompt = SparkPrompts.qa(question, context),
+            timeoutMillis = config.briefingTimeoutMillis,
+            maxTokens = 256,
         )
 
     suspend fun extractBill(imageBase64: String, ocrHint: String? = null): BillExtraction =
@@ -191,6 +200,49 @@ class SparkClient @Inject constructor(
             cache.put(cacheKey, raw)
             success = true
             parsed
+        } finally {
+            val latency = System.currentTimeMillis() - started
+            usage.record(feature, latency, success, promptTokens, completionTokens)
+            eval.log(EvalSample(feature, SparkPrompts.VERSION, success, latency))
+        }
+    }
+
+    private suspend fun completeText(
+        feature: String,
+        prompt: SparkPrompt,
+        timeoutMillis: Long,
+        maxTokens: Int,
+    ): String = limiter.guard {
+        val started = System.currentTimeMillis()
+        var success = false
+        var promptTokens = 0
+        var completionTokens = 0
+        try {
+            val raw = retries.withRetry(
+                transientRetries = config.transientMaxRetries,
+                timeoutRetries = config.timeoutMaxRetries,
+            ) {
+                val response = callWithFallback(
+                    SparkRequest(
+                        model = config.sparkModel,
+                        messages = listOf(
+                            developerMessage(prompt.instruction),
+                            userMessage(prompt.input, null),
+                        ),
+                        max_tokens = maxTokens,
+                    ),
+                    timeoutMillis,
+                )
+                response.usage?.let {
+                    promptTokens += it.prompt_tokens
+                    completionTokens += it.completion_tokens
+                }
+                val content = response.choices.firstOrNull()?.message?.content
+                    ?: throw InvalidAiResponseException()
+                contentText(content)
+            }
+            success = true
+            raw
         } finally {
             val latency = System.currentTimeMillis() - started
             usage.record(feature, latency, success, promptTokens, completionTokens)
