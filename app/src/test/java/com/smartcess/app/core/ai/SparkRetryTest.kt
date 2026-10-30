@@ -79,6 +79,26 @@ class SparkRetryTest {
     }
 
     @Test
+    fun sparkVersions502_fallsOverToWonderInOrder(): Unit = runBlocking {
+        val config = mockk<AiConfig>(relaxed = true)
+        every { config.sparkModel } returns "muse-spark-1.3"
+        every { config.sparkFallbackModel } returns "muse-spark-1.2"
+        every { config.emergencyFallbackModel } returns "muse-wonder-1.0"
+        every { config.intentTimeoutMillis } returns 10_000
+        val seen = mutableListOf<String>()
+        val api = object : SparkApi {
+            override suspend fun complete(request: SparkRequest): SparkResponse {
+                seen.add(request.model)
+                if (request.model != "muse-wonder-1.0") throw httpError(502)
+                return intentResponse("general_question")
+            }
+        }
+        val result = client(api, config).classifyIntent("hello")
+        assertEquals("general_question", result.intent)
+        assertEquals(listOf("muse-spark-1.3", "muse-spark-1.2", "muse-wonder-1.0"), seen)
+    }
+
+    @Test
     fun backendAlways502_throwsAiException(): Unit = runBlocking {
         var calls = 0
         val api = object : SparkApi {
@@ -91,8 +111,8 @@ class SparkRetryTest {
             client(api).classifyIntent("hello")
             throw AssertionError("expected AiException")
         } catch (e: AiException) {
-            // 2 models per block, initial try + 2 transient retries.
-            assertEquals(6, calls)
+            // 3 models per block, initial try + 2 transient retries.
+            assertEquals(9, calls)
         }
     }
 }

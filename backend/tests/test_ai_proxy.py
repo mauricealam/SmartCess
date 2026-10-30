@@ -68,6 +68,19 @@ def test_chat_success(monkeypatch):
     assert TEST_KEY not in response.text
 
 
+def test_chat_accepts_emergency_wonder_model(monkeypatch):
+    _use_meta(monkeypatch, _chat_ok)
+    response = client.post(
+        "/api/ai/chat",
+        json={
+            "model": "muse-wonder-1.0",
+            "messages": [{"role": "user", "content": "hi"}],
+        },
+        headers=_auth(),
+    )
+    assert response.status_code == 200
+
+
 def test_chat_requires_key(monkeypatch):
     settings.meta_api_key = ""
 

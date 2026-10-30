@@ -15,8 +15,10 @@ class Settings(BaseSettings):
     meta_base_url: str = "https://api.meta.ai/v1"
     meta_stt_url: str = "wss://api.meta.ai/v1/asr/realtime"
     stt_model: str = "muse-voice-transcribe-1.0"
-    allowed_models: str = "muse-spark-1.3,muse-spark-1.2"
-    default_model: str = "muse-spark-1.3"
+    allowed_models: str = "muse-spark-1.3,muse-spark-1.2,muse-wonder-1.0"
+    # TEMPORARY: Wonder leads while Meta's Spark serving 404s
+    # model_not_found on listed IDs; revert to muse-spark-1.3 on recovery.
+    default_model: str = "muse-wonder-1.0"
 
     jwt_secret: str = "dev-only-change-me"
     jwt_access_minutes: int = 15

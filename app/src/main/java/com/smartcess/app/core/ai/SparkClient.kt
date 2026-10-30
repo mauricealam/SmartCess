@@ -36,7 +36,8 @@ class SparkClient @Inject constructor(
     private val eval: AiEvalLogger,
 ) {
     private val json = SmartCessJson.instance
-    private val route get() = ModelFallback.route(config.sparkModel, config.sparkFallbackModel)
+    private val route get() =
+        ModelFallback.route(config.sparkModel, config.sparkFallbackModel, config.emergencyFallbackModel)
 
     // Public API
 
@@ -220,7 +221,8 @@ class SparkClient @Inject constructor(
                 if (e.code() !in 500..599) throw AiException("The AI request failed. Please try again.", e)
                 lastError = e
             }
-            if (++attempt > 1) throw AiException("The AI service is unavailable.", lastError)
+            // Walk the whole chain; exhaustion throws via the null-model branch above.
+            attempt++
         }
     }
 
