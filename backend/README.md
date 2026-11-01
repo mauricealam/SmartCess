@@ -40,7 +40,8 @@ One web service, Docker runtime, free plan — see [render.yaml](../render.yaml)
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `META_API_KEY` | yes | Meta Model API key, added server-side to Meta calls |
+| `META_API_KEY` | yes* | Meta Model API key, added server-side to Meta calls |
+| `MODEL_API_KEY` | no* | Docs-named alias; when set it wins over `META_API_KEY` (*one of the two is required) |
 | `JWT_SECRET` | yes | HMAC secret for session tokens (Render `generateValue`) |
 | `GOOGLE_SERVER_CLIENT_ID` | yes | Web OAuth client ID; token `aud` must match or exchange fails |
 | `META_BASE_URL` | no | Default `https://api.meta.ai/v1` |

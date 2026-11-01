@@ -12,11 +12,12 @@ import javax.inject.Singleton
 @Singleton
 class AiConfig @Inject constructor() {
     val sparkBaseUrl: String = BuildConfig.META_API_BASE_URL
-    // TEMPORARY: Wonder leads while Meta's Spark serving 404s model_not_found
-    // on listed IDs; revert primary to muse-spark-1.3 once Spark recovers.
-    val sparkModel: String = "muse-wonder-1.0"
+    // Primary chat model. Verified serving from Render egress on
+    // 2026-11-01 (intent + extraction both HTTP 200 as muse-spark-1.3).
+    // Wonder stays as the explicit fallback, 1.2 as the last resort.
+    val sparkModel: String = "muse-spark-1.3"
     /** Fallback when Meta cannot serve the primary. */
-    val sparkFallbackModel: String? = "muse-spark-1.3"
+    val sparkFallbackModel: String? = "muse-wonder-1.0"
     /** Last resort link of the chain (same endpoint, model-ID change). */
     val emergencyFallbackModel: String? = "muse-spark-1.2"
     val sttUrl: String = BuildConfig.META_STT_URL

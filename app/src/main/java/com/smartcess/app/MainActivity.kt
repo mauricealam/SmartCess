@@ -6,6 +6,7 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -37,8 +38,8 @@ class MainActivity : ComponentActivity() {
     private val pendingDeepLink = mutableStateOf<String?>(null)
 
     private companion object {
-        /** Minimum splash visibility so the brand reveal reads (in budget). */
-        const val SPLASH_MIN_MILLIS = 750L
+        /** Minimum splash visibility: cascade (~950ms) + rest beat. */
+        const val SPLASH_MIN_MILLIS = 1500L
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,11 +68,17 @@ class MainActivity : ComponentActivity() {
             if (reduceMotion) {
                 provider.remove()
             } else {
-                provider.view.animate().alpha(0f).setDuration(250)
+                provider.view.animate().alpha(0f).setDuration(300)
                     .withEndAction { provider.remove() }.start()
             }
         }
         enableEdgeToEdge()
+        // Single white theme: dark status/nav icons stay readable even when
+        // the phone itself is in dark mode.
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = true
+            isAppearanceLightNavigationBars = true
+        }
         setContent {
             val preferences by prefs.observe().collectAsState(initial = null)
             SmartCessTheme(

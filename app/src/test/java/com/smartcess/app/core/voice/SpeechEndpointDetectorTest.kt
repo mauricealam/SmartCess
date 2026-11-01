@@ -58,6 +58,46 @@ class SpeechEndpointDetectorTest {
         assertTrue(detector.onFrame(5000, 200))
     }
 
+    private fun pttDetector() = SpeechEndpointDetector(
+        speechThreshold = PttAudioSpec.SILENCE_PEAK,
+        speechConfirmMs = PttAudioSpec.SPEECH_CONFIRM_MS,
+        endSilenceMs = PttAudioSpec.END_SILENCE_MS,
+        noSpeechTimeoutMs = PttAudioSpec.NO_SPEECH_TIMEOUT_MS,
+        maxListenMs = PttAudioSpec.MAX_DURATION_MS,
+    )
+
+    @Test
+    fun ptt_shortCommand_endpointsRightAfterSpeech() {
+        // No fixed minimum wait: a 2 s command submits ~1.2 s after it ends.
+        val detector = pttDetector()
+        assertFalse(detector.onFrame(100, 0))
+        assertFalse(detector.onFrame(5000, 100))
+        assertFalse(detector.onFrame(5000, 2000))
+        assertFalse(detector.onFrame(100, 2100))
+        assertFalse(detector.onFrame(100, 3299))
+        assertTrue(detector.onFrame(100, 3300))
+    }
+
+    @Test
+    fun ptt_briefNoise_neverEndpoints() {
+        // A cough (< 300 ms voice) must not submit an empty turn.
+        val detector = pttDetector()
+        assertFalse(detector.onFrame(100, 0))
+        assertFalse(detector.onFrame(5000, 100))
+        assertFalse(detector.onFrame(5000, 200))
+        assertFalse(detector.onFrame(100, 300))
+        assertFalse(detector.onFrame(100, 5000))
+    }
+
+    @Test
+    fun ptt_quietRoom_timesOutAsNoSpeech() {
+        // Slow starters keep ~6 s to begin before the turn gives up.
+        val detector = pttDetector()
+        assertFalse(detector.onFrame(100, 0))
+        assertFalse(detector.onFrame(100, 5999))
+        assertTrue(detector.onFrame(100, 6000))
+    }
+
     @Test
     fun pcmPeak_readsLittleEndianSamples() {
         assertEquals(0, pcmPeak(byteArrayOf(), 0))

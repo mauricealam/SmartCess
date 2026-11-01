@@ -1,7 +1,11 @@
 package com.smartcess.app.features.voice
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.util.Log
 import androidx.annotation.StringRes
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.smartcess.app.R
@@ -66,10 +70,11 @@ data class VoiceUiState(
 private data class PendingQuestion(val intent: String, val question: String)
 
 /**
- * Talk flow (push-to-talk): record a WAV on Stop-tap, upload it to the
- * backend for Muse Voice Transcribe file transcription, classify the
- * transcript with Muse Spark, then SPEAK the answer, clarification, or
- * module confirmation. Typed input is the touch fallback (spec parity).
+ * Talk flow: record a WAV between Talk-tap and trailing-silence auto-stop
+ * (a Stop-tap still ends capture early), upload it to the backend for
+ * Muse Voice Transcribe file transcription, classify the transcript with
+ * Muse Spark, then SPEAK the answer, clarification, or module confirmation.
+ * Typed input is the touch fallback (spec parity).
  *
  * Blind-first guarantees:
  * - Recording runs only between Talk-tap and Stop; TTS speaks only after
@@ -78,6 +83,9 @@ private data class PendingQuestion(val intent: String, val question: String)
  * - Talk performs no tool calls itself (classify/answer are read-only);
  *   actions happen downstream with explicit user approval, so a repeated
  *   turn can never double-execute anything.
+ * - Mid-task turns are hands-free: after the app speaks a question or a
+ *   read-back, listening restarts automatically when speech ends. Saving,
+ *   failure, cancel, and navigation all stop the chain; a cap bounds it.
  */
 @HiltViewModel
 class VoiceViewModel @Inject constructor(
@@ -92,6 +100,7 @@ class VoiceViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     monitor: BackendHealthMonitor,
     @Named("io") private val ioDispatcher: CoroutineDispatcher,
+    private val actions: VoiceActionHandler,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(VoiceUiState())
@@ -106,6 +115,33 @@ class VoiceViewModel @Inject constructor(
 
     private var pending: PendingQuestion? = null
     private var maxDurationJob: Job? = null
+    private var autoStopJob: Job? = null
+    // Hands-free turn-taking: turnGen disarms stale speech callbacks (any
+    // fresh tap, typed answer, or cancel invalidates them); autoTurns counts
+    // consecutive auto-started turns against the cap (longest M1 flow needs
+    // 3: title?, when?, read-back; +2 margin before a manual tap is asked).
+    private var turnGen = 0
+    private var autoTurns = 0
+    internal var maxAutoTurns = 5
+
+    /**
+     * Fresh mic-grant check on every Talk tap. The screen's remembered
+     * permission flag can go stale (revoked in Settings, silenced stream),
+     * and on some devices AudioRecord never throws when blocked — it just
+     * records zeros. Checking here guarantees we never capture silence;
+     * tests override this (JVM has no permission system).
+     */
+    internal var micPermissionCheck: () -> Boolean = {
+        ContextCompat.checkSelfPermission(appContext, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+
+    /**
+     * Phase-timing sink (durations and byte counts only — never transcripts,
+     * questions, or answers). Tests override this (android.util.Log is a stub
+     * on the JVM); production logs to logcat for latency diagnosis.
+     */
+    internal var logPhase: (String) -> Unit = { msg -> Log.d("SmartCessTalk", msg) }
 
     init {
         viewModelScope.launch { speaker.setRate(prefs.get().ttsRate) }
@@ -113,7 +149,24 @@ class VoiceViewModel @Inject constructor(
 
     /** Talk-tap: single-flight; ignored while recording or processing. */
     fun startTalk() {
+        autoTurns = 0 // a deliberate tap restarts the hands-free allowance
+        startTalkInternal()
+    }
+
+    /** Hands-free next turn: same capture as a tap, minus the allowance reset. */
+    private fun autoListen() {
+        startTalkInternal()
+    }
+
+    private fun startTalkInternal() {
+        turnGen++ // any fresh capture disarms stale speech callbacks
         if (_state.value.recording || _state.value.processing) return
+        if (!micPermissionCheck()) {
+            // Blocked mic: say so (the screen speaks + shows this) instead
+            // of recording silence. Pending questions survive the tap.
+            _state.update { it.copy(errorRes = R.string.perm_mic_rationale) }
+            return
+        }
         speaker.stop()
         // pending is deliberately kept: a fresh Talk after a spoken question
         // is that question's answer.
@@ -138,13 +191,24 @@ class VoiceViewModel @Inject constructor(
             delay(PttAudioSpec.MAX_DURATION_MS + 2_000)
             if (_state.value.recording) stopTalk()
         }
+        // Silence auto-stop: submit without a Stop-tap so blind users never
+        // hunt for the button. Manual Stop/cancel win by cancelling this.
+        autoStopJob?.cancel()
+        autoStopJob = viewModelScope.launch {
+            while (!recorder.autoStopped && _state.value.recording) {
+                delay(AUTO_STOP_POLL_MS)
+            }
+            if (_state.value.recording) stopTalk()
+        }
     }
 
-    /** Stop-tap: ends capture, uploads, transcribes, answers. */
+    /** Stop-tap (or auto-stop): ends capture, uploads, transcribes, answers. */
     fun stopTalk() {
         if (!_state.value.recording) return
         maxDurationJob?.cancel()
         maxDurationJob = null
+        autoStopJob?.cancel()
+        autoStopJob = null
         _state.update { it.copy(recording = false, processing = true) }
         viewModelScope.launch {
             val rec = try {
@@ -161,7 +225,9 @@ class VoiceViewModel @Inject constructor(
                     return@launch
                 }
                 val bytes = withContext(ioDispatcher) { rec.file.readBytes() }
+                val uploadStart = System.currentTimeMillis()
                 val transcript = upload(bytes)
+                logPhase("upload=${System.currentTimeMillis() - uploadStart}ms bytes=${bytes.size}")
                 _state.update { it.copy(transcript = transcript) }
                 classify(transcript)
             } catch (e: CancellationException) {
@@ -170,6 +236,10 @@ class VoiceViewModel @Inject constructor(
                 fail(e.messageRes)
             } catch (e: UnclearException) {
                 fail(R.string.voice_not_clear)
+            } catch (e: IOException) {
+                // The capture file vanished (or is unreadable) between stop
+                // and upload: a spoken error, never a crashed turn.
+                fail(R.string.error_generic)
             } finally {
                 withContext(ioDispatcher) { runCatching { rec.file.delete() } }
             }
@@ -179,7 +249,11 @@ class VoiceViewModel @Inject constructor(
     fun cancel() {
         maxDurationJob?.cancel()
         maxDurationJob = null
+        autoStopJob?.cancel()
+        autoStopJob = null
+        turnGen++ // a cancelled task must never auto-listen when speech ends
         pending = null
+        actions.discard()
         viewModelScope.launch(ioDispatcher) { runCatching { recorder.cancel() } }
         speaker.stop()
         _state.value = VoiceUiState()
@@ -193,6 +267,7 @@ class VoiceViewModel @Inject constructor(
         val text = _state.value.typed.trim()
         if (text.isEmpty()) return
         if (_state.value.processing) return
+        turnGen++ // a typed answer disarms the spoken question's callback
         if (_state.value.recording) {
             maxDurationJob?.cancel()
             maxDurationJob = null
@@ -204,6 +279,13 @@ class VoiceViewModel @Inject constructor(
     }
 
     fun speak(text: String) = speaker.speak(text)
+
+    override fun onCleared() {
+        // The speaker is app-scoped and may outlive this screen; its
+        // completion callback must never start the mic with no UI present.
+        turnGen++
+        super.onCleared()
+    }
 
     private suspend fun upload(wav: ByteArray): String {
         val part = MultipartBody.Part.createFormData(
@@ -238,6 +320,19 @@ class VoiceViewModel @Inject constructor(
     private fun classify(text: String, fromVoice: Boolean = true) {
         viewModelScope.launch {
             _state.update { it.copy(processing = true, errorRes = null, message = null, messageRes = null) }
+            // An in-progress voice action owns its follow-up turns (confirm /
+            // cancel / more details). Typed input flows through the same path.
+            if (actions.hasPending) {
+                val actionStart = System.currentTimeMillis()
+                val turn = actions.followUp(text)
+                if (turn != null) {
+                    logPhase("action=${System.currentTimeMillis() - actionStart}ms saved=${turn.saved}")
+                    _state.update { it.copy(processing = false, message = turn.speak) }
+                    speakAndTrack(turn.speak, expectReply = !turn.saved && actions.hasPending)
+                    analytics.log(AnalyticsEvent.VOICE_COMMAND, mapOf("intent" to "voice_action", "success" to if (turn.saved) "saved" else "prompt"))
+                    return@launch
+                }
+            }
             try {
                 // Follow-up turns carry the pending question + recent turns so
                 // the task survives across Talk taps; fresh turns classify raw.
@@ -247,16 +342,34 @@ class VoiceViewModel @Inject constructor(
                 }.getOrDefault("")
                 val fullContext = listOfNotNull(context, history.ifBlank { null })
                     .joinToString("\n").ifBlank { null }
+                // Fast path: crisp commands skip AI classification entirely.
+                val fast = VoiceFastPath.route(text)
+                if (fast != null && VoiceActionIntents.isAction(fast)) {
+                    logPhase("route=fastpath intent=$fast")
+                    turns.upsert(ConversationTurnEntity(role = "USER", text = text, intent = fast))
+                    runAction(fast, text, fullContext)
+                    return@launch
+                }
+                val classifyStart = System.currentTimeMillis()
                 val result = spark.classifyIntent(text, fullContext)
+                logPhase("classify=${System.currentTimeMillis() - classifyStart}ms intent=${result.intent}")
                 turns.upsert(ConversationTurnEntity(role = "USER", text = text, intent = result.intent))
                 val question = result.clarifying_question
                 val route = routeForIntent(result.intent)
                 when {
+                    // Action intents own their follow-ups even when the
+                    // classifier also asks a question: the executor extracts
+                    // what was said and asks its own precise slot questions,
+                    // so the task survives across turns. Checking the question
+                    // first would orphan the task (next tap starts over).
+                    VoiceActionIntents.isAction(result.intent) -> {
+                        runAction(result.intent, text, fullContext)
+                    }
                     question != null -> {
                         pending = PendingQuestion(result.intent, question)
                         turns.upsert(ConversationTurnEntity(role = "ASSISTANT", text = question, intent = result.intent))
                         _state.update { it.copy(processing = false, message = question) }
-                        speakAndTrack(question)
+                        speakAndTrack(question, expectReply = true)
                         analytics.log(AnalyticsEvent.VOICE_COMMAND, mapOf("intent" to result.intent, "success" to "clarify"))
                     }
                     route != null -> {
@@ -271,7 +384,9 @@ class VoiceViewModel @Inject constructor(
                     }
                     else -> {
                         pending = null
+                        val answerStart = System.currentTimeMillis()
                         val answer = spark.answer(text, fullContext)
+                        logPhase("answer=${System.currentTimeMillis() - answerStart}ms chars=${answer.length}")
                         if (answer.isBlank()) {
                             // Empty model reply: offer help instead of silence.
                             turns.upsert(ConversationTurnEntity(role = "ASSISTANT", text = "help", intent = result.intent))
@@ -303,15 +418,42 @@ class VoiceViewModel @Inject constructor(
         }
     }
 
-    /** Speaks dynamic AI text and tracks the Speaking state for the screen. */
-    private fun speakAndTrack(text: String) {
+    /** Starts an action intent (shared by the fast route and AI classification). */
+    private suspend fun runAction(intent: String, text: String, fullContext: String?) {
+        pending = null // the action owns its follow-ups now
+        val actionStart = System.currentTimeMillis()
+        val turn = actions.start(intent, text, fullContext)
+        logPhase("action=${System.currentTimeMillis() - actionStart}ms saved=${turn.saved}")
+        _state.update { it.copy(processing = false, message = turn.speak) }
+        speakAndTrack(turn.speak, expectReply = !turn.saved && actions.hasPending)
+        analytics.log(AnalyticsEvent.VOICE_COMMAND, mapOf("intent" to intent, "success" to "prompt"))
+    }
+
+    /**
+     * Speaks dynamic AI text and tracks the Speaking state for the screen.
+     * When a reply is expected (a question was asked or an action awaits
+     * details/confirmation), listening restarts automatically once speech
+     * ends — unless a newer turn, cancel, or the cap intervened.
+     */
+    private fun speakAndTrack(text: String, expectReply: Boolean = false) {
         _state.update { it.copy(speaking = true) }
+        val gen = turnGen
         speaker.speak(text) {
             _state.update { it.copy(speaking = false) }
+            if (expectReply && gen == turnGen && autoTurns < maxAutoTurns) {
+                autoTurns++
+                autoListen()
+            }
         }
     }
 
     private fun fail(@StringRes res: Int, fromVoice: Boolean = true) {
+        // Thinking pauses are not errors: silence while a task awaits its
+        // reply goes idle quietly, keeping the pending task untouched.
+        if (fromVoice && res == R.string.voice_no_speech && actions.hasPending) {
+            _state.update { it.copy(processing = false, recording = false, speaking = false) }
+            return
+        }
         // Hearing-flavored errors make no sense for typed input.
         val shown = if (!fromVoice && (res == R.string.voice_no_speech || res == R.string.voice_not_clear)) {
             R.string.error_generic
@@ -326,6 +468,7 @@ class VoiceViewModel @Inject constructor(
 
     companion object {
         const val UPLOAD_TIMEOUT_MS = 45_000L
+        private const val AUTO_STOP_POLL_MS = 200L
 
         /**
          * Intent -> owning module route (spec voice/touch parity). Intents that need

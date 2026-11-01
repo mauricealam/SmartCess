@@ -85,6 +85,13 @@ data class RoutineHelp(
 )
 
 @Serializable
+data class ReminderExtraction(
+    val title: String = "",
+    val trigger_iso: String = "",
+    val confidence: Double = 0.0,
+)
+
+@Serializable
 data class BriefingPriority(
     val type: String = "",
     val title: String = "",

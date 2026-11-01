@@ -89,6 +89,11 @@ class ResponseSchemasTest {
     }
 
     @Test
+    fun reminder_matchesContract() {
+        checkContract("reminder", setOf("title", "trigger_iso", "confidence"))
+    }
+
+    @Test
     fun briefing_matchesContract() {
         checkContract("briefing", setOf("greeting", "priorities", "briefing"))
         val item = ResponseSchemas.forFeature("briefing")["properties"]!!

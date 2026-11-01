@@ -1,8 +1,7 @@
 package com.smartcess.app.core.ai
 
-/** Model chain, strongest-first: TEMPORARY Wonder lead while Meta's Spark
- *  serving 404s; Spark versions stay as fallbacks so the chain heals
- *  itself when Spark recovers (then revert the lead to 1.3). */
+/** Ordered model chain, strongest-first. The caller supplies the order
+ *  (primary, fallback, last resort); this helper only walks it. */
 data class ModelRoute(val models: List<String>)
 
 object ModelFallback {

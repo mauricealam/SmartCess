@@ -1,5 +1,6 @@
 package com.smartcess.app.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,9 +25,11 @@ enum class BannerKind { INFO, WARNING, ERROR, OFFLINE }
 
 /**
  * Spec banner for offline mode, low confidence, and errors.
- * A live region by default so TalkBack announces it; icon + words, never
- * color-only. Pass [announce] = false when the app's own TTS already speaks
- * the text (Talk screen), so the two voices never overlap.
+ * White ground with a 1dp outline edge and a kind-tinted icon — never a
+ * color wash alone, and icon + words, never color-only. A live region by
+ * default so TalkBack announces it; pass [announce] = false when the app's
+ * own TTS already speaks the text (Talk screen), so the two voices never
+ * overlap.
  */
 @Composable
 fun SmartCessBanner(
@@ -36,20 +39,16 @@ fun SmartCessBanner(
     title: String? = null,
     announce: Boolean = true,
 ) {
-    val container = when (kind) {
-        BannerKind.INFO -> MaterialTheme.colorScheme.primaryContainer
-        BannerKind.WARNING, BannerKind.OFFLINE -> MaterialTheme.colorScheme.tertiaryContainer
-        BannerKind.ERROR -> MaterialTheme.colorScheme.errorContainer
-    }
-    val content = when (kind) {
-        BannerKind.INFO -> MaterialTheme.colorScheme.onPrimaryContainer
-        BannerKind.WARNING, BannerKind.OFFLINE -> MaterialTheme.colorScheme.onTertiaryContainer
-        BannerKind.ERROR -> MaterialTheme.colorScheme.onErrorContainer
+    val iconTint = when (kind) {
+        BannerKind.INFO -> MaterialTheme.colorScheme.primary
+        BannerKind.WARNING, BannerKind.OFFLINE -> MaterialTheme.colorScheme.tertiary
+        BannerKind.ERROR -> MaterialTheme.colorScheme.error
     }
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = container,
-        contentColor = content,
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = modifier.fillMaxWidth().semantics {
             if (announce) liveRegion = LiveRegionMode.Polite
         },
@@ -62,6 +61,7 @@ fun SmartCessBanner(
             Icon(
                 imageVector = if (kind == BannerKind.INFO) Icons.Filled.Info else Icons.Filled.Warning,
                 contentDescription = null,
+                tint = iconTint,
             )
             androidx.compose.foundation.layout.Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 title?.let { Text(it, style = MaterialTheme.typography.titleMedium) }

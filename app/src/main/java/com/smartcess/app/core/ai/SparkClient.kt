@@ -122,6 +122,16 @@ class SparkClient @Inject constructor(
             fallback = { RoutineHelp(confidence = 0.0) },
         )
 
+    suspend fun extractReminder(text: String): ReminderExtraction =
+        completeJson(
+            feature = "reminder",
+            schemaName = "reminder",
+            prompt = SparkPrompts.reminder(text),
+            timeoutMillis = config.extractionTimeoutMillis,
+            parser = { raw -> json.decodeFromString(ReminderExtraction.serializer(), raw) },
+            fallback = { ReminderExtraction(confidence = 0.0) },
+        )
+
     suspend fun dailyBriefing(todayDataJson: String): BriefingResult =
         completeJson(
             feature = "briefing",

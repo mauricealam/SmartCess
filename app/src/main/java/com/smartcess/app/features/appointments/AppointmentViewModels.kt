@@ -118,6 +118,10 @@ class AppointmentsViewModel @Inject constructor(
         private val formats = listOf(
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm"),
+            // The extractor names the field start_iso, so ISO-with-seconds
+            // ("2026-11-02T09:00:00") is a likely reply; accept it as well.
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"),
             DateTimeFormatter.ofPattern("d/M/yyyy HH:mm"),
             DateTimeFormatter.ofPattern("d-M-yyyy HH:mm"),
         )

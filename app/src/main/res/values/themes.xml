@@ -1,18 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Launcher/activity theme; Compose SmartCessTheme takes over in content. -->
+    <!-- Launcher/activity theme; Compose SmartCessTheme takes over in content.
+         Single white theme: light bars with dark icons, matching MainActivity. -->
     <style name="Theme.SmartCess" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/smartcess_background</item>
-        <item name="android:statusBarColor">@color/smartcess_primary</item>
+        <item name="android:statusBarColor">@color/smartcess_background</item>
         <item name="android:navigationBarColor">@color/smartcess_background</item>
-        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 
-    <!-- System splash: brand reveal on primary blue, then the app theme. -->
+    <!-- System splash: blue logo reveal on white, then the app theme. -->
     <style name="Theme.SmartCess.Starting" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/smartcess_primary</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/avd_splash_wordmark</item>
-        <item name="windowSplashScreenAnimationDuration">700</item>
+        <item name="windowSplashScreenBackground">@color/smartcess_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/avd_splash_mark</item>
+        <item name="windowSplashScreenAnimationDuration">1000</item>
         <item name="postSplashScreenTheme">@style/Theme.SmartCess</item>
     </style>
 </resources>

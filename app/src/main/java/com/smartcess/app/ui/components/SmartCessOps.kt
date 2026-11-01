@@ -36,11 +36,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.smartcess.app.ui.theme.SmartCessTheme
 
-private val OpsShape = RoundedCornerShape(20.dp)
+private val OpsShape = RoundedCornerShape(28.dp)
 
 /**
  * Night Ops command bar: one half of the dual-action group (Talk and
- * Scan Bill). Tonal fill with ops-accent icon and arrow. 72dp target.
+ * Scan Bill). Clay-soft 28dp radius with a gentle lift, tonal fill,
+ * ops-accent icon and arrow. 72dp target.
  */
 @Composable
 fun OpsCommandBar(
@@ -59,6 +60,8 @@ fun OpsCommandBar(
         shape = OpsShape,
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 6.dp,
+        shadowElevation = 4.dp,
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 72.dp)
@@ -236,5 +239,5 @@ fun OpsNotice(
 @Composable
 private fun Modifier.opsFocusRing(focused: Boolean): Modifier {
     if (!focused) return this
-    return border(3.dp, MaterialTheme.colorScheme.primary, OpsShape)
+    return border(3.dp, SmartCessTheme.extra.focus, OpsShape)
 }

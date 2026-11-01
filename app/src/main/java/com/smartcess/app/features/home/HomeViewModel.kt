@@ -80,7 +80,7 @@ fun buildHomePreview(data: TodayData): HomeUiState {
 class HomeViewModel @Inject constructor(
     private val briefing: BriefingRepository,
     private val sessions: SessionManager,
-    monitor: BackendHealthMonitor,
+    private val monitor: BackendHealthMonitor,
 ) : ViewModel() {
     private val _state = MutableStateFlow(HomeUiState())
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
@@ -94,6 +94,8 @@ class HomeViewModel @Inject constructor(
     }
 
     fun refresh() {
+        // A stale DOWN banner recovers without an app restart: re-probe once.
+        if (monitor.state.value == HealthState.DOWN) monitor.retry()
         // Guard concurrent refreshes (double-tap retry): one load at a time.
         // Tracked by job, not by the loading flag — the initial state already
         // reports loading, so a flag guard would swallow the first load.

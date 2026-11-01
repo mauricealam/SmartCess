@@ -345,7 +345,7 @@
     <string name="dev_key_cleared" translatable="true">Developer key cleared. AI now uses the SmartCess backend.</string>
 
     <!-- Voice -->
-    <string name="talk_recording" translatable="true">Recording. Speak now.</string>
+    <string name="talk_recording" translatable="true">Recording. Speak now, it stops by itself.</string>
     <string name="talk_understanding" translatable="true">Understanding.</string>
     <string name="talk_speaking" translatable="true">Speaking.</string>
     <string name="talk_recording_too_long" translatable="true">That recording is too long. Please try a shorter one.</string>
@@ -368,6 +368,37 @@
     <string name="voice_api_unavailable" translatable="true">SmartCess cannot reach its AI service right now.</string>
     <string name="voice_timeout" translatable="true">That is taking too long. Please try again.</string>
     <string name="voice_help" translatable="true">I can help with bills, email, documents, appointments, and routines. What do you need?</string>
+    <string name="voice_action_ask_appt_title" translatable="true">What is the appointment for?</string>
+    <string name="voice_action_ask_appt_when" translatable="true">What day and time?</string>
+    <string name="voice_action_ask_routine_title" translatable="true">What is the routine for?</string>
+    <string name="voice_action_ask_routine_when" translatable="true">How often? For example, say every day at 8 AM.</string>
+    <string name="voice_action_confirm_appt" translatable="true">Appointment: %1$s. Say yes to save, or no to cancel.</string>
+    <string name="voice_action_confirm_routine" translatable="true">Routine: %1$s. Say yes to save, or no to cancel.</string>
+    <string name="voice_action_saved_appt" translatable="true">Saved. Your appointment is %1$s.</string>
+    <string name="voice_action_saved_routine" translatable="true">Saved. %1$s.</string>
+    <string name="voice_action_schedule_warn" translatable="true">But I could not schedule its reminder.</string>
+    <string name="voice_action_cancelled" translatable="true">Cancelled. Nothing was saved.</string>
+    <string name="voice_action_save_failed" translatable="true">I could not save that. Please try again.</string>
+    <string name="voice_action_still_saving" translatable="true">Still saving. One moment.</string>
+    <string name="voice_action_routine_daily_only" translatable="true">I can only set up daily routines by voice so far. Please try again with a daily time, like every day at 8 AM.</string>
+    <string name="voice_briefing_empty" translatable="true">Nothing needs your attention today.</string>
+    <string name="voice_bill_none" translatable="true">You have no saved bills yet.</string>
+    <string name="voice_bill_which" translatable="true">Which bill? %1$s</string>
+    <string name="voice_bill_answer" translatable="true">Your bill: %1$s.</string>
+    <string name="voice_bill_no_answer" translatable="true">I could not find that on this bill.</string>
+    <string name="voice_reminder_ask_title" translatable="true">What should I remind you about?</string>
+    <string name="voice_reminder_ask_when" translatable="true">What day and time should I remind you?</string>
+    <string name="voice_reminder_past" translatable="true">That time has already passed. What day and time should I remind you?</string>
+    <string name="voice_reminder_confirm" translatable="true">Reminder: %1$s. Say yes to save, or no to cancel.</string>
+    <string name="voice_reminder_saved" translatable="true">Saved. I will remind you %1$s.</string>
+    <string name="voice_cancel_none" translatable="true">You have no scheduled reminders.</string>
+    <string name="voice_cancel_which" translatable="true">Which reminder? %1$s</string>
+    <string name="voice_cancel_confirm" translatable="true">Cancel %1$s? Say yes to cancel, or no to keep it.</string>
+    <string name="voice_cancelled" translatable="true">Cancelled.</string>
+    <string name="voice_keep" translatable="true">OK, keeping it.</string>
+    <string name="voice_archive_confirm" translatable="true">Archive %1$s? Say yes to archive, or no to keep it.</string>
+    <string name="voice_archived" translatable="true">Bill archived.</string>
+    <string name="voice_dismissed" translatable="true">OK, never mind.</string>
     <string name="error_rate_limit" translatable="true">Too many requests. Please try again shortly.</string>
 
     <!-- Permissions -->

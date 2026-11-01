@@ -40,7 +40,10 @@ fun configValue(vararg names: String): String {
     return ""
 }
 // META_API_KEY matches LiteLLM convention; MODEL_API_KEY matches Meta's own examples.
-val metaApiKey: String = configValue("META_API_KEY", "MODEL_API_KEY")
+// KEYLESS_DEBUG=true forces a keyless debug build for test distribution: the
+// production transport never needs the baked key (backend/session path).
+val metaApiKey: String =
+    if (System.getenv("KEYLESS_DEBUG") == "true") "" else configValue("META_API_KEY", "MODEL_API_KEY")
 // Official Meta Model API defaults (dev.meta.ai/docs); override via env/local.properties/.env.
 val metaApiBaseUrl: String =
     configValue("META_API_BASE_URL", "META_API_BASE")

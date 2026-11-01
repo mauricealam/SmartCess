@@ -145,6 +145,12 @@ object ResponseSchemas {
             "confidence" to prop("number"),
             required = listOf("title", "kind", "schedule_rule", "confidence"),
         )
+        "reminder" -> obj(
+            "title" to prop("string"),
+            "trigger_iso" to prop("string"),
+            "confidence" to prop("number"),
+            required = listOf("title", "trigger_iso", "confidence"),
+        )
         "briefing" -> obj(
             "greeting" to prop("string"),
             "priorities" to objList(briefingPriority),

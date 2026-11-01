@@ -3,6 +3,7 @@ package com.smartcess.app.ui.theme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -37,6 +38,9 @@ class ColorContrastTest {
         assertPair("$name onSurface/surface", s, s.onSurface, s.surface)
         assertPair("$name onBackground/background", s, s.onBackground, s.background)
         assertPair("$name onErrorContainer/errorContainer", s, s.onErrorContainer, s.errorContainer)
+        // Secondary copy renders onSurfaceVariant on surface/background.
+        assertPair("$name onSurfaceVariant/surface", s, s.onSurfaceVariant, s.surface)
+        assertPair("$name onSurfaceVariant/background", s, s.onSurfaceVariant, s.background)
         // Text actions render primary on surface/background.
         assertPair("$name primary/surface", s, s.primary, s.surface)
         assertPair("$name primary/background", s, s.primary, s.background)
@@ -46,23 +50,36 @@ class ColorContrastTest {
     fun lightScheme_meetsAA() = checkScheme("light", LightScheme)
 
     @Test
-    fun darkScheme_meetsAA() = checkScheme("dark", DarkScheme)
-
-    @Test
     fun lightHighContrastScheme_meetsAA() = checkScheme("light-hc", LightHighContrastScheme)
 
     @Test
-    fun darkHighContrastScheme_meetsAA() = checkScheme("dark-hc", DarkHighContrastScheme)
-
-    @Test
     fun opsPairs_meetAA() {
-        // Night Ops accent pairs, per mode: bright teal + near-black ink at
-        // night (~11:1), deep teal + white ink by day (~6.4:1).
-        val nightFg = SmartCessOpsTokens.OnNightAccent
-        val nightBg = SmartCessOpsTokens.NightAccent
-        assertTrue("night ops ratio ${ratio(nightFg, nightBg)} below 4.5", ratio(nightFg, nightBg) >= 4.5)
+        // Single theme: only the day Ops accent pair exists
+        // (deep teal + white ink, ~6.4:1).
         val dayFg = SmartCessOpsTokens.OnDayAccent
         val dayBg = SmartCessOpsTokens.DayAccent
         assertTrue("day ops ratio ${ratio(dayFg, dayBg)} below 4.5", ratio(dayFg, dayBg) >= 4.5)
+    }
+
+    @Test
+    fun lightGround_isPureWhite() {
+        // One continuous white field: Background AND Surface are #FFFFFF.
+        assertEquals(0xFFFFFFFF.toInt(), LightScheme.background.toArgb())
+        assertEquals(0xFFFFFFFF.toInt(), LightScheme.surface.toArgb())
+    }
+
+    @Test
+    fun successWords_onWhite_meetsAA() {
+        val fg = SmartCessLightTokens.Success
+        val bg = LightScheme.surface
+        assertTrue("success/white ratio ${ratio(fg, bg)} below 4.5", ratio(fg, bg) >= 4.5)
+    }
+
+    @Test
+    fun heroAccent_onLightGround_meetsGraphicsAA() {
+        // Day-teal hero accents/icons on the white field need 3:1 (graphics).
+        val accent = SmartCessOpsTokens.DayAccent
+        val bg = LightScheme.surface
+        assertTrue("day accent/white ratio ${ratio(accent, bg)} below 3.0", ratio(accent, bg) >= 3.0)
     }
 }

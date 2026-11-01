@@ -12,7 +12,8 @@ import com.smartcess.app.R
 /**
  * Spec confirmation dialog. Every destructive or committing action
  * (save, schedule, calendar, archive, delete) asks through this first.
- * Optional [content] renders extra controls (e.g. day pickers) under the message.
+ * White surface with full-AA ink copy. Optional [content] renders extra
+ * controls (e.g. day pickers) under the message.
  */
 @Composable
 fun SmartCessConfirmDialog(
@@ -27,6 +28,9 @@ fun SmartCessConfirmDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface,
         title = { Text(title, style = MaterialTheme.typography.headlineLarge) },
         text = {
             Column {

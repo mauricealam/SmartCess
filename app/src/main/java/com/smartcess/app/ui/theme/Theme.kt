@@ -1,9 +1,7 @@
 package com.smartcess.app.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -34,64 +32,27 @@ internal val LightScheme = lightColorScheme(
     tertiaryContainer = Color(0xFFFFE1A8),
     onTertiaryContainer = Color(0xFF4A3200),
     surface = SmartCessLightTokens.Surface, // #FFFFFF
-    onSurface = Color(0xFF191C20),
+    onSurface = SmartCessLightTokens.Ink, // #101418
     surfaceVariant = Color(0xFFE2E6EC),
-    onSurfaceVariant = Color(0xFF43474E),
+    onSurfaceVariant = SmartCessLightTokens.SecondaryText, // #3C4043
     surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFF6F8FB),
+    surfaceContainerLow = Color(0xFFFFFFFF),
     surfaceContainer = Color(0xFFEDF1F7),
     surfaceContainerHigh = Color(0xFFE6EAF1),
     surfaceContainerHighest = Color(0xFFDFE4EC),
-    background = SmartCessLightTokens.Background, // #F6F8FB
-    onBackground = Color(0xFF191C20),
+    background = SmartCessLightTokens.Background, // #FFFFFF
+    onBackground = SmartCessLightTokens.Ink, // #101418
     error = SmartCessLightTokens.Error, // #B3261E
     onError = Color.White,
     errorContainer = Color(0xFFF9DEDC),
     onErrorContainer = Color(0xFF410E0B),
     outline = Color(0xFF74777F),
-    outlineVariant = Color(0xFFC4C6CF),
+    outlineVariant = SmartCessLightTokens.CardOutline, // #1A1D21 at 12%
     scrim = Color.Black,
     inverseSurface = Color(0xFF2F3033),
     inverseOnSurface = Color(0xFFF1F0F4),
     inversePrimary = Color(0xFF8AB4F8),
     surfaceTint = SmartCessLightTokens.Primary,
-)
-
-internal val DarkScheme = darkColorScheme(
-    primary = SmartCessDarkTokens.Primary, // #8AB4F8
-    onPrimary = Color(0xFF062B5C),
-    primaryContainer = Color(0xFF0B3D91),
-    onPrimaryContainer = Color(0xFFD9E6FF),
-    secondary = Color(0xFFA0BFF0),
-    onSecondary = Color(0xFF062B5C),
-    secondaryContainer = Color(0xFF24407C),
-    onSecondaryContainer = Color(0xFFDCE6F5),
-    tertiary = Color(0xFFFFB74D),
-    onTertiary = Color(0xFF4A2F00),
-    tertiaryContainer = Color(0xFF6B4A00),
-    onTertiaryContainer = Color(0xFFFFE1A8),
-    surface = SmartCessDarkTokens.Surface, // #121212
-    onSurface = Color(0xFFE3E2E6),
-    surfaceVariant = Color(0xFF43474E),
-    onSurfaceVariant = Color(0xFFC4C7C5),
-    surfaceContainerLowest = Color(0xFF0B0C0E),
-    surfaceContainerLow = Color(0xFF121212),
-    surfaceContainer = Color(0xFF1C1C1E),
-    surfaceContainerHigh = Color(0xFF24262B),
-    surfaceContainerHighest = Color(0xFF2F3136),
-    background = Color(0xFF0F1115),
-    onBackground = Color(0xFFE3E2E6),
-    error = SmartCessDarkTokens.Error, // #F2B8B5
-    onError = Color(0xFF601410),
-    errorContainer = Color(0xFF8C1D18),
-    onErrorContainer = Color(0xFFF9DEDC),
-    outline = Color(0xFF8E9099),
-    outlineVariant = Color(0xFF43474E),
-    scrim = Color.Black,
-    inverseSurface = Color(0xFFE3E2E6),
-    inverseOnSurface = Color(0xFF2F3033),
-    inversePrimary = Color(0xFF0B3D91),
-    surfaceTint = SmartCessDarkTokens.Primary,
 )
 
 /**
@@ -138,43 +99,6 @@ internal val LightHighContrastScheme = lightColorScheme(
     surfaceTint = Color.Black,
 )
 
-internal val DarkHighContrastScheme = darkColorScheme(
-    primary = Color.White,
-    onPrimary = Color.Black,
-    primaryContainer = Color.White,
-    onPrimaryContainer = Color.Black,
-    secondary = Color.White,
-    onSecondary = Color.Black,
-    secondaryContainer = Color.White,
-    onSecondaryContainer = Color.Black,
-    tertiary = Color.White,
-    onTertiary = Color.Black,
-    tertiaryContainer = Color.White,
-    onTertiaryContainer = Color.Black,
-    surface = Color.Black,
-    onSurface = Color.White,
-    surfaceVariant = Color.Black,
-    onSurfaceVariant = Color.White,
-    surfaceContainerLowest = Color.Black,
-    surfaceContainerLow = Color.Black,
-    surfaceContainer = Color.Black,
-    surfaceContainerHigh = Color.Black,
-    surfaceContainerHighest = Color.Black,
-    background = Color.Black,
-    onBackground = Color.White,
-    error = Color(0xFFFFDAD6),
-    onError = Color.Black,
-    errorContainer = Color(0xFFFFDAD6),
-    onErrorContainer = Color.Black,
-    outline = Color.White,
-    outlineVariant = Color.White,
-    scrim = Color.Black,
-    inverseSurface = Color.White,
-    inverseOnSurface = Color.Black,
-    inversePrimary = Color.Black,
-    surfaceTint = Color.White,
-)
-
 /** Extra tokens beyond the Material3 palette (status + focus + ops accent). */
 @Immutable
 data class SmartCessColors(
@@ -202,37 +126,26 @@ object SmartCessTheme {
         get() = LocalSmartCessColors.current
 }
 
+/**
+ * Single white theme: the app never follows the system dark mode.
+ * [highContrast] stays as an explicit accessibility preference (light
+ * high-contrast only); [largeText] scales type 1.3x.
+ */
 @Composable
 fun SmartCessTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
     highContrast: Boolean = false,
     largeText: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val scheme = when {
-        highContrast && darkTheme -> DarkHighContrastScheme
-        highContrast -> LightHighContrastScheme
-        darkTheme -> DarkScheme
-        else -> LightScheme
-    }
+    val scheme = if (highContrast) LightHighContrastScheme else LightScheme
     val typography = if (largeText) SmartCessTypography.scaled(LARGE_TEXT_FACTOR) else SmartCessTypography
-    val extra = if (darkTheme) {
-        SmartCessColors(
-            success = SmartCessDarkTokens.Success,
-            warning = SmartCessDarkTokens.Warning,
-            focus = SmartCessDarkTokens.Focus,
-            ops = SmartCessOpsTokens.NightAccent,
-            onOps = SmartCessOpsTokens.OnNightAccent,
-        )
-    } else {
-        SmartCessColors(
-            success = SmartCessLightTokens.Success,
-            warning = SmartCessLightTokens.Warning,
-            focus = SmartCessLightTokens.Focus,
-            ops = SmartCessOpsTokens.DayAccent,
-            onOps = SmartCessOpsTokens.OnDayAccent,
-        )
-    }
+    val extra = SmartCessColors(
+        success = SmartCessLightTokens.Success,
+        warning = SmartCessLightTokens.Warning,
+        focus = SmartCessLightTokens.Focus,
+        ops = SmartCessOpsTokens.DayAccent,
+        onOps = SmartCessOpsTokens.OnDayAccent,
+    )
     CompositionLocalProvider(LocalSmartCessColors provides extra) {
         MaterialTheme(
             colorScheme = scheme,

@@ -1,5 +1,6 @@
 package com.smartcess.app.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -9,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -20,11 +22,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.smartcess.app.ui.theme.SmartCessTheme
 
-private val SmartCessButtonShape = RoundedCornerShape(16.dp)
+private val SmartCessButtonShape = RoundedCornerShape(20.dp)
 
 /**
- * Spec primary button: filled, 48dp minimum height, 16dp radius,
- * visible #FFD54F focus ring for keyboard/switch users.
+ * Spec hero button: ops-accent fill, 48dp minimum height, clay-soft 20dp
+ * radius, visible #FFD54F focus ring for keyboard/switch users. One hero
+ * action per surface; everything else is secondary.
  */
 @Composable
 fun SmartCessPrimaryButton(
@@ -36,14 +39,15 @@ fun SmartCessPrimaryButton(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
+    val extra = SmartCessTheme.extra
     Button(
         onClick = onClick,
         enabled = enabled,
         interactionSource = interaction,
         shape = SmartCessButtonShape,
         colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
+            containerColor = extra.ops,
+            contentColor = extra.onOps,
         ),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
         modifier = modifier
@@ -56,8 +60,9 @@ fun SmartCessPrimaryButton(
 }
 
 /**
- * Tonal secondary button: soft container fill, same 48dp target and focus
- * ring. No wireframe outline; separation comes from tonal elevation.
+ * Secondary button: brand-blue outline + brand-blue text on the white
+ * field, same 48dp target, 20dp radius and focus ring. Never a tonal gray
+ * fill as the only signal; disabled state keeps the M3 dimmed treatment.
  */
 @Composable
 fun SmartCessSecondaryButton(
@@ -69,14 +74,17 @@ fun SmartCessSecondaryButton(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    Button(
+    OutlinedButton(
         onClick = onClick,
         enabled = enabled,
         interactionSource = interaction,
         shape = SmartCessButtonShape,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-            contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(
+            1.dp,
+            if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        ),
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = MaterialTheme.colorScheme.primary,
         ),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
         modifier = modifier

@@ -22,6 +22,12 @@ object PttAudioSpec {
     const val MAX_DURATION_MS = 60_000L
     /** 16-bit peaks under ~700 are room noise on phone mics. */
     const val SILENCE_PEAK = 700
+    /** Voice that must accumulate before trailing silence can end capture. */
+    const val SPEECH_CONFIRM_MS = 300L
+    /** Trailing silence after confirmed speech that ends capture by itself. */
+    const val END_SILENCE_MS = 1_200L
+    /** Cutoff when nothing was said at all; slow starters keep time to begin. */
+    const val NO_SPEECH_TIMEOUT_MS = 6_000L
 }
 
 data class RecordedAudio(val file: File, val peak: Int, val durationMs: Long)
@@ -36,6 +42,8 @@ interface TalkRecorder {
     /** Ends capture and deletes the file. */
     fun cancel()
     val isRecording: Boolean
+    /** True once capture ended itself on trailing silence (see [PttAudioSpec]). */
+    val autoStopped: Boolean
 }
 
 @Singleton
@@ -50,7 +58,9 @@ class TalkRecorderImpl @Inject constructor(
     @Volatile private var result: RecordedAudio? = null
     @Volatile private var failure: MicException? = null
     @Volatile private var cancelled = false
+    @Volatile private var autoStop = false
     override val isRecording: Boolean get() = synchronized(lock) { worker?.isAlive == true }
+    override val autoStopped: Boolean get() = autoStop
 
     override fun start() {
         synchronized(lock) {
@@ -59,6 +69,7 @@ class TalkRecorderImpl @Inject constructor(
             cancelled = false
             result = null
             failure = null
+            autoStop = false
             val minBuffer = AudioRecord.getMinBufferSize(
                 PttAudioSpec.SAMPLE_RATE, PttAudioSpec.CHANNEL, PttAudioSpec.ENCODING,
             ).coerceAtLeast(4096)
@@ -115,21 +126,38 @@ class TalkRecorderImpl @Inject constructor(
                 out.write(ByteArray(WavWriter.HEADER_SIZE)) // patched on stop
                 recorder.startRecording()
                 val shorts = ShortArray(minBuffer / 2)
+                // Speech-aware endpointing: capture ends on trailing silence
+                // once real voice was heard — no fixed minimum wait, so short
+                // commands submit ~3s sooner. Slow starters are protected by
+                // the no-speech timeout instead. The WAV finalizes normally.
+                val endpoint = SpeechEndpointDetector(
+                    speechThreshold = PttAudioSpec.SILENCE_PEAK,
+                    speechConfirmMs = PttAudioSpec.SPEECH_CONFIRM_MS,
+                    endSilenceMs = PttAudioSpec.END_SILENCE_MS,
+                    noSpeechTimeoutMs = PttAudioSpec.NO_SPEECH_TIMEOUT_MS,
+                    maxListenMs = PttAudioSpec.MAX_DURATION_MS,
+                )
                 while (!stopRequested) {
-                    if (System.currentTimeMillis() - startedMs >= PttAudioSpec.MAX_DURATION_MS) break
+                    val nowMs = System.currentTimeMillis()
                     val read = recorder.read(shorts, 0, shorts.size)
                     if (read < 0) break // OVERRUN/INVALID heading; end cleanly
                     if (read == 0) continue
                     val bytes = ByteArray(read * 2)
+                    var chunkPeak = 0
                     for (i in 0 until read) {
                         val sample = shorts[i].toInt()
                         val abs = if (sample < 0) -sample else sample
                         if (abs > peak) peak = abs
+                        if (abs > chunkPeak) chunkPeak = abs
                         bytes[i * 2] = (sample and 0xFF).toByte()
                         bytes[i * 2 + 1] = ((sample shr 8) and 0xFF).toByte()
                     }
                     out.write(bytes)
                     dataBytes += bytes.size
+                    if (endpoint.onFrame(chunkPeak, nowMs)) {
+                        autoStop = true
+                        break
+                    }
                 }
             }
             WavWriter.finalize(file, dataBytes, PttAudioSpec.SAMPLE_RATE)

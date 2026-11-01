@@ -3,7 +3,6 @@ package com.smartcess.app.features.auth
 import android.app.Activity
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -121,8 +120,7 @@ fun SignInScreen(
 
 /**
  * "Sign in with Google" button following Google's branding: G mark, seated
- * text, white fill in light theme and dark fill in dark theme. 56dp target
- * for low-vision touch.
+ * text, white fill (single theme). 56dp target for low-vision touch.
  */
 @Composable
 private fun GoogleSignInButton(
@@ -130,10 +128,9 @@ private fun GoogleSignInButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val dark = isSystemInDarkTheme()
-    val container = if (dark) Color(0xFF131314) else Color.White
-    val content = if (dark) Color(0xFFE3E3E3) else Color(0xFF1F1F1F)
-    val border = if (dark) Color(0xFF8E918F) else Color(0xFF747775)
+    val container = Color.White
+    val content = Color(0xFF1F1F1F)
+    val border = Color(0xFF747775)
     Surface(
         onClick = onClick,
         enabled = !busy,

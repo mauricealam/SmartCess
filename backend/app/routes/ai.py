@@ -65,12 +65,12 @@ class BillExtractRequest(BaseModel):
 
 
 def _headers() -> dict[str, str]:
-    return {"Authorization": f"Bearer {get_settings().meta_api_key}"}
+    return {"Authorization": f"Bearer {get_settings().effective_meta_key}"}
 
 
 def _require_key() -> None:
-    if not get_settings().meta_api_key:
-        logger.error("META_API_KEY is not configured")
+    if not get_settings().effective_meta_key:
+        logger.error("no Meta API key is configured (MODEL_API_KEY/META_API_KEY)")
         raise ai_unavailable()
 
 
@@ -79,9 +79,10 @@ def _check_rate(sub: str, bucket: str, limit: int) -> None:
         raise rate_limited()
 
 
-# Meta's model resolution flaps: a model can 404 model_not_found for
-# minutes and then 200 again, so 404 joins 5xx as retryable (3 tries).
-RETRYABLE_META = frozenset({404, 500, 502, 503, 504})
+# Only 5xx is retried. A 404 model_not_found is a deterministic
+# model-configuration error, not a flap: retrying it burns ~3.5s per model
+# and multiplies user-visible latency across the app chain. One attempt.
+RETRYABLE_META = frozenset({500, 502, 503, 504})
 META_RETRY_SLEEPS = (1.0, 2.0)
 
 
@@ -164,12 +165,21 @@ async def chat(body: ChatRequest, sub: str = Depends(current_sub)) -> dict:
     if response.status_code == 429:
         raise ai_busy()
     if response.status_code != 200:
-        logger.warning(
-            "meta chat status=%s model=%s meta_error=%s",
-            response.status_code,
-            model,
-            _meta_error_snippet(response),
-        )
+        # Internal classification (logs only): model-config vs network.
+        # Users always get the same safe service-unavailable message.
+        if response.status_code == 404:
+            logger.error(
+                "meta chat status=404 model=%s class=model_config meta_error=%s",
+                model,
+                _meta_error_snippet(response),
+            )
+        else:
+            logger.warning(
+                "meta chat status=%s model=%s meta_error=%s",
+                response.status_code,
+                model,
+                _meta_error_snippet(response),
+            )
         raise map_meta_http(response.status_code)
     try:
         content, finish_reason, usage = _first_content(response.json())

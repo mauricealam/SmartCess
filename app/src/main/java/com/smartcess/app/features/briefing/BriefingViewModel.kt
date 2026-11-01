@@ -6,6 +6,7 @@ import com.smartcess.app.R
 import com.smartcess.app.core.ai.OfflineModeException
 import com.smartcess.app.core.ai.SessionExpiredException
 import com.smartcess.app.core.ai.SparkClient
+import com.smartcess.app.core.ai.SparkPrompts
 import com.smartcess.app.core.ai.Speaker
 import com.smartcess.app.data.local.entity.AppointmentEntity
 import com.smartcess.app.data.local.entity.BillEntity
@@ -66,12 +67,14 @@ class BriefingViewModel @Inject constructor(
             if (!data.isEmpty) {
                 aiBriefing = runCatching {
                     spark.dailyBriefing(
-                        "overdue=${data.overdueBills.size}," +
-                            "dueSoon=${data.billsDueSoon.size}," +
-                            "appointments=${data.appointments.size}," +
-                            "urgentEmail=${data.urgentEmails.size}," +
-                            "documents=${data.documentsWithDeadlines.size}," +
-                            "routines=${data.routinesDue.size}",
+                        SparkPrompts.briefingContext(
+                            overdue = data.overdueBills.size,
+                            dueSoon = data.billsDueSoon.size,
+                            appointments = data.appointments.size,
+                            urgentEmail = data.urgentEmails.size,
+                            documents = data.documentsWithDeadlines.size,
+                            routines = data.routinesDue.size,
+                        ),
                     ).briefing.ifBlank { null }
                 }.getOrElse { e ->
                     if (e is OfflineModeException) offline = true

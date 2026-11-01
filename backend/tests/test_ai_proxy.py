@@ -97,6 +97,49 @@ def test_chat_requires_key(monkeypatch):
     assert response.json()["error"]["code"] == "ai_unavailable"
 
 
+def test_chat_prefers_model_api_key(monkeypatch):
+    def check_auth(request):
+        assert request.headers["authorization"] == "Bearer [REDACTED]"
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": "hi"}}],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+            },
+        )
+
+    _use_meta(monkeypatch, check_auth)
+    settings.model_api_key = "DOCS-NAMED-KEY"
+    try:
+        response = client.post(
+            "/api/ai/chat",
+            json={"messages": [{"role": "user", "content": "hi"}]},
+            headers=_auth(),
+        )
+    finally:
+        settings.model_api_key = ""
+    assert response.status_code == 200
+
+
+def test_chat_strips_key_whitespace(monkeypatch):
+    def check_auth(request):
+        assert request.headers["authorization"] == f"Bearer {TEST_KEY}"
+        return _chat_ok(request)
+
+    _use_meta(monkeypatch, check_auth)
+    original = settings.meta_api_key
+    settings.meta_api_key = f"  {TEST_KEY}\n"
+    try:
+        response = client.post(
+            "/api/ai/chat",
+            json={"messages": [{"role": "user", "content": "hi"}]},
+            headers=_auth(),
+        )
+    finally:
+        settings.meta_api_key = original
+    assert response.status_code == 200
+
+
 def test_chat_requires_auth(monkeypatch):
     _use_meta(monkeypatch, _chat_ok)
     response = client.post(
@@ -123,8 +166,7 @@ def test_chat_accepts_fallback_model(monkeypatch):
         "/api/ai/chat",
         json={
             "model": "muse-spark-1.2",
-            "messages": [{"role": "user", "content": "hi"}],
-        },
+            "messages": [{"role": "user", "content": "hi"}]},
         headers=_auth(),
     )
     assert response.status_code == 200
@@ -157,7 +199,7 @@ def test_chat_retries_flapping_meta(monkeypatch):
     def flapping(request):
         calls.append(1)
         if len(calls) < 3:
-            return httpx.Response(404, json={"error": {"code": "model_not_found"}})
+            return httpx.Response(503, json={"error": {"code": "server_busy"}})
         return _chat_ok(request)
 
     _use_meta(monkeypatch, flapping)
@@ -210,7 +252,8 @@ def test_chat_failure_logs_meta_error(monkeypatch, caplog):
     assert "model_not_found" in caplog.text
 
 
-def test_chat_gives_up_after_retries(monkeypatch):
+def test_chat_model_not_found_single_attempt(monkeypatch):
+    """404 model_not_found is deterministic config: exactly one upstream call."""
     calls = []
 
     def missing(request):
@@ -225,7 +268,45 @@ def test_chat_gives_up_after_retries(monkeypatch):
     )
     assert response.status_code == 502
     assert response.json()["error"]["code"] == "ai_unavailable"
-    assert len(calls) == 3
+    assert len(calls) == 1
+
+
+def test_chat_404_classified_as_model_config(monkeypatch, caplog):
+    import logging
+
+    _use_meta(
+        monkeypatch,
+        lambda request: httpx.Response(
+            404, json={"error": {"code": "model_not_found"}}
+        ),
+    )
+    with caplog.at_level(logging.DEBUG, logger="smartcess.ai"):
+        response = client.post(
+            "/api/ai/chat",
+            json={"messages": [{"role": "user", "content": "hi"}]},
+            headers=_auth(),
+        )
+    assert response.status_code == 502
+    # Safe user-facing code unchanged; internal class distinguishes config.
+    assert response.json()["error"]["code"] == "ai_unavailable"
+    assert "class=model_config" in caplog.text
+    assert "model_not_found" in caplog.text
+
+
+def test_chat_5xx_has_no_model_config_class(monkeypatch, caplog):
+    import logging
+
+    _use_meta(
+        monkeypatch, lambda request: httpx.Response(500, json={"error": {}})
+    )
+    with caplog.at_level(logging.DEBUG, logger="smartcess.ai"):
+        response = client.post(
+            "/api/ai/chat",
+            json={"messages": [{"role": "user", "content": "hi"}]},
+            headers=_auth(),
+        )
+    assert response.status_code == 502
+    assert "class=model_config" not in caplog.text
 
 
 def test_chat_meta_error_body_never_forwarded(monkeypatch):

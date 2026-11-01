@@ -78,7 +78,7 @@ async def _meta_transcribe(wav: bytes, settings) -> httpx.Response:
                 response = await client.post(
                     STT_META_PATH,
                     files=files,
-                    headers={"Authorization": f"Bearer {settings.meta_api_key}"},
+                    headers={"Authorization": f"Bearer {settings.effective_meta_key}"},
                 )
                 if response.status_code not in STT_RETRYABLE:
                     return response
@@ -104,8 +104,8 @@ async def transcribe(
         raise rate_limited()
     if sub in active:
         raise ai_busy()
-    if not settings.meta_api_key:
-        logger.error("META_API_KEY is not configured")
+    if not settings.effective_meta_key:
+        logger.error("no Meta API key is configured (MODEL_API_KEY/META_API_KEY)")
         raise ai_unavailable()
     data = await audio.read(settings.max_audio_bytes + 1)
     if len(data) > settings.max_audio_bytes:
@@ -245,8 +245,8 @@ async def realtime(client: WebSocket):
     if sub in active:
         await client.close(code=WS_BUSY_CLOSE)
         return
-    if not get_settings().meta_api_key:
-        logger.error("META_API_KEY is not configured")
+    if not get_settings().effective_meta_key:
+        logger.error("no Meta API key is configured (MODEL_API_KEY/META_API_KEY)")
         await client.close(code=WS_UNAVAILABLE_CLOSE)
         return
     active.add(sub)
@@ -265,7 +265,7 @@ async def _relay(client: WebSocket, sub: str) -> None:
         await client.close(code=WS_UNAVAILABLE_CLOSE)
         return
     try:
-        await meta.send(_handshake(settings.meta_api_key))
+        await meta.send(_handshake(settings.effective_meta_key))
     except Exception:
         logger.warning("meta stt handshake failed")
         await _close_quietly(meta)
