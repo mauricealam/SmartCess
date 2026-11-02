@@ -198,6 +198,10 @@ private fun CameraPreviewContent(
                 Banner(text = stringResource(R.string.banner_offline))
                 Spacer(Modifier.height(8.dp))
             }
+            if (uiState.demoNoCapture) {
+                Banner(text = stringResource(R.string.camera_demo_no_capture))
+                Spacer(Modifier.height(8.dp))
+            }
             val errorRes = uiState.errorRes
             if (uiState.phase == CameraPhase.ERROR && errorRes != null) {
                 ErrorBanner(
@@ -222,6 +226,7 @@ private fun CameraPreviewContent(
             if (uiState.phase == CameraPhase.REVIEW && reviewBody != null) {
                 ReviewBlock(
                     body = reviewBody,
+                    listening = uiState.reviewListening,
                     onSave = viewModel::confirmSave,
                     onDiscard = viewModel::discardDraft,
                 )
@@ -235,7 +240,8 @@ private fun CameraPreviewContent(
                     },
                 ),
                 onClick = viewModel::capture,
-                enabled = uiState.captureEnabled && !busy && uiState.phase != CameraPhase.REVIEW,
+                enabled = uiState.captureEnabled && !busy &&
+                    uiState.phase != CameraPhase.REVIEW && !uiState.demoNoCapture,
                 modifier = Modifier.fillMaxWidth(),
                 leadingContent = if (busy) {
                     {
@@ -298,6 +304,7 @@ private fun CameraPreviewContent(
 @Composable
 private fun ReviewBlock(
     body: String,
+    listening: Boolean,
     onSave: () -> Unit,
     onDiscard: () -> Unit,
 ) {
@@ -318,6 +325,12 @@ private fun ReviewBlock(
             modifier = Modifier.semantics { heading() },
         )
         Text(text = body, style = MaterialTheme.typography.bodyLarge)
+        if (listening) {
+            Text(
+                text = stringResource(R.string.camera_review_listening),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
         SmartCessPrimaryButton(
             text = stringResource(R.string.camera_review_save),
             onClick = onSave,

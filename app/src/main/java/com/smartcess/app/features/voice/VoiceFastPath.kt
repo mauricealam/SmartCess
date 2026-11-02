@@ -73,6 +73,13 @@ object VoiceFastPath {
         ) {
             return VoiceActionIntents.ASK_BILL_QUESTION
         }
+        // Capture-disabled guidance test (fast path only; not in AI vocab).
+        if (
+            has("\\bguidance test\\b") || has("\\bcamera test\\b") ||
+            has("\\btest (the |my )?(guidance|camera)\\b")
+        ) {
+            return VoiceActionIntents.GUIDE_TEST
+        }
         // "scan this" captures (bill or paper land on the same camera flow).
         if (has("\\bscan\\b")) return VoiceActionIntents.SCAN_BILL
         val mentionsDoc = has("\\b(documents?|docs?|papers?|letters?|forms?|files?|scans?|receipts?)\\b")

@@ -57,10 +57,11 @@ object VoiceActionIntents {
     const val READ_DOCUMENT = "read_document"
     const val SCAN_BILL = "scan_bill"
     const val COMPLETE_ROUTINE = "complete_routine"
+    const val GUIDE_TEST = "guide_test"
     private val ALL = setOf(
         ADD_APPOINTMENT, ADD_ROUTINE, DAILY_BRIEFING, ASK_BILL_QUESTION,
         CREATE_REMINDER, CANCEL_REMINDER, ARCHIVE_BILL, EMAIL_BRIEFING,
-        READ_DOCUMENT, SCAN_BILL, COMPLETE_ROUTINE,
+        READ_DOCUMENT, SCAN_BILL, COMPLETE_ROUTINE, GUIDE_TEST,
     )
     fun isAction(intent: String): Boolean = intent in ALL
 }
@@ -243,6 +244,7 @@ class VoiceActionHandler @Inject constructor(
             VoiceActionIntents.READ_DOCUMENT -> startReadDocument(text)
             VoiceActionIntents.SCAN_BILL -> guideBillCapture()
             VoiceActionIntents.COMPLETE_ROUTINE -> startCompleteRoutine(text)
+            VoiceActionIntents.GUIDE_TEST -> guideTest()
             else -> ActionTurn(appContext.getString(R.string.error_generic))
         }
     }
@@ -899,6 +901,13 @@ class VoiceActionHandler @Inject constructor(
         ActionTurn(
             appContext.getString(R.string.voice_bill_capture),
             navigateTo = Routes.camera(Routes.MODE_BILL),
+        )
+
+    /** Diagnostic session: guidance runs, capture execution is disabled. */
+    private fun guideTest(): ActionTurn =
+        ActionTurn(
+            appContext.getString(R.string.voice_guide_test),
+            navigateTo = Routes.camera(Routes.MODE_BILL, captureOn = false),
         )
 
     private suspend fun startCompleteRoutine(text: String): ActionTurn {

@@ -61,6 +61,9 @@ class VoiceFastPathTest {
         assertEquals("read_document", VoiceFastPath.route("show my papers"))
         assertEquals("scan_bill", VoiceFastPath.route("scan this"))
         assertEquals("scan_bill", VoiceFastPath.route("scan my bill"))
+        assertEquals("guide_test", VoiceFastPath.route("guidance test"))
+        assertEquals("guide_test", VoiceFastPath.route("test the camera"))
+        assertEquals("guide_test", VoiceFastPath.route("camera test"))
         assertEquals("complete_routine", VoiceFastPath.route("mark vitamins done"))
         assertEquals("complete_routine", VoiceFastPath.route("complete my medication routine"))
     }

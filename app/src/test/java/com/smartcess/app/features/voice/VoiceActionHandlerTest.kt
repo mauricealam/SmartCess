@@ -748,7 +748,7 @@ class VoiceActionHandlerTest {
         every { documents.observeAll() } returns flowOf(emptyList())
         val turn = handler.start("read_document", "read my lease")
         assertEquals("literal", turn.speak)
-        assertEquals("camera?mode=doc", turn.navigateTo)
+        assertEquals("camera?mode=doc&capture=on", turn.navigateTo)
         assertFalse(handler.hasPending)
     }
 
@@ -766,7 +766,15 @@ class VoiceActionHandlerTest {
     fun scanBill_guidesCapture() = runTest {
         val turn = handler.start("scan_bill", "scan this")
         assertEquals("literal", turn.speak)
-        assertEquals("camera?mode=bill", turn.navigateTo)
+        assertEquals("camera?mode=bill&capture=on", turn.navigateTo)
+        assertFalse(handler.hasPending)
+    }
+
+    @Test
+    fun guideTest_opensCaptureDisabledSession() = runTest {
+        val turn = handler.start("guide_test", "guidance test")
+        assertEquals("literal", turn.speak)
+        assertEquals("camera?mode=bill&capture=off", turn.navigateTo)
         assertFalse(handler.hasPending)
     }
 

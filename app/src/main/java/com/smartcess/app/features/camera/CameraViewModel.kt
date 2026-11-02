@@ -1,6 +1,8 @@
 package com.smartcess.app.features.camera
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Base64
 import androidx.annotation.StringRes
@@ -55,6 +57,9 @@ import javax.inject.Inject
 /** Camera phase: framing loop, capture/processing, review-before-save, or a recoverable error. */
 enum class CameraPhase { FRAMING, CAPTURING, PROCESSING, REVIEW, ERROR }
 
+/** Spoken review verdict. Anything else is ignored in REVIEW. */
+enum class ReviewCommand { SAVE, DISCARD, NONE }
+
 /** Saved capture id plus which result screen owns it. */
 data class CaptureResult(val id: Long, val isDocument: Boolean)
 
@@ -73,6 +78,10 @@ data class CameraUiState(
     val isDocument: Boolean = false,
     /** Spoken + shown extraction summary awaiting explicit Save/Discard. Null outside REVIEW. */
     val reviewBody: String? = null,
+    /** Review confirmation listening: saying yes/save or no/discard/retake acts. */
+    val reviewListening: Boolean = false,
+    /** Diagnostic session: framing guidance runs, capture execution is disabled. */
+    val demoNoCapture: Boolean = false,
 )
 
 /**
@@ -96,6 +105,7 @@ class CameraViewModel @Inject constructor(
     private val prefs: PreferencesRepository,
     private val speaker: Speaker,
     private val guidance: GuidancePlayer,
+    private val gate: CameraSpeechGate,
     private val analytics: AnalyticsLogger,
     private val transcriber: MuseVoiceTranscriber,
     private val ocr: OcrEngine,
@@ -106,7 +116,16 @@ class CameraViewModel @Inject constructor(
     val captureMode: String = normalizeMode(savedStateHandle.get<String>(Routes.ARG_MODE))
     val isDocumentMode: Boolean = captureMode == Routes.MODE_DOC
 
-    private val _uiState = MutableStateFlow(CameraUiState(isDocument = isDocumentMode))
+    /**
+     * Diagnostic switch: capture=off disables capture execution (touch and
+     * voice) while guidance keeps running. Missing/invalid values keep
+     * normal behavior.
+     */
+    val captureAllowed: Boolean = normalizeCapture(savedStateHandle.get<String>(Routes.ARG_CAPTURE))
+
+    private val _uiState = MutableStateFlow(
+        CameraUiState(isDocument = isDocumentMode, demoNoCapture = !captureAllowed),
+    )
     val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()
 
     /** Emits the saved id + result owner after the user confirms Save. */
@@ -141,7 +160,17 @@ class CameraViewModel @Inject constructor(
     private var firstReadyLogged = false
     private var sessionLogged = false
     private var voiceJob: Job? = null
+    private var reviewJob: Job? = null
     private var analyzerBound = false
+    private var demoAnnounced = false
+    /**
+     * Recognition generation: every arming/disarm bumps it, and each
+     * collector dispatches only while its generation is current. Stale
+     * callbacks from a previous session, state, or capture can never act.
+     */
+    private var listenGen = 0L
+    /** Review session id: a confirmation applies only to its own capture. */
+    private var reviewId = 0L
 
     // Unconfirmed extraction drafts. Only confirmSave() persists, and each
     // mode touches only its own repository.
@@ -170,15 +199,21 @@ class CameraViewModel @Inject constructor(
         framingStartMs = 0L
         firstReadyLogged = false
         imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(context), analyzer)
+        if (!captureAllowed && !demoAnnounced) {
+            demoAnnounced = true
+            gate.speak(context.getString(R.string.camera_demo_no_capture))
+        }
     }
 
     /**
      * Screen left while the VM may survive on the back stack: stop the mic
-     * and guidance speech, forget session state. The capture-readiness gate
-     * (condition/captureEnabled) is untouched.
+     * and guidance speech, forget session state, invalidate any in-flight
+     * recognition. The capture-readiness gate (condition/captureEnabled) is
+     * untouched.
      */
     fun onSessionEnd() {
         stopVoiceCapture()
+        stopReviewListening()
         guidance.stop()
         guidance.reset()
         framingStartMs = 0L
@@ -222,8 +257,16 @@ class CameraViewModel @Inject constructor(
 
     // Capture + extraction
 
-    /** Touch capture. Enabled when READY, or always once framing is unavailable. */
+    /**
+     * Touch capture. Enabled when READY, or always once framing is
+     * unavailable. The diagnostic no-capture session blocks here: both
+     * touch and voice capture funnel through this single choke point.
+     */
     fun capture() {
+        if (!captureAllowed) {
+            gate.speak(context.getString(R.string.camera_demo_no_capture))
+            return
+        }
         val state = _uiState.value
         if (!state.captureEnabled) return
         if (state.phase == CameraPhase.CAPTURING || state.phase == CameraPhase.PROCESSING) return
@@ -255,7 +298,8 @@ class CameraViewModel @Inject constructor(
     /**
      * Arms/disarms "say capture" listening while framing. Only fires through
      * [capture], so the READY gate still applies (spec: capture by voice
-     * once framing is good).
+     * once framing is good). Transcripts heard while the app itself is
+     * speaking are discarded, so guidance can never self-trigger.
      */
     fun setVoiceCaptureEnabled(enabled: Boolean) {
         if (enabled == _uiState.value.voiceCapture) return
@@ -265,8 +309,10 @@ class CameraViewModel @Inject constructor(
             return
         }
         voiceJob?.cancel()
+        val gen = ++listenGen
         voiceJob = viewModelScope.launch {
             transcriber.transcribe().collect { event ->
+                if (gen != listenGen) return@collect
                 val text = when (event) {
                     is TranscriptEvent.Partial -> event.text
                     is TranscriptEvent.Final -> event.text
@@ -275,8 +321,10 @@ class CameraViewModel @Inject constructor(
                         return@collect
                     }
                 }
+                if (!gate.commandsAllowed) return@collect
                 if (text.contains(CAPTURE_WORD, ignoreCase = true)) {
                     _uiState.update { it.copy(voiceCapture = false) }
+                    stopVoiceCapture()
                     onVoiceCaptureCommand()
                 }
             }
@@ -284,14 +332,75 @@ class CameraViewModel @Inject constructor(
     }
 
     private fun stopVoiceCapture() {
+        listenGen++
         voiceJob?.cancel()
         voiceJob = null
         transcriber.stop()
     }
 
+    /**
+     * Arms review confirmation listening after the spoken result finishes.
+     * Only yes/save (confirm) and no/discard/retake (discard) act, and only
+     * for the review session that armed them.
+     */
+    @VisibleForTesting
+    internal fun startReviewListening() {
+        if (!micGranted()) {
+            _uiState.update { it.copy(reviewListening = false) }
+            return
+        }
+        reviewJob?.cancel()
+        val gen = ++listenGen
+        val id = reviewId
+        _uiState.update { it.copy(reviewListening = true) }
+        reviewJob = viewModelScope.launch {
+            transcriber.transcribe().collect { event ->
+                if (gen != listenGen || id != reviewId) return@collect
+                if (_uiState.value.phase != CameraPhase.REVIEW) return@collect
+                val text = when (event) {
+                    is TranscriptEvent.Partial -> event.text
+                    is TranscriptEvent.Final -> event.text
+                    is TranscriptEvent.Error -> {
+                        stopReviewListening()
+                        return@collect
+                    }
+                }
+                if (!gate.commandsAllowed) return@collect
+                when (reviewCommand(text)) {
+                    ReviewCommand.SAVE -> {
+                        stopReviewListening()
+                        confirmSave()
+                    }
+                    ReviewCommand.DISCARD -> {
+                        stopReviewListening()
+                        discardDraft()
+                    }
+                    ReviewCommand.NONE -> Unit
+                }
+            }
+        }
+    }
+
+    private fun stopReviewListening() {
+        listenGen++
+        reviewId++
+        reviewJob?.cancel()
+        reviewJob = null
+        transcriber.stop()
+        _uiState.update { it.copy(reviewListening = false) }
+    }
+
+    /** Overridable for JVM tests (Android permission statics are stubs there). */
+    var micPermissionCheck: () -> Boolean = {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun micGranted(): Boolean = micPermissionCheck()
+
     /** Back to the framing loop after an error (rescan path). */
     fun rescan() {
-        speaker.stop()
+        gate.stop()
         framingStartMs = 0L
         firstReadyLogged = false
         _uiState.update {
@@ -301,7 +410,7 @@ class CameraViewModel @Inject constructor(
 
     /** Speak + show a screen-level message (e.g. permission denied). */
     fun announce(@StringRes res: Int) {
-        speaker.speak(context.getString(res))
+        gate.speak(context.getString(res))
     }
 
     private fun extractAndSave(rawFile: File) {
@@ -384,6 +493,7 @@ class CameraViewModel @Inject constructor(
         docDraft = doc
         draftImagePath = imagePath
         draftOffline = offline
+        reviewId++
         val body = when {
             bill != null -> context.getString(
                 R.string.camera_review_bill,
@@ -402,8 +512,28 @@ class CameraViewModel @Inject constructor(
             it.copy(phase = CameraPhase.REVIEW, reviewBody = body, isOffline = offline)
         }
         analytics.log(AnalyticsEvent.BILL_SCAN_COMPLETE, mapOf("saved" to "review"))
-        speaker.speak(body)
-        if (signInRequired) speaker.speak(context.getString(R.string.auth_sign_in_required))
+        presentReview(body, signInRequired)
+    }
+
+    /**
+     * Speaks the extracted result and arms confirmation listening only
+     * after the prompt finishes — the prompt's own words ("Save it?")
+     * can never confirm. Persists nothing.
+     */
+    @VisibleForTesting
+    internal fun presentReview(body: String, signInRequired: Boolean = false) {
+        _uiState.update {
+            if (it.phase == CameraPhase.REVIEW) it else it.copy(phase = CameraPhase.REVIEW, reviewBody = body)
+        }
+        gate.speak(body) {
+            if (signInRequired) {
+                gate.speak(context.getString(R.string.auth_sign_in_required)) {
+                    startReviewListening()
+                }
+            } else {
+                startReviewListening()
+            }
+        }
     }
 
     /**
@@ -416,6 +546,7 @@ class CameraViewModel @Inject constructor(
         val imagePath = draftImagePath
         val offline = draftOffline
         if (_uiState.value.phase != CameraPhase.REVIEW || (bill == null && doc == null)) return
+        stopReviewListening()
         clearDrafts()
         viewModelScope.launch {
             val outcome = if (bill != null) {
@@ -438,6 +569,7 @@ class CameraViewModel @Inject constructor(
 
     /** Discards the unconfirmed draft and returns to framing. Persists nothing. */
     fun discardDraft() {
+        stopReviewListening()
         runCatching { draftImagePath?.let { File(it).delete() } }
         clearDrafts()
         rescan()
@@ -484,6 +616,26 @@ class CameraViewModel @Inject constructor(
             "${bill.currency} ${bill.amount}".trim()
         }
 
+    /**
+     * Whole-word review verdict. Negations and multi-word commands are
+     * checked before bare "save" so "don't save it" discards.
+     */
+    private fun reviewCommand(text: String): ReviewCommand {
+        val norm = " " + text.lowercase()
+            .replace("’", "").replace("'", "")
+            .replace(Regex("[^a-z ]"), " ")
+            .replace(Regex("\\s+"), " ") + " "
+        fun has(phrase: String): Boolean = norm.contains(" $phrase ")
+        return when {
+            has("do not save") || has("dont save") || has("not save") ||
+                has("discard") || has("retake") || has("take again") ||
+                has("no") || has("nope") -> ReviewCommand.DISCARD
+            has("save") || has("yes") || has("yeah") || has("yep") ||
+                has("confirm") -> ReviewCommand.SAVE
+            else -> ReviewCommand.NONE
+        }
+    }
+
     private fun fail(@StringRes res: Int, speak: Boolean) {
         _uiState.update { it.copy(phase = CameraPhase.ERROR, errorRes = res) }
         if (speak) announce(res)
@@ -511,6 +663,7 @@ class CameraViewModel @Inject constructor(
         docDraft = doc
         draftImagePath = imagePath
         draftOffline = offline
+        reviewId++
         val body = when {
             bill != null -> "bill:%s".format(bill.provider)
             doc != null -> "doc:%s".format(doc.title)
@@ -529,6 +682,9 @@ class CameraViewModel @Inject constructor(
         /** Only "doc" selects document mode; missing/invalid values mean bill. */
         fun normalizeMode(raw: String?): String =
             if (raw == Routes.MODE_DOC) Routes.MODE_DOC else Routes.MODE_BILL
+
+        /** Only capture=off disables capture; missing/invalid values keep it enabled. */
+        fun normalizeCapture(raw: String?): Boolean = raw != Routes.CAPTURE_OFF
     }
 
     private fun captureDir(): String =

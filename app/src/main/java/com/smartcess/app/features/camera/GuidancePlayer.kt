@@ -3,7 +3,6 @@ package com.smartcess.app.features.camera
 import android.content.Context
 import android.os.VibrationEffect
 import android.os.Vibrator
-import com.smartcess.app.core.ai.Speaker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
@@ -16,10 +15,12 @@ import javax.inject.Singleton
  * (spec: 3s); READY speaks once with a long pulse and latches until the
  * condition leaves READY. The speaker uses QUEUE_FLUSH, so a new
  * instruction always replaces the previous one instead of queueing.
+ * All speech routes through the [CameraSpeechGate] so guidance can never
+ * trigger voice capture.
  */
 @Singleton
 class GuidancePlayer @Inject constructor(
-    private val speaker: Speaker,
+    private val gate: CameraSpeechGate,
     @ApplicationContext context: Context,
 ) {
     private val vibrator: Vibrator? = context.getSystemService(Vibrator::class.java)
@@ -40,7 +41,7 @@ class GuidancePlayer @Inject constructor(
             lastCondition = condition
             lastSpokenAt.set(System.currentTimeMillis())
             pulse(READY_PULSE_MS)
-            speaker.speak(instruction)
+            gate.speak(instruction)
             return
         }
         readyLatched = false
@@ -49,11 +50,11 @@ class GuidancePlayer @Inject constructor(
         lastCondition = condition
         lastSpokenAt.set(now)
         pulseWave(patternFor(condition))
-        speaker.speak(instruction)
+        gate.speak(instruction)
     }
 
     fun stop() {
-        speaker.stop()
+        gate.stop()
     }
 
     /** New camera session: forget latch/cooldown so Ready can announce again. */

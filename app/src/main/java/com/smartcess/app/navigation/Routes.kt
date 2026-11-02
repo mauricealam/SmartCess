@@ -12,10 +12,12 @@ object Routes {
     const val VOICE = "voice"
     const val CAMERA = "camera"
     /** Camera with explicit capture mode (bill/doc). Bare "camera" still matches with bill default. */
-    const val CAMERA_ROUTE = "camera?mode={mode}"
+    const val CAMERA_ROUTE = "camera?mode={mode}&capture={capture}"
     const val ARG_MODE = "mode"
+    const val ARG_CAPTURE = "capture"
     const val MODE_BILL = "bill"
     const val MODE_DOC = "doc"
+    const val CAPTURE_OFF = "off"
     const val BILLS = "bills"
     const val BILL_RESULT = "bill_result/{billId}"
     const val COMPARISON = "comparison/{billId}"
@@ -33,7 +35,8 @@ object Routes {
     const val ARG_APPOINTMENT_ID = "appointmentId"
     const val ARG_ROUTINE_ID = "routineId"
 
-    fun camera(mode: String = MODE_BILL) = "camera?mode=$mode"
+    fun camera(mode: String = MODE_BILL, captureOn: Boolean = true) =
+        "camera?mode=$mode&capture=${if (captureOn) "on" else CAPTURE_OFF}"
     fun billResult(billId: Long) = "bill_result/$billId"
     fun comparison(billId: Long) = "comparison/$billId"
     fun reminder(reminderId: Long) = "reminder/$reminderId"

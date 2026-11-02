@@ -14,7 +14,8 @@ class GuidanceResetTest {
     private fun player(speaker: Speaker): GuidancePlayer {
         val ctx = mockk<Context>(relaxed = true)
         every { ctx.getSystemService(Vibrator::class.java) } returns null
-        return GuidancePlayer(speaker, ctx)
+        val gate = CameraSpeechGate(speaker)
+        return GuidancePlayer(gate, ctx)
     }
 
     @Test
@@ -23,10 +24,10 @@ class GuidanceResetTest {
         val guidance = player(speaker)
         guidance.guide(FramingCondition.READY, "Ready.")
         guidance.guide(FramingCondition.READY, "Ready.")
-        verify(exactly = 1) { speaker.speak("Ready.") }
+        verify(exactly = 1) { speaker.speak("Ready.", any()) }
         guidance.reset()
         guidance.guide(FramingCondition.READY, "Ready.")
-        verify(exactly = 2) { speaker.speak("Ready.") }
+        verify(exactly = 2) { speaker.speak("Ready.", any()) }
     }
 
     @Test
@@ -35,9 +36,9 @@ class GuidanceResetTest {
         val guidance = player(speaker)
         guidance.guide(FramingCondition.TOO_FAR, "Closer.")
         guidance.guide(FramingCondition.TOO_FAR, "Closer.")
-        verify(exactly = 1) { speaker.speak("Closer.") }
+        verify(exactly = 1) { speaker.speak("Closer.", any()) }
         guidance.reset()
         guidance.guide(FramingCondition.TOO_FAR, "Closer.")
-        verify(exactly = 2) { speaker.speak("Closer.") }
+        verify(exactly = 2) { speaker.speak("Closer.", any()) }
     }
 }
