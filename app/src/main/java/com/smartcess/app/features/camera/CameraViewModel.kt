@@ -30,8 +30,11 @@ import com.google.mlkit.vision.common.InputImage
 import com.smartcess.app.core.media.ImageCompressor
 import com.smartcess.app.core.privacy.AnalyticsEvent
 import com.smartcess.app.core.privacy.AnalyticsLogger
-import com.smartcess.app.core.voice.MuseVoiceTranscriber
-import com.smartcess.app.core.voice.TranscriptEvent
+import com.smartcess.app.core.session.BackendVoiceApi
+import com.smartcess.app.core.voice.MicException
+import com.smartcess.app.core.voice.PttAudioSpec
+import com.smartcess.app.core.voice.TalkCues
+import com.smartcess.app.core.voice.TalkRecorder
 import com.smartcess.app.data.local.entity.BillEntity
 import com.smartcess.app.data.local.entity.DocumentEntity
 import com.smartcess.app.data.repository.BillRepository
@@ -40,7 +43,11 @@ import com.smartcess.app.data.repository.PreferencesRepository
 import com.smartcess.app.navigation.Routes
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -51,8 +58,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
+import java.io.IOException
 import javax.inject.Inject
+import javax.inject.Named
 
 /** Camera phase: framing loop, capture/processing, review-before-save, or a recoverable error. */
 enum class CameraPhase { FRAMING, CAPTURING, PROCESSING, REVIEW, ERROR }
@@ -107,8 +120,11 @@ class CameraViewModel @Inject constructor(
     private val guidance: GuidancePlayer,
     private val gate: CameraSpeechGate,
     private val analytics: AnalyticsLogger,
-    private val transcriber: MuseVoiceTranscriber,
+    private val recorder: TalkRecorder,
+    @Named("backendAuthed") private val voiceApi: BackendVoiceApi,
+    private val cues: TalkCues,
     private val ocr: OcrEngine,
+    @Named("io") private val ioDispatcher: CoroutineDispatcher,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -261,15 +277,16 @@ class CameraViewModel @Inject constructor(
      * Touch capture. Enabled when READY, or always once framing is
      * unavailable. The diagnostic no-capture session blocks here: both
      * touch and voice capture funnel through this single choke point.
+     * Returns true when a capture actually started.
      */
-    fun capture() {
+    fun capture(): Boolean {
         if (!captureAllowed) {
             gate.speak(context.getString(R.string.camera_demo_no_capture))
-            return
+            return false
         }
         val state = _uiState.value
-        if (!state.captureEnabled) return
-        if (state.phase == CameraPhase.CAPTURING || state.phase == CameraPhase.PROCESSING) return
+        if (!state.captureEnabled) return false
+        if (state.phase == CameraPhase.CAPTURING || state.phase == CameraPhase.PROCESSING) return false
         stopVoiceCapture()
         _uiState.update { it.copy(phase = CameraPhase.CAPTURING, errorRes = null, voiceCapture = false) }
         val outputDir = File(context.cacheDir, captureDir()).apply { mkdirs() }
@@ -288,18 +305,20 @@ class CameraViewModel @Inject constructor(
                 }
             },
         )
+        return true
     }
 
     /** Voice capture: the voice agent routes a "capture" utterance here. */
-    fun onVoiceCaptureCommand() {
-        capture()
+    fun onVoiceCaptureCommand(): Boolean {
+        return capture()
     }
 
     /**
-     * Arms/disarms "say capture" listening while framing. Only fires through
-     * [capture], so the READY gate still applies (spec: capture by voice
-     * once framing is good). Transcripts heard while the app itself is
-     * speaking are discarded, so guidance can never self-trigger.
+     * Arms/disarms "say capture" listening while framing. Utterance-based
+     * (same proven Talk pipeline: record with silence auto-stop, HTTPS
+     * transcribe, dispatch). Only fires through [capture], so the READY
+     * gate still applies; a command while not ready speaks guidance and
+     * keeps listening instead of failing silently.
      */
     fun setVoiceCaptureEnabled(enabled: Boolean) {
         if (enabled == _uiState.value.voiceCapture) return
@@ -311,22 +330,30 @@ class CameraViewModel @Inject constructor(
         voiceJob?.cancel()
         val gen = ++listenGen
         voiceJob = viewModelScope.launch {
-            transcriber.transcribe().collect { event ->
-                if (gen != listenGen) return@collect
-                val text = when (event) {
-                    is TranscriptEvent.Partial -> event.text
-                    is TranscriptEvent.Final -> event.text
-                    is TranscriptEvent.Error -> {
+            while (gen == listenGen && _uiState.value.voiceCapture) {
+                when (val heard = listenUtterance(gen)) {
+                    is UtteranceResult.Heard -> {
+                        // No `continue`: every iteration must reach the
+                        // inter-utterance delay below, otherwise ignored
+                        // utterances re-listen in a zero-time spin.
+                        if (gen == listenGen && gate.commandsAllowed &&
+                            heard.text.contains(CAPTURE_WORD, ignoreCase = true)
+                        ) {
+                            if (onVoiceCaptureCommand()) {
+                                _uiState.update { it.copy(voiceCapture = false) }
+                            } else if (captureAllowed) {
+                                speakNotReady()
+                            }
+                        }
+                    }
+                    is UtteranceResult.Silence -> Unit // no speech: listen again
+                    is UtteranceResult.Fatal -> {
                         _uiState.update { it.copy(voiceCapture = false) }
-                        return@collect
+                        stopVoiceCapture()
+                        announce(heard.res)
                     }
                 }
-                if (!gate.commandsAllowed) return@collect
-                if (text.contains(CAPTURE_WORD, ignoreCase = true)) {
-                    _uiState.update { it.copy(voiceCapture = false) }
-                    stopVoiceCapture()
-                    onVoiceCaptureCommand()
-                }
+                delay(INTER_UTTERANCE_MS)
             }
         }
     }
@@ -335,7 +362,7 @@ class CameraViewModel @Inject constructor(
         listenGen++
         voiceJob?.cancel()
         voiceJob = null
-        transcriber.stop()
+        viewModelScope.launch(ioDispatcher) { runCatching { recorder.cancel() } }
     }
 
     /**
@@ -354,29 +381,34 @@ class CameraViewModel @Inject constructor(
         val id = reviewId
         _uiState.update { it.copy(reviewListening = true) }
         reviewJob = viewModelScope.launch {
-            transcriber.transcribe().collect { event ->
-                if (gen != listenGen || id != reviewId) return@collect
-                if (_uiState.value.phase != CameraPhase.REVIEW) return@collect
-                val text = when (event) {
-                    is TranscriptEvent.Partial -> event.text
-                    is TranscriptEvent.Final -> event.text
-                    is TranscriptEvent.Error -> {
+            while (gen == listenGen && id == reviewId && _uiState.value.phase == CameraPhase.REVIEW) {
+                when (val heard = listenUtterance(gen)) {
+                    is UtteranceResult.Heard -> {
+                        // No `continue` here either: stale or muted
+                        // utterances must still pace through the delay below.
+                        if (gen == listenGen && id == reviewId &&
+                            _uiState.value.phase == CameraPhase.REVIEW && gate.commandsAllowed
+                        ) {
+                            when (reviewCommand(heard.text)) {
+                                ReviewCommand.SAVE -> {
+                                    stopReviewListening()
+                                    confirmSave()
+                                }
+                                ReviewCommand.DISCARD -> {
+                                    stopReviewListening()
+                                    discardDraft()
+                                }
+                                ReviewCommand.NONE -> Unit
+                            }
+                        }
+                    }
+                    is UtteranceResult.Silence -> Unit // no verdict: listen again
+                    is UtteranceResult.Fatal -> {
                         stopReviewListening()
-                        return@collect
+                        announce(heard.res)
                     }
                 }
-                if (!gate.commandsAllowed) return@collect
-                when (reviewCommand(text)) {
-                    ReviewCommand.SAVE -> {
-                        stopReviewListening()
-                        confirmSave()
-                    }
-                    ReviewCommand.DISCARD -> {
-                        stopReviewListening()
-                        discardDraft()
-                    }
-                    ReviewCommand.NONE -> Unit
-                }
+                delay(INTER_UTTERANCE_MS)
             }
         }
     }
@@ -386,8 +418,111 @@ class CameraViewModel @Inject constructor(
         reviewId++
         reviewJob?.cancel()
         reviewJob = null
-        transcriber.stop()
+        viewModelScope.launch(ioDispatcher) { runCatching { recorder.cancel() } }
         _uiState.update { it.copy(reviewListening = false) }
+    }
+
+    private sealed interface UtteranceResult {
+        data class Heard(val text: String) : UtteranceResult
+        data object Silence : UtteranceResult
+        data class Fatal(@StringRes val res: Int) : UtteranceResult
+    }
+
+    /**
+     * One record-transcribe round. Never records while app speech is
+     * audible (no paid call on our own TTS); drops recordings overlapped
+     * by speech at dispatch. Silence/unclear returns [UtteranceResult.Silence]
+     * for a quiet retry; auth/network/mic failures return [UtteranceResult.Fatal].
+     */
+    private suspend fun listenUtterance(gen: Long): UtteranceResult {
+        repeat(GATE_WAIT_ROUNDS) {
+            if (gen != listenGen) return UtteranceResult.Silence
+            if (gate.commandsAllowed) return recordAndUpload(gen)
+            delay(GATE_WAIT_MS)
+        }
+        return UtteranceResult.Silence
+    }
+
+    private suspend fun recordAndUpload(gen: Long): UtteranceResult {
+        try {
+            recorder.start()
+        } catch (e: MicException) {
+            val res = if ((e.message ?: "").contains("permission", ignoreCase = true)) {
+                R.string.perm_mic_rationale
+            } else {
+                R.string.error_generic
+            }
+            return UtteranceResult.Fatal(res)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return UtteranceResult.Fatal(R.string.error_generic)
+        }
+        cues.recordingStarted()
+        try {
+            while (!recorder.autoStopped && gen == listenGen) {
+                delay(AUTO_STOP_POLL_MS)
+            }
+            if (gen != listenGen) {
+                runCatching { withContext(ioDispatcher) { recorder.cancel() } }
+                return UtteranceResult.Silence
+            }
+            val rec = withContext(ioDispatcher) { recorder.stop() }
+            try {
+                if (rec.peak < PttAudioSpec.SILENCE_PEAK) return UtteranceResult.Silence
+                if (!gate.commandsAllowed || gen != listenGen) return UtteranceResult.Silence
+                val bytes = withContext(ioDispatcher) { rec.file.readBytes() }
+                return UtteranceResult.Heard(upload(bytes))
+            } finally {
+                withContext(ioDispatcher) { runCatching { rec.file.delete() } }
+            }
+        } catch (e: CancellationException) {
+            runCatching { withContext(ioDispatcher) { recorder.cancel() } }
+            throw e
+        } catch (e: UploadException) {
+            return UtteranceResult.Fatal(e.messageRes)
+        } catch (e: UnclearException) {
+            return UtteranceResult.Silence
+        } catch (e: IOException) {
+            return UtteranceResult.Fatal(R.string.error_generic)
+        }
+    }
+
+    private suspend fun upload(wav: ByteArray): String {
+        val part = MultipartBody.Part.createFormData(
+            "audio", "talk.wav", wav.toRequestBody("audio/wav".toMediaType()),
+        )
+        try {
+            val response = withTimeout(UPLOAD_TIMEOUT_MS) { voiceApi.transcribe(part) }
+            if (response.transcript.isBlank()) throw UnclearException()
+            return response.transcript
+        } catch (e: CancellationException) {
+            if (e is TimeoutCancellationException) throw UploadException(R.string.voice_timeout)
+            throw e
+        } catch (e: retrofit2.HttpException) {
+            throw UploadException(uploadErrorRes(e))
+        } catch (e: IOException) {
+            throw UploadException(R.string.voice_api_unavailable)
+        }
+    }
+
+    private fun uploadErrorRes(e: retrofit2.HttpException): Int {
+        if (e.code() == 401) return R.string.auth_sign_in_required
+        if (e.code() == 429) return R.string.error_rate_limit
+        if (e.code() == 413) return R.string.talk_recording_too_long
+        val body = runCatching { e.response()?.errorBody()?.string() }.getOrNull() ?: ""
+        if (body.contains("ai_unclear")) return R.string.voice_not_clear
+        if (e.code() == 504) return R.string.voice_timeout
+        return R.string.voice_api_unavailable
+    }
+
+    private fun speakNotReady() {
+        gate.speak(
+            context.getString(
+                R.string.camera_not_ready,
+                context.getString(_uiState.value.instructionRes),
+            ),
+        )
     }
 
     /** Overridable for JVM tests (Android permission statics are stubs there). */
@@ -643,6 +778,7 @@ class CameraViewModel @Inject constructor(
 
     override fun onCleared() {
         stopVoiceCapture()
+        stopReviewListening()
         if (analyzerBound) analyzer.close()
         guidance.stop()
         super.onCleared()
@@ -678,6 +814,12 @@ class CameraViewModel @Inject constructor(
         private const val OCR_HINT_MAX = 500
         private const val CAPTURE_WORD = "capture"
         private const val REVIEW_SUMMARY_MAX = 200
+        const val UPLOAD_TIMEOUT_MS = 45_000L
+        private const val AUTO_STOP_POLL_MS = 200L
+        private const val GATE_WAIT_MS = 300L
+        private const val GATE_WAIT_ROUNDS = 20
+        /** Breather between takes: lets guidance interleave, bounds call rate. */
+        private const val INTER_UTTERANCE_MS = 500L
 
         /** Only "doc" selects document mode; missing/invalid values mean bill. */
         fun normalizeMode(raw: String?): String =
@@ -690,3 +832,6 @@ class CameraViewModel @Inject constructor(
     private fun captureDir(): String =
         if (isDocumentMode) CAPTURE_DIR_DOC else CAPTURE_DIR_BILL
 }
+
+private class UploadException(@StringRes val messageRes: Int) : Exception()
+private class UnclearException : Exception()

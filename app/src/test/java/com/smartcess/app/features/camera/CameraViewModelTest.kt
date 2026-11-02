@@ -4,12 +4,16 @@ import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import com.smartcess.app.core.ai.BillExtraction
 import com.smartcess.app.core.ai.DocumentSummary
-import com.smartcess.app.core.voice.MuseVoiceTranscriber
-import com.smartcess.app.core.voice.TranscriptEvent
 import com.smartcess.app.core.ai.OcrEngine
 import com.smartcess.app.core.ai.Speaker
 import com.smartcess.app.core.ai.SparkClient
 import com.smartcess.app.core.privacy.AnalyticsLogger
+import com.smartcess.app.core.session.BackendVoiceApi
+import com.smartcess.app.core.session.TranscribeResponse
+import com.smartcess.app.core.voice.MicException
+import com.smartcess.app.core.voice.RecordedAudio
+import com.smartcess.app.core.voice.TalkCues
+import com.smartcess.app.core.voice.TalkRecorder
 import com.smartcess.app.data.local.entity.UserPreferencesEntity
 import com.smartcess.app.data.repository.BillRepository
 import com.smartcess.app.data.repository.DocumentRepository
@@ -20,33 +24,35 @@ import com.smartcess.app.navigation.Routes
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.confirmVerified
-import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import retrofit2.HttpException
+import retrofit2.Response
 
 /**
- * Capture-mode routing + review-before-save regression tests.
- *
- * Bill mode must persist only through BillRepository, document mode only
- * through DocumentRepository, and nothing may be written before the user
- * confirms Save. The JVM seam is [CameraViewModel.seedReviewForTest],
- * which reaches the same REVIEW state as capture + extraction.
+ * Capture-mode routing, review-before-save, utterance voice, and the
+ * TTS/listening guard. Voice tests script transcripts through a fake
+ * recorder + fake HTTPS API — the same pipeline shape as Talk.
  */
 class CameraViewModelTest {
 
@@ -67,28 +73,67 @@ class CameraViewModelTest {
         }
     }
 
-    private val testDispatcher = StandardTestDispatcher()
+    private class FakeRecorder : TalkRecorder {
+        var starts = 0
+        var autoStopNow = false
+        var stopPeak = 5000
+        var startThrows: Exception? = null
+        var file: File = File.createTempFile("utt", ".wav").also { it.writeBytes(ByteArray(128)) }
+        override fun start() {
+            startThrows?.let { throw it }
+            starts++
+        }
+        override fun stop(): RecordedAudio {
+            if (!file.exists()) file.writeBytes(ByteArray(128))
+            return RecordedAudio(file, stopPeak, 1000)
+        }
+        override fun cancel() {}
+        override val isRecording: Boolean get() = false
+        override val autoStopped: Boolean get() = autoStopNow
+    }
+
+    private class FakeVoiceApi : BackendVoiceApi {
+        val queue = ArrayDeque<Any>()
+        var calls = 0
+        override suspend fun transcribe(audio: MultipartBody.Part): TranscribeResponse {
+            calls++
+            return when (val next = queue.removeFirstOrNull()) {
+                is TranscribeResponse -> next
+                is Throwable -> throw next
+                else -> TranscribeResponse("hello there", 900, 1)
+            }
+        }
+        fun hear(vararg texts: String) {
+            texts.forEach { queue.add(TranscribeResponse(it, 900, 1)) }
+        }
+    }
+
+    // Inferred type intentional: the explicit `: StandardTestDispatcher`
+    // annotation on this property breaks kotlinc resolution in this file.
+    private var testDispatcher = StandardTestDispatcher()
     private lateinit var bills: BillRepository
     private lateinit var documents: DocumentRepository
     private lateinit var prefs: PreferencesRepository
     private lateinit var guidance: GuidancePlayer
-    private lateinit var transcriber: MuseVoiceTranscriber
-    private lateinit var speech: MutableSharedFlow<TranscriptEvent>
+    private lateinit var recorder: FakeRecorder
+    private lateinit var voiceApi: FakeVoiceApi
     private lateinit var fakeSpeaker: FakeSpeaker
     private lateinit var gate: CameraSpeechGate
     private var clockNow = 1_000_000L
 
     @Before
     fun setUp() {
+        // Fresh scheduler per test: listen loops from an earlier test must
+        // never wake inside a later one.
+        testDispatcher = StandardTestDispatcher()
         Dispatchers.setMain(testDispatcher)
+        clockNow = 1_000_000L
         bills = mockk()
         documents = mockk()
         prefs = mockk()
         guidance = mockk(relaxed = true)
-        speech = MutableSharedFlow(extraBufferCapacity = 8)
-        transcriber = mockk()
-        every { transcriber.transcribe() } returns speech
-        every { transcriber.stop() } returns Unit
+        recorder = FakeRecorder()
+        voiceApi = FakeVoiceApi()
         fakeSpeaker = FakeSpeaker()
         gate = CameraSpeechGate(fakeSpeaker).also { it.clock = { clockNow } }
         coEvery { prefs.get() } returns UserPreferencesEntity()
@@ -113,23 +158,27 @@ class CameraViewModelTest {
             guidance = guidance,
             gate = gate,
             analytics = mockk<AnalyticsLogger>(relaxed = true),
-            transcriber = transcriber,
+            recorder = recorder,
+            voiceApi = voiceApi,
+            cues = mockk<TalkCues>(relaxed = true),
             ocr = mockk<OcrEngine>(relaxed = true),
+            ioDispatcher = testDispatcher,
             savedStateHandle = SavedStateHandle(args),
         ).also { it.micPermissionCheck = { true } }
     }
 
     private fun ok(id: Long) = SaveOutcome(id, ValidationResult(emptyList()))
 
-    private suspend fun say(text: String) {
-        speech.emit(TranscriptEvent.Final(text))
-    }
-
     /** Finishes in-flight app speech and elapses the audio-tail guard. */
     private fun finishSpeech() {
         fakeSpeaker.completeAll()
         clockNow += CameraSpeechGate.TAIL_GUARD_MS
     }
+
+    private fun httpError(code: Int): HttpException =
+        HttpException(
+            Response.error<TranscribeResponse>(code, "".toResponseBody("text/plain".toMediaType())),
+        )
 
     // Mode routing
 
@@ -268,39 +317,113 @@ class CameraViewModelTest {
         assertEquals(gateBefore, vm.uiState.value.captureEnabled)
     }
 
-    // Self-trigger guard
+    // Self-trigger guard (utterance path)
 
     @Test
-    fun framingTtsCaptureWord_cannotTriggerCapture() = runTest {
+    fun framingTtsCaptureWord_neverRecordsWhileSpeaking() = runTest {
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        recorder.autoStopNow = true
+        // Guidance speaks the trigger word while armed; no recording starts.
+        gate.speak("Ready. Tap capture or say capture.")
+        vm.setVoiceCaptureEnabled(true)
+        advanceTimeBy(5_000)
+        assertEquals(0, recorder.starts)
+        assertEquals(0, voiceApi.calls)
+        assertTrue(vm.uiState.value.voiceCapture)
+        // After speech + tail, listening resumes and unknown words re-listen.
+        finishSpeech()
+        advanceTimeBy(2_000)
+        assertTrue(startsAtLeast(1))
+        assertTrue(vm.uiState.value.voiceCapture)
+        assertEquals(CameraPhase.FRAMING, vm.uiState.value.phase)
+        // Mirror leaving the camera: disarm so runTest can reach idle.
+        vm.setVoiceCaptureEnabled(false)
+        advanceUntilIdle()
+    }
+
+    private fun startsAtLeast(n: Int) = recorder.starts >= n
+
+    @Test
+    fun framingSpeechMidRecording_dropsAtDispatch() = runTest {
         val vm = viewModel(Routes.MODE_BILL)
         advanceUntilIdle()
         vm.setVoiceCaptureEnabled(true)
-        advanceUntilIdle()
-        // Guidance speaks the trigger word while armed; the mic hears it.
-        gate.speak("Ready. Tap capture or say capture.")
-        say("capture")
-        advanceUntilIdle()
-        // No dispatch: still armed, still framing, nothing captured.
+        advanceTimeBy(500)
+        assertEquals(1, recorder.starts) // recording in flight, auto-stop pending
+        gate.speak("Move the phone slightly to the left.") // TTS overlaps the take
+        recorder.autoStopNow = true
+        advanceTimeBy(1_000)
+        assertEquals(0, voiceApi.calls) // dropped: never transcribed, never acts
         assertTrue(vm.uiState.value.voiceCapture)
-        assertEquals(CameraPhase.FRAMING, vm.uiState.value.phase)
-        finishSpeech()
+        vm.setVoiceCaptureEnabled(false)
         advanceUntilIdle()
-        // Framing commands are state-scoped: "yes" is not a framing command.
-        say("yes")
-        advanceUntilIdle()
-        assertTrue(vm.uiState.value.voiceCapture)
-        assertEquals(CameraPhase.FRAMING, vm.uiState.value.phase)
     }
 
     @Test
     fun captureCommand_rejected_whenNotReady() = runTest {
         val vm = viewModel(Routes.MODE_BILL)
         advanceUntilIdle()
-        vm.onVoiceCaptureCommand()
+        assertFalse(vm.onVoiceCaptureCommand())
         advanceUntilIdle()
         assertEquals(CameraPhase.FRAMING, vm.uiState.value.phase)
         coVerify(exactly = 0) { bills.save(any()) }
         coVerify(exactly = 0) { documents.save(any()) }
+    }
+
+    @Test
+    fun captureCommandWhileNotReady_speaksGuidance_keepsListening() = runTest {
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        recorder.autoStopNow = true
+        voiceApi.hear("capture")
+        vm.setVoiceCaptureEnabled(true)
+        advanceTimeBy(3_000)
+        assertEquals(CameraPhase.FRAMING, vm.uiState.value.phase)
+        assertTrue(fakeSpeaker.spoken.isNotEmpty()) // "not ready" + instruction
+        assertTrue(vm.uiState.value.voiceCapture) // still armed for Ready
+        coVerify(exactly = 0) { bills.save(any()) }
+        vm.setVoiceCaptureEnabled(false)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun micFailure_speaks_disarms() = runTest {
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        recorder.startThrows = MicException("permission denied")
+        vm.setVoiceCaptureEnabled(true)
+        advanceTimeBy(2_000)
+        assertFalse(vm.uiState.value.voiceCapture)
+        assertTrue(fakeSpeaker.spoken.isNotEmpty())
+    }
+
+    @Test
+    fun authFailure_speaks_disarms() = runTest {
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        recorder.autoStopNow = true
+        voiceApi.queue.add(httpError(401))
+        vm.setVoiceCaptureEnabled(true)
+        advanceTimeBy(3_000)
+        assertFalse(vm.uiState.value.voiceCapture)
+        assertTrue(fakeSpeaker.spoken.isNotEmpty())
+        coVerify(exactly = 0) { bills.save(any()) }
+    }
+
+    @Test
+    fun unclearTranscript_relistensSilently() = runTest {
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        recorder.autoStopNow = true
+        voiceApi.queue.add(TranscribeResponse("", 900, 1))
+        vm.setVoiceCaptureEnabled(true)
+        advanceTimeBy(3_000)
+        assertTrue(vm.uiState.value.voiceCapture)
+        assertTrue(fakeSpeaker.spoken.isEmpty())
+        assertTrue(startsAtLeast(2))
+        vm.setVoiceCaptureEnabled(false)
+        advanceUntilIdle()
     }
 
     // Spoken REVIEW
@@ -310,18 +433,15 @@ class CameraViewModelTest {
         coEvery { bills.save(any()) } returns ok(7L)
         val vm = viewModel(Routes.MODE_BILL)
         advanceUntilIdle()
+        recorder.autoStopNow = true
         vm.seedReviewForTest(bill = BillExtraction(provider = "City Electric", amount = 42.0))
         vm.presentReview("Bill from City Electric. Save it?")
         advanceUntilIdle()
         assertFalse(vm.uiState.value.reviewListening) // prompt still speaking
-        say("yes")
-        advanceUntilIdle()
-        coVerify(exactly = 0) { bills.save(any()) }
+        assertEquals(0, recorder.starts) // nothing recorded the prompt
+        voiceApi.hear("yes")
         finishSpeech()
-        advanceUntilIdle()
-        assertTrue(vm.uiState.value.reviewListening)
-        say("yes")
-        advanceUntilIdle()
+        advanceUntilIdle() // utterance -> SAVE ends the loop
         coVerify(exactly = 1) { bills.save(any()) }
         assertFalse(vm.uiState.value.reviewListening)
     }
@@ -331,14 +451,14 @@ class CameraViewModelTest {
         coEvery { bills.save(any()) } returns ok(7L)
         val vm = viewModel(Routes.MODE_BILL)
         advanceUntilIdle()
+        recorder.autoStopNow = true
         suspend fun verdict(word: String): CameraPhase {
             vm.seedReviewForTest(bill = BillExtraction(provider = "City Electric", amount = 42.0))
             vm.presentReview("Save it?")
             advanceUntilIdle()
+            voiceApi.hear(word)
             finishSpeech()
-            advanceUntilIdle()
-            say(word)
-            advanceUntilIdle()
+            advanceUntilIdle() // verdict ends the loop (save or discard)
             return vm.uiState.value.phase
         }
         assertEquals(CameraPhase.FRAMING, verdict("save it"))
@@ -353,39 +473,21 @@ class CameraViewModelTest {
     fun reviewCommands_wrongState_ignored() = runTest {
         val vm = viewModel(Routes.MODE_BILL)
         advanceUntilIdle()
+        recorder.autoStopNow = true
         vm.seedReviewForTest(bill = BillExtraction(provider = "City Electric", amount = 42.0))
         vm.presentReview("Save it?")
         advanceUntilIdle()
+        voiceApi.hear("capture", "maybe later")
         finishSpeech()
-        advanceUntilIdle()
-        say("capture") // framing word in REVIEW: ignored
-        advanceUntilIdle()
-        assertEquals(CameraPhase.REVIEW, vm.uiState.value.phase)
-        say("maybe later") // not a command: ignored
-        advanceUntilIdle()
+        advanceTimeBy(4_000) // bounded: ignored words never end the loop
         assertEquals(CameraPhase.REVIEW, vm.uiState.value.phase)
         coVerify(exactly = 0) { bills.save(any()) }
-    }
-
-    @Test
-    fun staleTranscript_afterDiscard_ignored() = runTest {
-        coEvery { bills.save(any()) } returns ok(7L)
-        val vm = viewModel(Routes.MODE_BILL)
-        advanceUntilIdle()
-        vm.seedReviewForTest(bill = BillExtraction(provider = "City Electric", amount = 42.0))
-        vm.presentReview("Save it?")
-        advanceUntilIdle()
-        finishSpeech()
-        advanceUntilIdle()
         vm.discardDraft()
         advanceUntilIdle()
-        say("yes")
-        advanceUntilIdle()
-        coVerify(exactly = 0) { bills.save(any()) }
     }
 
     @Test
-    fun staleTranscript_afterSessionEnd_ignored() = runTest {
+    fun staleUtterance_afterDiscard_ignored() = runTest {
         coEvery { bills.save(any()) } returns ok(7L)
         val vm = viewModel(Routes.MODE_BILL)
         advanceUntilIdle()
@@ -393,36 +495,32 @@ class CameraViewModelTest {
         vm.presentReview("Save it?")
         advanceUntilIdle()
         finishSpeech()
-        advanceUntilIdle()
-        vm.onSessionEnd()
-        advanceUntilIdle()
-        say("yes")
-        advanceUntilIdle()
+        runCurrent() // arming starts one utterance; auto-stop still pending
+        assertTrue(vm.uiState.value.reviewListening)
+        assertEquals(1, recorder.starts)
+        vm.discardDraft()
+        recorder.autoStopNow = true
+        advanceTimeBy(2_000)
+        assertEquals(0, voiceApi.calls)
         coVerify(exactly = 0) { bills.save(any()) }
     }
 
     @Test
-    fun staleTranscript_afterNewCapture_appliesOnlyToCurrent() = runTest {
+    fun staleUtterance_afterSessionEnd_ignored() = runTest {
         coEvery { bills.save(any()) } returns ok(7L)
         val vm = viewModel(Routes.MODE_BILL)
         advanceUntilIdle()
-        vm.seedReviewForTest(bill = BillExtraction(provider = "First", amount = 1.0))
+        vm.seedReviewForTest(bill = BillExtraction(provider = "City Electric", amount = 42.0))
         vm.presentReview("Save it?")
         advanceUntilIdle()
         finishSpeech()
-        advanceUntilIdle()
-        // A new capture replaces the session; the old collector is stale.
-        vm.seedReviewForTest(bill = BillExtraction(provider = "Second", amount = 2.0))
-        advanceUntilIdle()
-        say("yes")
-        advanceUntilIdle()
+        runCurrent()
+        assertEquals(1, recorder.starts)
+        vm.onSessionEnd()
+        recorder.autoStopNow = true
+        advanceTimeBy(2_000)
+        assertEquals(0, voiceApi.calls)
         coVerify(exactly = 0) { bills.save(any()) }
-        // The current session arms fresh and accepts its own verdict.
-        vm.startReviewListening()
-        advanceUntilIdle()
-        say("yes")
-        advanceUntilIdle()
-        coVerify(exactly = 1) { bills.save(any()) }
     }
 
     @Test
@@ -467,3 +565,4 @@ class CameraViewModelTest {
         assertFalse(vm.uiState.value.demoNoCapture)
     }
 }
+

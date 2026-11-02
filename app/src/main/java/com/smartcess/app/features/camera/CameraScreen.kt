@@ -154,6 +154,14 @@ private fun CameraPreviewContent(
             viewModel.setVoiceCaptureEnabled(true)
         }
     }
+    // Hands-free: voice capture arms itself whenever framing starts (open,
+    // discard, rescan) if the mic is granted. A manual toggle-off sticks
+    // until the next phase change; review runs its own listener.
+    LaunchedEffect(uiState.phase, hasMic) {
+        if (hasMic && uiState.phase == CameraPhase.FRAMING && !uiState.voiceCapture) {
+            viewModel.setVoiceCaptureEnabled(true)
+        }
+    }
 
     DisposableEffect(lifecycleOwner, previewView) {
         viewModel.bindAnalyzer()
