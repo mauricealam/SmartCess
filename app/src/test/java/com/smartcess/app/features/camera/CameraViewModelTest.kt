@@ -23,6 +23,7 @@ import com.smartcess.app.data.repository.ValidationResult
 import com.smartcess.app.navigation.Routes
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.confirmVerified
 import io.mockk.mockk
 import io.mockk.verify
@@ -43,6 +44,8 @@ import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -563,6 +566,75 @@ class CameraViewModelTest {
         val vm = viewModel(Routes.MODE_BILL)
         advanceUntilIdle()
         assertFalse(vm.uiState.value.demoNoCapture)
+    }
+
+    // Temporary guidance-test diagnostics
+
+    @Test
+    fun diag_populatedInGuidanceTest_only() = runTest {
+        every { guidance.guide(any(), any()) } returns GuidanceOutcome.SPOKEN
+        every { guidance.cooldownRemainingMs(any()) } returns 0L
+        val normal = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        normal.seedDiagFrameForTest(
+            FramingInput(hasText = true, coverage = 0.5f, offsetX = -0.3f, minEdgeMargin = 0.1f),
+            FrameMeta(width = 1280, height = 720, rotation = 0, blocks = 12),
+        )
+        advanceUntilIdle()
+        assertNull(normal.uiState.value.diag)
+
+        val demo = viewModel(Routes.MODE_BILL, Routes.CAPTURE_OFF)
+        advanceUntilIdle()
+        val logged = mutableListOf<String>()
+        demo.logDiag = { logged.add(it) }
+        demo.seedDiagFrameForTest(
+            FramingInput(hasText = true, coverage = 0.5f, offsetX = -0.3f, minEdgeMargin = 0.1f),
+            FrameMeta(width = 1280, height = 720, rotation = 0, blocks = 12),
+        )
+        advanceUntilIdle()
+        val diag = demo.uiState.value.diag
+        assertNotNull(diag)
+        diag!!
+        assertEquals(1280, diag.frameWidth)
+        assertEquals(720, diag.frameHeight)
+        assertEquals(0, diag.rotation)
+        assertEquals(12, diag.blocks)
+        assertEquals(0.5f, diag.coverage)
+        assertEquals(-0.3f, diag.offsetX)
+        assertEquals(FramingCondition.OFF_LEFT, diag.condition)
+        assertEquals(GuidanceOutcome.SPOKEN, diag.outcome)
+        assertTrue(diag.gateAllowed)
+        assertEquals(1, logged.size)
+        val line = logged[0]
+        assertTrue(line.contains("frame=1280x720"))
+        assertTrue(line.contains("rot=0"))
+        assertTrue(line.contains("blocks=12"))
+        assertTrue(line.contains("cond=OFF_LEFT"))
+        assertTrue(line.contains("spoke=SPOKEN"))
+    }
+
+    @Test
+    fun diag_logThrottled_sameCondition() = runTest {
+        every { guidance.guide(any(), any()) } returns GuidanceOutcome.COOLDOWN_SUPPRESSED
+        every { guidance.cooldownRemainingMs(any()) } returns 1_500L
+        val demo = viewModel(Routes.MODE_BILL, Routes.CAPTURE_OFF)
+        advanceUntilIdle()
+        val logged = mutableListOf<String>()
+        demo.logDiag = { logged.add(it) }
+        val input = FramingInput(hasText = true, coverage = 0.05f, minEdgeMargin = 0.2f)
+        val meta = FrameMeta(width = 1280, height = 720, rotation = 0, blocks = 4)
+        demo.seedDiagFrameForTest(input, meta)
+        demo.seedDiagFrameForTest(input, meta)
+        demo.seedDiagFrameForTest(input, meta)
+        advanceUntilIdle()
+        // Same condition within the window: one log line, live overlay kept.
+        assertEquals(1, logged.size)
+        assertTrue(logged[0].contains("cond=TOO_FAR"))
+        val diag = demo.uiState.value.diag
+        assertNotNull(diag)
+        assertEquals(FramingCondition.TOO_FAR, diag!!.condition)
+        assertEquals(GuidanceOutcome.COOLDOWN_SUPPRESSED, diag.outcome)
+        assertEquals(1_500L, diag.cooldownMs)
     }
 }
 

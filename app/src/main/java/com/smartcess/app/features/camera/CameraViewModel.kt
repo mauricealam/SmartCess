@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Base64
+import android.util.Log
 import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import androidx.camera.core.ImageAnalysis
@@ -95,6 +96,8 @@ data class CameraUiState(
     val reviewListening: Boolean = false,
     /** Diagnostic session: framing guidance runs, capture execution is disabled. */
     val demoNoCapture: Boolean = false,
+    /** Temporary guidance-test diagnostics; null in normal sessions. */
+    val diag: FramingDiag? = null,
 )
 
 /**
@@ -169,8 +172,19 @@ class CameraViewModel @Inject constructor(
         TextFramingAnalyzer(
             onResult = ::onFramingInput,
             onError = { onAnalyzerError() },
+            onFrameMeta = { lastFrameMeta = it },
         )
     }
+
+    /**
+     * Temporary guidance-test log sink. Numbers and condition names only —
+     * never OCR text, images, or document content. Tests override this
+     * (android.util.Log is a stub on the JVM).
+     */
+    internal var logDiag: (String) -> Unit = { msg -> Log.d(TAG_DIAG, msg) }
+    private var lastFrameMeta = FrameMeta()
+    private var lastDiagLogMs = 0L
+    private var lastDiagCondition: FramingCondition? = null
 
     private var framingStartMs = 0L
     private var firstReadyLogged = false
@@ -252,7 +266,8 @@ class CameraViewModel @Inject constructor(
                 captureEnabled = condition == FramingCondition.READY || it.framingUnavailable,
             )
         }
-        guidance.guide(condition, context.getString(res))
+        val outcome = guidance.guide(condition, context.getString(res))
+        if (_uiState.value.demoNoCapture) publishDiag(input, condition, outcome)
         if (condition != previous) {
             viewModelScope.launch {
                 val metadata = mutableMapOf("condition" to condition.name)
@@ -263,6 +278,48 @@ class CameraViewModel @Inject constructor(
                 analytics.log(AnalyticsEvent.FRAMING_GUIDANCE, metadata)
             }
         }
+    }
+
+    /**
+     * Temporary guidance-test diagnostics: overlay state every frame, logcat
+     * on condition change (or every [DIAG_LOG_MS]). Numbers and condition
+     * names only — never OCR text, images, or document content.
+     */
+    private fun publishDiag(input: FramingInput, condition: FramingCondition, outcome: GuidanceOutcome) {
+        val meta = lastFrameMeta
+        val diag = FramingDiag(
+            frameWidth = meta.width,
+            frameHeight = meta.height,
+            rotation = meta.rotation,
+            blocks = meta.blocks,
+            coverage = input.coverage,
+            offsetX = input.offsetX,
+            offsetY = input.offsetY,
+            margin = input.minEdgeMargin,
+            condition = condition,
+            outcome = outcome,
+            gateAllowed = gate.commandsAllowed,
+            cooldownMs = guidance.cooldownRemainingMs(condition),
+        )
+        _uiState.update { it.copy(diag = diag) }
+        val now = System.currentTimeMillis()
+        if (condition != lastDiagCondition || now - lastDiagLogMs >= DIAG_LOG_MS) {
+            lastDiagCondition = condition
+            lastDiagLogMs = now
+            logDiag(
+                "frame=${meta.width}x${meta.height} rot=${meta.rotation} " +
+                    "blocks=${meta.blocks} cov=${"%.3f".format(input.coverage)} " +
+                    "off=${"%.3f".format(input.offsetX)}/${"%.3f".format(input.offsetY)} " +
+                    "margin=${"%.3f".format(input.minEdgeMargin)} cond=$condition " +
+                    "spoke=$outcome gate=${gate.commandsAllowed}",
+            )
+        }
+    }
+
+    @VisibleForTesting
+    internal fun seedDiagFrameForTest(input: FramingInput, meta: FrameMeta) {
+        lastFrameMeta = meta
+        onFramingInput(input)
     }
 
     private fun onAnalyzerError() {
@@ -814,6 +871,8 @@ class CameraViewModel @Inject constructor(
         private const val OCR_HINT_MAX = 500
         private const val CAPTURE_WORD = "capture"
         private const val REVIEW_SUMMARY_MAX = 200
+        const val TAG_DIAG = "FramingDiag"
+        private const val DIAG_LOG_MS = 2_000L
         const val UPLOAD_TIMEOUT_MS = 45_000L
         private const val AUTO_STOP_POLL_MS = 200L
         private const val GATE_WAIT_MS = 300L

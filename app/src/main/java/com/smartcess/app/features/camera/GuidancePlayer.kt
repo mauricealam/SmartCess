@@ -8,6 +8,13 @@ import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** What a [GuidancePlayer.guide] request actually did. */
+enum class GuidanceOutcome {
+    SPOKEN,
+    COOLDOWN_SUPPRESSED,
+    READY_LATCHED,
+}
+
 /**
  * Speaks one framing instruction at a time with haptic feedback.
  *
@@ -34,23 +41,37 @@ class GuidancePlayer @Inject constructor(
      */
     @Volatile var hapticsEnabled: Boolean = true
 
-    fun guide(condition: FramingCondition, instruction: String) {
+    /**
+     * Requests guidance for [condition]. Returns what actually happened so
+     * the guidance-test diagnostics can show requested-vs-spoken; existing
+     * callers may ignore the result.
+     */
+    fun guide(condition: FramingCondition, instruction: String): GuidanceOutcome {
         if (condition == FramingCondition.READY) {
-            if (readyLatched) return
+            if (readyLatched) return GuidanceOutcome.READY_LATCHED
             readyLatched = true
             lastCondition = condition
             lastSpokenAt.set(System.currentTimeMillis())
             pulse(READY_PULSE_MS)
             gate.speak(instruction)
-            return
+            return GuidanceOutcome.SPOKEN
         }
         readyLatched = false
         val now = System.currentTimeMillis()
-        if (condition == lastCondition && now - lastSpokenAt.get() < COOLDOWN_MS) return
+        if (condition == lastCondition && now - lastSpokenAt.get() < COOLDOWN_MS) {
+            return GuidanceOutcome.COOLDOWN_SUPPRESSED
+        }
         lastCondition = condition
         lastSpokenAt.set(now)
         pulseWave(patternFor(condition))
         gate.speak(instruction)
+        return GuidanceOutcome.SPOKEN
+    }
+
+    /** Repeat-cooldown remaining for [condition] (0 when it would speak now). */
+    fun cooldownRemainingMs(condition: FramingCondition): Long {
+        if (condition != lastCondition) return 0L
+        return (COOLDOWN_MS - (System.currentTimeMillis() - lastSpokenAt.get())).coerceAtLeast(0L)
     }
 
     fun stop() {

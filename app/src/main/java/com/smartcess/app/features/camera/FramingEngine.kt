@@ -45,6 +45,27 @@ data class FramingInput(
     val minEdgeMargin: Float = 1f,
 )
 
+/**
+ * Temporary guidance-test diagnostics. Numbers and condition names only —
+ * never OCR text, images, document content, or credentials. Populated
+ * only in the capture-disabled diagnostic session; null otherwise.
+ */
+data class FramingDiag(
+    val frameWidth: Int = 0,
+    val frameHeight: Int = 0,
+    val rotation: Int = 0,
+    val blocks: Int = 0,
+    val coverage: Float = 0f,
+    val offsetX: Float = 0f,
+    val offsetY: Float = 0f,
+    val margin: Float = 1f,
+    val condition: FramingCondition = FramingCondition.NO_TEXT,
+    val outcome: GuidanceOutcome = GuidanceOutcome.SPOKEN,
+    val gateAllowed: Boolean = true,
+    /** Milliseconds of repeat-cooldown remaining for this condition. */
+    val cooldownMs: Long = 0L,
+)
+
 object FramingEngine {
     /** Below this text coverage the bill is too small in frame. */
     const val MIN_COVERAGE = 0.15f
