@@ -50,6 +50,32 @@ class VoiceFastPathTest {
         assertNull(VoiceFastPath.route("dentist tomorrow"))
     }
 
+    @Test
+    fun route_m3Commands_hit() {
+        assertEquals("email_briefing", VoiceFastPath.route("check my email"))
+        assertEquals("email_briefing", VoiceFastPath.route("brief me on my email"))
+        assertEquals("email_briefing", VoiceFastPath.route("read my email"))
+        assertEquals("read_document", VoiceFastPath.route("read my document"))
+        assertEquals("read_document", VoiceFastPath.route("summarize my document"))
+        assertEquals("read_document", VoiceFastPath.route("what does my lease say"))
+        assertEquals("read_document", VoiceFastPath.route("show my papers"))
+        assertEquals("scan_bill", VoiceFastPath.route("scan this"))
+        assertEquals("scan_bill", VoiceFastPath.route("scan my bill"))
+        assertEquals("complete_routine", VoiceFastPath.route("mark vitamins done"))
+        assertEquals("complete_routine", VoiceFastPath.route("complete my medication routine"))
+    }
+
+    @Test
+    fun route_m3Guards_preferSpecific() {
+        // "complete a new routine" creates; bill questions beat doc reads.
+        assertEquals("add_routine", VoiceFastPath.route("complete a new routine"))
+        assertEquals("ask_bill_question", VoiceFastPath.route("what does my electric bill say"))
+        assertEquals("ask_bill_question", VoiceFastPath.route("how much is my bill"))
+        assertNull(VoiceFastPath.route("don't mark vitamins done"))
+        assertNull(VoiceFastPath.route("summarize my bill")) // fuzzy: AI decides
+        assertNull(VoiceFastPath.route("read my bill")) // fuzzy: AI decides
+    }
+
     // Datetimes
 
     @Test

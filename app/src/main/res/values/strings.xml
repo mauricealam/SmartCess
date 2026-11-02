@@ -29,7 +29,6 @@
     <string name="voice_hint" translatable="true">Try “What is due this week?” or “Scan my bill”.</string>
 
     <!-- Guided camera / framing phrases (exact contracted wording) -->
-    <string name="camera_title" translatable="true">Scan document</string>
     <string name="camera_capture" translatable="true">Capture</string>
     <string name="camera_capture_desc" translatable="true">Capture the document photo</string>
     <string name="camera_processing" translatable="true">Processing your bill…</string>
@@ -39,16 +38,34 @@
     <string name="camera_grant_permission" translatable="true">Allow camera</string>
     <string name="camera_open_settings" translatable="true">Open settings</string>
     <string name="framing_no_text" translatable="true">I do not see a document. Point the camera at the bill.</string>
-    <string name="framing_move_closer" translatable="true">Move closer to the bill.</string>
-    <string name="framing_move_back" translatable="true">Move back slightly.</string>
+    <string name="framing_move_closer" translatable="true">Move the phone closer to the bill.</string>
+    <string name="framing_move_back" translatable="true">Move the phone back slightly.</string>
     <string name="framing_move_left" translatable="true">Move the phone slightly to the left.</string>
     <string name="framing_move_right" translatable="true">Move the phone slightly to the right.</string>
-    <string name="framing_move_up" translatable="true">Move the phone down a little.</string>
-    <string name="framing_move_down" translatable="true">Move the phone up a little.</string>
+    <string name="framing_move_up" translatable="true">Move the phone up a little.</string>
+    <string name="framing_move_down" translatable="true">Move the phone down a little.</string>
     <string name="framing_hold_straight" translatable="true">Hold the phone straight over the bill.</string>
     <string name="framing_too_dark" translatable="true">It is too dark. Move to better light if possible.</string>
     <string name="framing_ready" translatable="true">Ready. Tap capture or say capture.</string>
     <string name="framing_unavailable" translatable="true">Automatic framing is unavailable. Position the bill in the frame and tap capture when ready.</string>
+    <string name="framing_no_text_doc" translatable="true">I do not see a document. Point the camera at the page.</string>
+    <string name="framing_move_closer_doc" translatable="true">Move the phone closer to the page.</string>
+    <string name="framing_hold_straight_doc" translatable="true">Hold the phone straight over the page.</string>
+    <string name="framing_unavailable_doc" translatable="true">Automatic framing is unavailable. Position the page in the frame and tap capture when ready.</string>
+    <string name="framing_edge_cropped" translatable="true">Words reach the edge of the frame. Move the phone back slightly.</string>
+    <string name="camera_title_bill" translatable="true">Scan bill</string>
+    <string name="camera_title_doc" translatable="true">Scan document</string>
+    <string name="camera_processing_doc" translatable="true">Processing your document.</string>
+    <string name="camera_review_title" translatable="true">Review before saving</string>
+    <string name="camera_review_save" translatable="true">Save</string>
+    <string name="camera_review_discard" translatable="true">Discard and retake</string>
+    <string name="camera_review_saved" translatable="true">Saved.</string>
+    <string name="camera_review_bill" translatable="true">Bill from %1$s, %2$s, due %3$s. Save it?</string>
+    <string name="camera_review_doc" translatable="true">%1$s. %2$s Save it?</string>
+    <string name="bill_unknown_provider" translatable="true">unknown provider</string>
+    <string name="bill_no_due_date" translatable="true">no date found</string>
+    <string name="bill_amount_unknown" translatable="true">amount unknown</string>
+    <string name="documents_untitled" translatable="true">Untitled document</string>
 
     <!-- Bills -->
     <string name="bills_title" translatable="true">Bills</string>
@@ -399,6 +416,16 @@
     <string name="voice_archive_confirm" translatable="true">Archive %1$s? Say yes to archive, or no to keep it.</string>
     <string name="voice_archived" translatable="true">Bill archived.</string>
     <string name="voice_dismissed" translatable="true">OK, never mind.</string>
+    <string name="voice_email_none" translatable="true">Your inbox is empty.</string>
+    <string name="voice_doc_which" translatable="true">Which document? %1$s</string>
+    <string name="voice_doc_no_content" translatable="true">This document has no readable summary yet.</string>
+    <string name="voice_doc_summary_of" translatable="true">Here is the summary of %1$s.</string>
+    <string name="voice_doc_capture" translatable="true">I do not have that document saved. Opening the camera so you can scan it. Hold the page steady in front of the camera.</string>
+    <string name="voice_bill_capture" translatable="true">Opening the bill scanner. Hold the bill steady in front of the camera.</string>
+    <string name="voice_routine_none_due" translatable="true">No routines are due.</string>
+    <string name="voice_routine_which" translatable="true">Which routine? %1$s</string>
+    <string name="voice_routine_confirm" translatable="true">Mark %1$s done? Say yes to confirm, or no to keep it.</string>
+    <string name="voice_routine_done" translatable="true">Marked %1$s done.</string>
     <string name="error_rate_limit" translatable="true">Too many requests. Please try again shortly.</string>
 
     <!-- Permissions -->

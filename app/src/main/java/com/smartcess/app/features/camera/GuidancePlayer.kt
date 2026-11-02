@@ -56,6 +56,13 @@ class GuidancePlayer @Inject constructor(
         speaker.stop()
     }
 
+    /** New camera session: forget latch/cooldown so Ready can announce again. */
+    fun reset() {
+        readyLatched = false
+        lastCondition = null
+        lastSpokenAt.set(0L)
+    }
+
     private fun pulse(millis: Long) {
         if (!hapticsEnabled) return
         val vib = vibrator ?: return
@@ -82,6 +89,7 @@ class GuidancePlayer @Inject constructor(
         fun patternFor(condition: FramingCondition): LongArray = when (condition) {
             FramingCondition.TOO_FAR,
             FramingCondition.TOO_CLOSE,
+            FramingCondition.EDGE_CROPPED,
             FramingCondition.TILTED,
             -> longArrayOf(0, TICK_MS, GAP_MS, TICK_MS)
             FramingCondition.TOO_DARK -> longArrayOf(0, TICK_MS, GAP_MS, TICK_MS, GAP_MS, TICK_MS)

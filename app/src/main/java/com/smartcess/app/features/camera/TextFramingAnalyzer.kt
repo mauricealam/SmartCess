@@ -64,7 +64,7 @@ class TextFramingAnalyzer(
         recognizer.process(input)
             .addOnSuccessListener { visionText ->
                 lastRecognizedText = visionText.text
-                onResult(toFramingInput(visionText, width, height, luminance))
+                onResult(toFramingInput(visionText, width, height, luminance, rotation))
             }
             .addOnFailureListener { e -> onError(e) }
             .addOnCompleteListener {
@@ -83,6 +83,7 @@ class TextFramingAnalyzer(
         imageWidth: Int,
         imageHeight: Int,
         luminance: Float,
+        rotationDegrees: Int,
     ): FramingInput {
         val boxes = visionText.textBlocks.mapNotNull { it.boundingBox }
         if (boxes.isEmpty()) {
@@ -92,16 +93,27 @@ class TextFramingAnalyzer(
         boxes.drop(1).forEach { union.union(it) }
         val frameArea = (imageWidth * imageHeight).toFloat().coerceAtLeast(1f)
         val coverage = (union.width() * union.height()) / frameArea
-        val offsetX = (union.exactCenterX() / imageWidth) - 0.5f
-        val offsetY = (union.exactCenterY() / imageHeight) - 0.5f
-        val skew = largestBlockSkew(visionText)
+        // Buffer-space geometry, then into upright screen space. Coverage
+        // and margin are rotation-invariant and pass through untouched.
+        val (uprightX, uprightY) = FramingGeometry.uprightOffsets(
+            (union.exactCenterX() / imageWidth) - 0.5f,
+            (union.exactCenterY() / imageHeight) - 0.5f,
+            rotationDegrees,
+        )
+        val skew = FramingGeometry.uprightSkew(largestBlockSkew(visionText), rotationDegrees)
+        val smallSide = minOf(imageWidth, imageHeight).toFloat().coerceAtLeast(1f)
+        val margin = minOf(
+            union.left, union.top,
+            imageWidth - union.right, imageHeight - union.bottom,
+        ).toFloat().coerceAtLeast(0f) / smallSide
         return FramingInput(
             hasText = true,
             coverage = coverage.coerceIn(0f, 1f),
-            offsetX = offsetX,
-            offsetY = offsetY,
+            offsetX = uprightX,
+            offsetY = uprightY,
             skewDegrees = skew,
             meanLuminance = luminance,
+            minEdgeMargin = margin,
         )
     }
 

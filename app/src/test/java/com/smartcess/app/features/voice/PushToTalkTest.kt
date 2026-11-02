@@ -31,10 +31,13 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -216,7 +219,7 @@ class PushToTalkTest {
         recorder.rec = RecordedAudio(recordedFile(), peak = 5000, durationMs = 1200)
         voiceApi.response = TranscribeResponse("my documents", 900, 1)
         coEvery { spark.classifyIntent(any(), any()) } returns
-            IntentResult(intent = "read_document", confidence = 0.9, clarifying_question = "Which document?")
+            IntentResult(intent = "general_question", confidence = 0.9, clarifying_question = "Which document?")
         val vm = viewModel()
         vm.startTalk()
         runCurrent()
@@ -243,28 +246,26 @@ class PushToTalkTest {
         coEvery { spark.classifyIntent(any(), any()) } answers {
             contexts.add(invocation.args[1] as String?)
             if (contexts.size == 1) {
-                IntentResult(intent = "read_document", confidence = 0.9, clarifying_question = "Which document?")
+                IntentResult(intent = "general_question", confidence = 0.9, clarifying_question = "Which document?")
             } else {
-                IntentResult(intent = "read_document", confidence = 0.95)
+                IntentResult(intent = "general_question", confidence = 0.95)
             }
         }
+        coEvery { spark.answer(any(), any()) } returns "opening"
         val vm = viewModel()
         vm.startTalk()
         runCurrent()
         vm.stopTalk()
         advanceUntilIdle()
-        val routes = mutableListOf<String>()
-        backgroundScope.launch { vm.navigate.collect { routes.add(it) } }
         recorder.rec = RecordedAudio(recordedFile(), peak = 5000, durationMs = 1100)
         vm.startTalk()
         runCurrent()
         vm.stopTalk()
         advanceUntilIdle()
-        // Second classification saw the pending question; route confirmed + spoken.
+        // Second classification saw the pending question; answer spoken.
         assertEquals(2, contexts.size)
         assertTrue(contexts[1] != null && contexts[1]!!.contains("Which document?"))
         assertEquals(listOf("Which document?", "opening"), speaker.spoken)
-        assertEquals(1, routes.size)
     }
 
     @Test
@@ -544,6 +545,28 @@ class PushToTalkTest {
     }
 
     @Test
+    fun actionTurnWithNavigateTo_opensScreenWithoutAutoListen() = runTest {
+        val handler = mockk<VoiceActionHandler>()
+        every { handler.hasPending } returns false
+        coEvery { handler.start(any(), any(), any()) } returns
+            ActionTurn("Opening the camera.", navigateTo = "camera")
+        val vm = viewModel(handler = handler)
+        // Subscribe before the turn: the navigate flow has no replay, so a
+        // late collector would miss the emit. (backgroundScope collection is
+        // not driven deterministically here; test-scope async is.)
+        val route = async { vm.navigate.first() }
+        runCurrent()
+        vm.onTypedChange("scan this")
+        vm.submitTyped()
+        advanceUntilIdle()
+        assertEquals("camera", route.await())
+        assertEquals("Opening the camera.", vm.state.value.message)
+        speaker.completeSpeech()
+        assertFalse(vm.state.value.recording) // leaving Talk: no auto-listen
+        coVerify(exactly = 0) { spark.classifyIntent(any(), any()) }
+    }
+
+    @Test
     fun pendingFollowUp_skipsClassify_speaksTurn() = runTest {
         val handler = mockk<VoiceActionHandler>()
         every { handler.hasPending } returns true
@@ -633,7 +656,7 @@ class PushToTalkTest {
     @Test
     fun cancelDuringSpeech_blocksAutoListen() = runTest {
         coEvery { spark.classifyIntent(any(), any()) } returns
-            IntentResult(intent = "read_document", confidence = 0.9, clarifying_question = "Which document?")
+            IntentResult(intent = "general_question", confidence = 0.9, clarifying_question = "Which document?")
         val vm = viewModel()
         vm.onTypedChange("my documents")
         vm.submitTyped()
@@ -648,7 +671,7 @@ class PushToTalkTest {
     @Test
     fun autoTurnCap_stopsHandsFreeUntilManualTap() = runTest {
         coEvery { spark.classifyIntent(any(), any()) } returns
-            IntentResult(intent = "read_document", confidence = 0.9, clarifying_question = "Which document?")
+            IntentResult(intent = "general_question", confidence = 0.9, clarifying_question = "Which document?")
         val vm = viewModel()
         vm.maxAutoTurns = 1
         vm.onTypedChange("my documents")

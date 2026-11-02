@@ -22,7 +22,12 @@ class GuidanceHapticsTest {
 
     @Test
     fun distanceAndTilt_doublePulse() {
-        listOf(FramingCondition.TOO_FAR, FramingCondition.TOO_CLOSE, FramingCondition.TILTED).forEach {
+        listOf(
+            FramingCondition.TOO_FAR,
+            FramingCondition.TOO_CLOSE,
+            FramingCondition.EDGE_CROPPED,
+            FramingCondition.TILTED,
+        ).forEach {
             assertArrayEquals(longArrayOf(0, 35, 80, 35), patternFor(it))
         }
     }

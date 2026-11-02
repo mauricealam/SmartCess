@@ -5,12 +5,13 @@ package com.smartcess.app.features.camera
  * thresholds are unit-testable on the JVM (spec: framing-threshold tests).
  *
  * Priority (spec: no-text > far/close > off-center > tilt > lighting):
- * NO_TEXT -> TOO_FAR / TOO_CLOSE -> OFF_* -> TILTED -> TOO_DARK -> READY.
+ * NO_TEXT -> TOO_FAR / TOO_CLOSE -> EDGE_CROPPED -> OFF_* -> TILTED -> TOO_DARK -> READY.
  */
 enum class FramingCondition {
     NO_TEXT,
     TOO_FAR,
     TOO_CLOSE,
+    EDGE_CROPPED,
     OFF_LEFT,
     OFF_RIGHT,
     OFF_UP,
@@ -31,6 +32,8 @@ enum class FramingCondition {
  *   Negative means the bill appears above center (move phone up).
  * @param skewDegrees absolute tilt of the largest block's top edge.
  * @param meanLuminance mean frame luma (0..1) from the Y plane.
+ * @param minEdgeMargin smallest distance from the text union box to any
+ *   frame edge, as a fraction of the frame's smaller side (0..~0.5).
  */
 data class FramingInput(
     val hasText: Boolean,
@@ -39,6 +42,7 @@ data class FramingInput(
     val offsetY: Float = 0f,
     val skewDegrees: Float = 0f,
     val meanLuminance: Float = 1f,
+    val minEdgeMargin: Float = 1f,
 )
 
 object FramingEngine {
@@ -57,10 +61,19 @@ object FramingEngine {
     /** Below this mean luma the scene is too dark to scan. */
     const val MIN_LUMINANCE = 0.18f
 
+    /**
+     * Text union closer than this to any frame edge flags possible
+     * cropping. Heuristic limits: it sees detected TEXT, not the physical
+     * page — margins, photos, or undetected print near an edge are missed,
+     * and it never proves the whole page is inside the frame.
+     */
+    const val MIN_EDGE_MARGIN = 0.02f
+
     fun evaluate(input: FramingInput): FramingCondition {
         if (!input.hasText) return FramingCondition.NO_TEXT
         if (input.coverage < MIN_COVERAGE) return FramingCondition.TOO_FAR
         if (input.coverage > MAX_COVERAGE) return FramingCondition.TOO_CLOSE
+        if (input.minEdgeMargin < MIN_EDGE_MARGIN) return FramingCondition.EDGE_CROPPED
         val offX = kotlin.math.abs(input.offsetX) > CENTER_TOLERANCE
         val offY = kotlin.math.abs(input.offsetY) > CENTER_TOLERANCE
         if (offX || offY) {

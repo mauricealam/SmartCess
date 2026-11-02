@@ -8,11 +8,15 @@ import com.smartcess.app.core.ai.RoutineHelp
 import com.smartcess.app.core.ai.SparkClient
 import com.smartcess.app.data.local.entity.AppointmentEntity
 import com.smartcess.app.data.local.entity.BillEntity
+import com.smartcess.app.data.local.entity.DocumentEntity
+import com.smartcess.app.data.local.entity.EmailItemEntity
 import com.smartcess.app.data.local.entity.ReminderEntity
 import com.smartcess.app.data.local.entity.RoutineEntity
 import com.smartcess.app.data.repository.AppointmentRepository
 import com.smartcess.app.data.repository.BillRepository
 import com.smartcess.app.data.repository.BriefingRepository
+import com.smartcess.app.data.repository.DocumentRepository
+import com.smartcess.app.data.repository.EmailRepository
 import com.smartcess.app.data.repository.IssueSeverity
 import com.smartcess.app.data.repository.ReminderRepository
 import com.smartcess.app.data.repository.RoutineRepository
@@ -53,6 +57,8 @@ class VoiceActionHandlerTest {
     private lateinit var scheduler: ReminderScheduler
     private lateinit var briefing: BriefingRepository
     private lateinit var bills: BillRepository
+    private lateinit var emails: EmailRepository
+    private lateinit var documents: DocumentRepository
     private lateinit var ctx: Context
     private lateinit var handler: VoiceActionHandler
 
@@ -79,6 +85,8 @@ class VoiceActionHandlerTest {
         scheduler = mockk()
         briefing = mockk()
         bills = mockk()
+        emails = mockk()
+        documents = mockk()
         ctx = mockk()
         // Format calls echo their args (vararg may arrive as one array);
         // literal strings collapse to "literal".
@@ -89,7 +97,8 @@ class VoiceActionHandlerTest {
         }
         every { ctx.getString(any()) } returns "literal"
         handler = VoiceActionHandler(
-            spark, appointments, routines, reminders, scheduler, briefing, bills, ctx,
+            spark, appointments, routines, reminders, scheduler,
+            briefing, bills, emails, documents, ctx,
         )
     }
 
@@ -116,6 +125,35 @@ class VoiceActionHandlerTest {
         overdueBills = emptyList(), billsDueSoon = emptyList(),
         appointments = emptyList(), urgentEmails = emptyList(),
         documentsWithDeadlines = emptyList(), routinesDue = emptyList(),
+    )
+
+    private fun email(
+        sender: String = "Tenaga Nasional",
+        subject: String = "Your electricity bill is ready",
+        urgency: String = "high",
+    ) = EmailItemEntity(
+        sender = sender, subject = subject, body = "Body.",
+        receivedAt = System.currentTimeMillis(), urgency = urgency,
+    )
+
+    private fun doc(
+        id: Long = 1L,
+        title: String = "Lease agreement",
+        summary: String = "Twelve month lease starting January.",
+        keyPoints: List<String> = listOf("Rent due on the 1st."),
+        deadline: String? = "2026-12-31",
+    ) = DocumentEntity(
+        id = id, title = title, type = "contract", summary = summary,
+        keyPoints = keyPoints, deadline = deadline, confidence = 0.9,
+    )
+
+    private fun dueRoutine(
+        id: Long = 1L,
+        title: String = "Vitamins",
+        nextDue: Long = System.currentTimeMillis() + 3_600_000L,
+    ) = RoutineEntity(
+        id = id, title = title, kind = "MEDICATION",
+        scheduleRule = "DAILY 08:00", nextDueMillis = nextDue,
     )
 
     @Test
@@ -651,4 +689,169 @@ class VoiceActionHandlerTest {
         assertTrue(confirm.speak.contains("City Water"))
         assertTrue(handler.hasPending)
     }
+
+    // Milestone 3
+
+    @Test
+    fun emailBriefing_announcesSample_readsNothing() = runTest {
+        coEvery { emails.seedDemoInboxIfEmpty() } returns Unit
+        every { emails.observeAll() } returns flowOf(
+            listOf(email(), email(sender = "City Clinic", subject = "Appointment reminder", urgency = "normal")),
+        )
+        val turn = handler.start("email_briefing", "check my email")
+        assertTrue(turn.speak.contains("Sample inbox: 2 emails."))
+        assertTrue(turn.speak.contains("high urgency from Tenaga Nasional"))
+        assertTrue(turn.speak.contains("Appointment reminder"))
+        assertFalse(handler.hasPending)
+        coVerify(exactly = 1) { emails.seedDemoInboxIfEmpty() }
+        coVerify(exactly = 0) { emails.markRead(any()) }
+    }
+
+    @Test
+    fun emailBriefing_emptyInbox() = runTest {
+        coEvery { emails.seedDemoInboxIfEmpty() } returns Unit
+        every { emails.observeAll() } returns flowOf(emptyList())
+        val turn = handler.start("email_briefing", "check my email")
+        assertEquals("literal", turn.speak)
+        assertFalse(handler.hasPending)
+    }
+
+    @Test
+    fun readDocument_singleMatch_readsSavedContent() = runTest {
+        every { documents.observeAll() } returns flowOf(listOf(doc()))
+        val turn = handler.start("read_document", "read my lease")
+        verify { ctx.getString(R.string.voice_doc_summary_of, "Lease agreement") }
+        assertTrue(turn.speak.contains("fmt[Lease agreement]"))
+        assertTrue(turn.speak.contains("Twelve month lease"))
+        assertTrue(turn.speak.contains("Rent due on the 1st."))
+        assertTrue(turn.speak.contains("31 December 2026"))
+        assertFalse(handler.hasPending)
+        assertNull(turn.navigateTo)
+    }
+
+    @Test
+    fun readDocument_multiMatch_asksThenReadsSelection() = runTest {
+        every { documents.observeAll() } returns flowOf(
+            listOf(doc(id = 1L, title = "Lease 2025"), doc(id = 2L, title = "Lease 2026")),
+        )
+        val asked = handler.start("read_document", "read document")
+        assertTrue(asked.speak.contains("1. Lease 2025"))
+        assertTrue(asked.speak.contains("2. Lease 2026"))
+        assertTrue(handler.hasPending)
+        val read = handler.followUp("2")!!
+        assertTrue(read.speak.contains("fmt[Lease 2026]"))
+        assertFalse(handler.hasPending)
+    }
+
+    @Test
+    fun readDocument_noDocs_guidesCapture() = runTest {
+        every { documents.observeAll() } returns flowOf(emptyList())
+        val turn = handler.start("read_document", "read my lease")
+        assertEquals("literal", turn.speak)
+        assertEquals("camera?mode=doc", turn.navigateTo)
+        assertFalse(handler.hasPending)
+    }
+
+    @Test
+    fun readDocument_blankContent_saysSo() = runTest {
+        every { documents.observeAll() } returns flowOf(
+            listOf(doc(summary = "  ", keyPoints = emptyList(), deadline = null)),
+        )
+        val turn = handler.start("read_document", "read my lease")
+        assertEquals("literal", turn.speak)
+        assertFalse(handler.hasPending)
+    }
+
+    @Test
+    fun scanBill_guidesCapture() = runTest {
+        val turn = handler.start("scan_bill", "scan this")
+        assertEquals("literal", turn.speak)
+        assertEquals("camera?mode=bill", turn.navigateTo)
+        assertFalse(handler.hasPending)
+    }
+
+    @Test
+    fun completeRoutine_singleMatch_confirmsAndCompletes() = runTest {
+        coEvery { routines.dueToday(any()) } returns listOf(dueRoutine())
+        coEvery { routines.complete(any()) } returns Unit
+        coEvery { reminders.scheduledFor(any(), any()) } returns emptyList()
+        coEvery { routines.getById(any()) } returns dueRoutine(
+            nextDue = System.currentTimeMillis() + 86_400_000L,
+        )
+        coEvery {
+            reminders.create(
+                kind = any(), title = any(), triggerAtMillis = any(), referenceId = any(),
+            )
+        } returns 11L
+        coEvery { scheduler.schedule(any()) } returns Unit
+        val confirm = handler.start("complete_routine", "mark vitamins done")
+        assertTrue(confirm.speak.contains("Vitamins"))
+        assertTrue(handler.hasPending)
+        coVerify(exactly = 0) { routines.complete(any()) }
+        val done = handler.followUp("yes")!!
+        assertTrue(done.saved)
+        assertTrue(done.speak.contains("Vitamins"))
+        coVerify(exactly = 1) { routines.complete(1L) }
+        coVerify(exactly = 1) { scheduler.schedule(11L) }
+        assertFalse(handler.hasPending)
+    }
+
+    @Test
+    fun completeRoutine_multiMatch_selectThenYes() = runTest {
+        coEvery { routines.dueToday(any()) } returns listOf(
+            dueRoutine(id = 1L, title = "Vitamins"),
+            dueRoutine(id = 2L, title = "Stretch"),
+        )
+        coEvery { routines.complete(any()) } returns Unit
+        coEvery { reminders.scheduledFor(any(), any()) } returns emptyList()
+        coEvery { routines.getById(any()) } returns dueRoutine(id = 2L, nextDue = 0L)
+        val asked = handler.start("complete_routine", "mark done")
+        assertTrue(asked.speak.contains("1. Vitamins"))
+        assertTrue(asked.speak.contains("2. Stretch"))
+        val confirm = handler.followUp("stretch")!!
+        assertTrue(confirm.speak.contains("Stretch"))
+        handler.followUp("yes")
+        coVerify(exactly = 1) { routines.complete(2L) }
+        coVerify(exactly = 0) { routines.complete(1L) }
+    }
+
+    @Test
+    fun completeRoutine_noneDue() = runTest {
+        coEvery { routines.dueToday(any()) } returns emptyList()
+        val turn = handler.start("complete_routine", "mark vitamins done")
+        assertEquals("literal", turn.speak)
+        assertFalse(handler.hasPending)
+    }
+
+    @Test
+    fun completeRoutine_no_keepsUntouched() = runTest {
+        coEvery { routines.dueToday(any()) } returns listOf(dueRoutine())
+        handler.start("complete_routine", "mark vitamins done")
+        val kept = handler.followUp("no")!!
+        verify { ctx.getString(R.string.voice_keep) }
+        assertFalse(kept.saved)
+        coVerify(exactly = 0) { routines.complete(any()) }
+    }
+
+    @Test
+    fun completeRoutine_schedulingFailure_reportsWarn() = runTest {
+        coEvery { routines.dueToday(any()) } returns listOf(dueRoutine())
+        coEvery { routines.complete(any()) } returns Unit
+        coEvery { reminders.scheduledFor(any(), any()) } returns emptyList()
+        coEvery { routines.getById(any()) } returns dueRoutine(
+            nextDue = System.currentTimeMillis() + 86_400_000L,
+        )
+        coEvery {
+            reminders.create(
+                kind = any(), title = any(), triggerAtMillis = any(), referenceId = any(),
+            )
+        } returns 11L
+        coEvery { scheduler.schedule(any()) } throws RuntimeException("work denied")
+        handler.start("complete_routine", "mark vitamins done")
+        val done = handler.followUp("yes")!!
+        assertTrue(done.saved) // completed locally; scheduling reported
+        verify { ctx.getString(R.string.voice_action_schedule_warn) }
+        coVerify(exactly = 1) { routines.complete(1L) }
+    }
 }
+

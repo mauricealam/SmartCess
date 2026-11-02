@@ -14,8 +14,16 @@ class RoutineRepository @Inject constructor(private val dao: RoutineDao) {
     fun observeAll(): Flow<List<RoutineEntity>> = dao.observeAll()
     suspend fun getById(id: Long): RoutineEntity? = dao.getById(id)
 
-    suspend fun dueToday(): List<RoutineEntity> {
-        val endOfDay = Instant.now().toEpochMilli() + 24L * 60 * 60 * 1000
+    /**
+     * Routines due within a rolling 24-hour window: everything with
+     * nextDueMillis <= now + 24h (overdue included, nulls excluded). This
+     * is NOT a local-calendar-day predicate — a routine due tomorrow
+     * morning counts as "due" all day today. No timezone is involved;
+     * comparisons are raw epoch millis. [nowMillis] is injectable for
+     * boundary tests; callers use the default.
+     */
+    suspend fun dueToday(nowMillis: Long = Instant.now().toEpochMilli()): List<RoutineEntity> {
+        val endOfDay = nowMillis + 24L * 60 * 60 * 1000
         return dao.dueBefore(endOfDay)
     }
 

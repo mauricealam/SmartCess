@@ -8,6 +8,7 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.camera.core.CameraSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -66,19 +67,21 @@ import com.smartcess.app.ui.components.SmartCessSecondaryButton
 import com.smartcess.app.ui.theme.SmartCessTheme
 
 /**
- * Guided bill scanner: live preview + framing overlay + one spoken
- * instruction at a time. Capture (touch or voice) sends only the final
- * compressed image to Muse Spark, then hands the saved bill id to review.
+ * Guided scanner (bill or document mode): live preview + framing overlay +
+ * one spoken instruction at a time. Capture (touch or voice) sends only
+ * the final compressed image to Muse Spark, shows the extraction for
+ * explicit review, and hands the saved id to the result screen on Save.
  */
 @Composable
 fun CameraScreen(
     onBack: () -> Unit,
-    onCaptured: (Long) -> Unit,
+    onCaptured: (CaptureResult) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CameraViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+    @StringRes val titleRes = if (viewModel.isDocumentMode) R.string.camera_title_doc else R.string.camera_title_bill
     var hasPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
@@ -97,12 +100,13 @@ fun CameraScreen(
         if (!hasPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
     }
     LaunchedEffect(Unit) {
-        viewModel.captured.collect { billId -> onCaptured(billId) }
+        viewModel.captured.collect { result -> onCaptured(result) }
     }
 
     if (!hasPermission) {
         CameraPermissionDenied(
             askedOnce = askedOnce,
+            titleRes = titleRes,
             onAskAgain = { permissionLauncher.launch(Manifest.permission.CAMERA) },
             onBack = onBack,
             onAnnounce = { viewModel.announce(R.string.error_permission) },
@@ -113,6 +117,7 @@ fun CameraScreen(
 
     CameraPreviewContent(
         uiState = uiState,
+        titleRes = titleRes,
         viewModel = viewModel,
         onBack = onBack,
         modifier = modifier,
@@ -122,6 +127,7 @@ fun CameraScreen(
 @Composable
 private fun CameraPreviewContent(
     uiState: CameraUiState,
+    @StringRes titleRes: Int,
     viewModel: CameraViewModel,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -150,6 +156,7 @@ private fun CameraPreviewContent(
     }
 
     DisposableEffect(lifecycleOwner, previewView) {
+        viewModel.bindAnalyzer()
         val providerFuture = ProcessCameraProvider.getInstance(context)
         val listener = Runnable {
             val provider = providerFuture.get()
@@ -168,6 +175,7 @@ private fun CameraPreviewContent(
         providerFuture.addListener(listener, ContextCompat.getMainExecutor(context))
         onDispose {
             runCatching { providerFuture.get().unbindAll() }
+            viewModel.onSessionEnd()
         }
     }
 
@@ -182,7 +190,7 @@ private fun CameraPreviewContent(
                 .navigationBarsPadding()
                 .padding(16.dp),
         ) {
-            RowHeader(onBack = onBack)
+            RowHeader(onBack = onBack, titleRes = titleRes)
 
             Spacer(Modifier.weight(1f))
 
@@ -210,12 +218,24 @@ private fun CameraPreviewContent(
 
             val busy = uiState.phase == CameraPhase.CAPTURING ||
                 uiState.phase == CameraPhase.PROCESSING
+            val reviewBody = uiState.reviewBody
+            if (uiState.phase == CameraPhase.REVIEW && reviewBody != null) {
+                ReviewBlock(
+                    body = reviewBody,
+                    onSave = viewModel::confirmSave,
+                    onDiscard = viewModel::discardDraft,
+                )
+            }
             OpsButton(
                 text = stringResource(
-                    if (busy) R.string.camera_processing else R.string.camera_capture,
+                    if (busy) {
+                        if (uiState.isDocument) R.string.camera_processing_doc else R.string.camera_processing
+                    } else {
+                        R.string.camera_capture
+                    },
                 ),
                 onClick = viewModel::capture,
-                enabled = uiState.captureEnabled && !busy,
+                enabled = uiState.captureEnabled && !busy && uiState.phase != CameraPhase.REVIEW,
                 modifier = Modifier.fillMaxWidth(),
                 leadingContent = if (busy) {
                     {
@@ -276,7 +296,44 @@ private fun CameraPreviewContent(
  * floating on raw video, and the back action gets the tonal circle.
  */
 @Composable
-private fun RowHeader(onBack: () -> Unit) {
+private fun ReviewBlock(
+    body: String,
+    onSave: () -> Unit,
+    onDiscard: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { liveRegion = LiveRegionMode.Polite }
+            .background(
+                MaterialTheme.colorScheme.surfaceContainerHighest,
+                RoundedCornerShape(12.dp),
+            )
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.camera_review_title),
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.semantics { heading() },
+        )
+        Text(text = body, style = MaterialTheme.typography.bodyLarge)
+        SmartCessPrimaryButton(
+            text = stringResource(R.string.camera_review_save),
+            onClick = onSave,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        )
+        SmartCessSecondaryButton(
+            text = stringResource(R.string.camera_review_discard),
+            onClick = onDiscard,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+    Spacer(Modifier.height(12.dp))
+}
+
+@Composable
+private fun RowHeader(onBack: () -> Unit, @StringRes titleRes: Int) {
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = Color(0xFF0B0F0E),
@@ -303,7 +360,7 @@ private fun RowHeader(onBack: () -> Unit) {
                 )
             }
             Text(
-                text = stringResource(R.string.camera_title),
+                text = stringResource(titleRes),
                 style = MaterialTheme.typography.headlineLarge,
                 modifier = Modifier.semantics { heading() },
             )
@@ -352,6 +409,7 @@ private fun ErrorBanner(text: String, onRescan: () -> Unit) {
 @Composable
 private fun CameraPermissionDenied(
     askedOnce: Boolean,
+    @StringRes titleRes: Int,
     onAskAgain: () -> Unit,
     onBack: () -> Unit,
     onAnnounce: () -> Unit,
@@ -375,7 +433,7 @@ private fun CameraPermissionDenied(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
-            text = stringResource(R.string.camera_title),
+            text = stringResource(titleRes),
             style = MaterialTheme.typography.headlineLarge,
             modifier = Modifier.semantics { heading() },
         )

@@ -47,6 +47,13 @@ object VoiceFastPath {
         if (has("\\b(cancel|cancelled|canceling|cancelling|stop|delete|remove|clear)\\b") && mentionsRemind) {
             return VoiceActionIntents.CANCEL_REMINDER
         }
+        // "complete a new routine" creates; everything else marks done.
+        if (
+            Regex("^(mark|complete|completed|finish|finished)\\b").containsMatchIn(trimmed) &&
+            !has("\\b(new|add|create)\\b")
+        ) {
+            return VoiceActionIntents.COMPLETE_ROUTINE
+        }
         if (
             has("\\bremind me\\b") || trimmed.startsWith("reminder ") ||
             (has("\\b(add|create|set|make|new)\\b") && has("\\breminders?\\b"))
@@ -65,6 +72,22 @@ object VoiceFastPath {
             (has("\\bdue\\b") && has("\\b(what|when|is|are)\\b"))
         ) {
             return VoiceActionIntents.ASK_BILL_QUESTION
+        }
+        // "scan this" captures (bill or paper land on the same camera flow).
+        if (has("\\bscan\\b")) return VoiceActionIntents.SCAN_BILL
+        val mentionsDoc = has("\\b(documents?|docs?|papers?|letters?|forms?|files?|scans?|receipts?)\\b")
+        if (
+            ((has("\\bread\\b") || has("\\bopen\\b") || has("\\bshow\\b")) && mentionsDoc) ||
+            (mentionsDoc && has("\\b(summary|summarize|summarise|what)\\b")) ||
+            (has("\\bwhat does\\b") && has("\\bsay\\b") && !mentionsBill)
+        ) {
+            return VoiceActionIntents.READ_DOCUMENT
+        }
+        if (
+            has("\\b(emails?|inbox|mail)\\b") &&
+            (has("\\b(brief|briefing|read|check|unread|new|summary)\\b") || has("\\bwhat\\b"))
+        ) {
+            return VoiceActionIntents.EMAIL_BRIEFING
         }
         if (
             has("\\bbrief(ing| me)?\\b") || has("what needs my attention") ||

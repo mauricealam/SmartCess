@@ -425,6 +425,15 @@ class VoiceViewModel @Inject constructor(
         val turn = actions.start(intent, text, fullContext)
         logPhase("action=${System.currentTimeMillis() - actionStart}ms saved=${turn.saved}")
         _state.update { it.copy(processing = false, message = turn.speak) }
+        // Capture guidance speaks, then opens the camera; the app-scoped
+        // speaker keeps talking across the navigation. No auto-listen: the
+        // user is leaving Talk, and the history keeps the request context.
+        if (turn.navigateTo != null) {
+            speakAndTrack(turn.speak)
+            analytics.log(AnalyticsEvent.VOICE_COMMAND, mapOf("intent" to intent, "success" to "guide"))
+            _navigate.emit(turn.navigateTo)
+            return
+        }
         speakAndTrack(turn.speak, expectReply = !turn.saved && actions.hasPending)
         analytics.log(AnalyticsEvent.VOICE_COMMAND, mapOf("intent" to intent, "success" to "prompt"))
     }

@@ -12,11 +12,15 @@ import com.smartcess.app.core.ai.SparkClient
 import com.smartcess.app.core.work.ReminderScheduler
 import com.smartcess.app.data.local.entity.AppointmentEntity
 import com.smartcess.app.data.local.entity.BillEntity
+import com.smartcess.app.data.local.entity.DocumentEntity
+import com.smartcess.app.data.local.entity.EmailItemEntity
 import com.smartcess.app.data.local.entity.ReminderEntity
 import com.smartcess.app.data.local.entity.RoutineEntity
 import com.smartcess.app.data.repository.AppointmentRepository
 import com.smartcess.app.data.repository.BillRepository
 import com.smartcess.app.data.repository.BriefingRepository
+import com.smartcess.app.data.repository.DocumentRepository
+import com.smartcess.app.data.repository.EmailRepository
 import com.smartcess.app.data.repository.ReminderRepository
 import com.smartcess.app.data.repository.RoutineRepository
 import com.smartcess.app.data.repository.TodayData
@@ -24,6 +28,7 @@ import com.smartcess.app.data.repository.ROUTINE_KINDS
 import com.smartcess.app.features.appointments.AppointmentsViewModel
 import com.smartcess.app.features.bills.BillResultViewModel
 import com.smartcess.app.features.routines.RoutinesViewModel
+import com.smartcess.app.navigation.Routes
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import java.time.Instant
@@ -35,7 +40,11 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import java.util.concurrent.TimeoutException
 
-/** Intents the voice executor completes end-to-end (Milestones 1+2). */
+/**
+ * Intents the voice executor completes end-to-end (Milestones 1-3).
+ * COMPLETE_ROUTINE is fast-route-only: the AI classifier vocabulary has no
+ * completion intent, so only crisp "mark X done" commands trigger it.
+ */
 object VoiceActionIntents {
     const val ADD_APPOINTMENT = "add_appointment"
     const val ADD_ROUTINE = "add_routine"
@@ -44,15 +53,20 @@ object VoiceActionIntents {
     const val CREATE_REMINDER = "create_reminder"
     const val CANCEL_REMINDER = "cancel_reminder"
     const val ARCHIVE_BILL = "archive_bill"
+    const val EMAIL_BRIEFING = "email_briefing"
+    const val READ_DOCUMENT = "read_document"
+    const val SCAN_BILL = "scan_bill"
+    const val COMPLETE_ROUTINE = "complete_routine"
     private val ALL = setOf(
         ADD_APPOINTMENT, ADD_ROUTINE, DAILY_BRIEFING, ASK_BILL_QUESTION,
-        CREATE_REMINDER, CANCEL_REMINDER, ARCHIVE_BILL,
+        CREATE_REMINDER, CANCEL_REMINDER, ARCHIVE_BILL, EMAIL_BRIEFING,
+        READ_DOCUMENT, SCAN_BILL, COMPLETE_ROUTINE,
     )
     fun isAction(intent: String): Boolean = intent in ALL
 }
 
-/** One executor turn: exactly what to speak, and whether a record persisted. */
-data class ActionTurn(val speak: String, val saved: Boolean = false)
+/** One executor turn: exactly what to speak, whether a record persisted, and an optional screen to open after speaking (capture guidance). */
+data class ActionTurn(val speak: String, val saved: Boolean = false, val navigateTo: String? = null)
 
 private sealed interface PendingAction {
     /** Everything heard for this action, oldest first (slot-fill context). */
@@ -142,6 +156,27 @@ private data class PendingArchiveConfirm(
     override val taskTurns: List<String> = emptyList(),
 ) : PendingAction
 
+/** Awaiting the user's pick (by number or name) before reading. Read-only. */
+private data class PendingDocChoice(
+    val candidates: List<DocumentEntity>,
+    override val heard: List<String>,
+    override val taskTurns: List<String> = emptyList(),
+) : PendingAction
+
+/** Awaiting the user's pick before the completion read-back. Nothing touched yet. */
+private data class PendingCompleteChoice(
+    val candidates: List<RoutineEntity>,
+    override val heard: List<String>,
+    override val taskTurns: List<String> = emptyList(),
+) : PendingAction
+
+/** Named completion target awaiting explicit "yes". */
+private data class PendingCompleteConfirm(
+    val target: RoutineEntity,
+    override val heard: List<String>,
+    override val taskTurns: List<String> = emptyList(),
+) : PendingAction
+
 /**
  * Executes voice actions end-to-end: extract details from speech, ask for
  * missing slots across follow-up turns, read back the exact proposal, and
@@ -166,6 +201,8 @@ private data class PendingArchiveConfirm(
  *   first; multiple matches are spoken as numbered options and the user picks
  *   — the top match is never silently chosen. The named target still needs an
  *   explicit "yes".
+ * - Reading (Milestone 3): email briefing and document reading speak saved
+ *   content only; new captures navigate to the camera with spoken guidance.
  */
 @Singleton
 class VoiceActionHandler @Inject constructor(
@@ -176,6 +213,8 @@ class VoiceActionHandler @Inject constructor(
     private val scheduler: ReminderScheduler,
     private val briefing: BriefingRepository,
     private val bills: BillRepository,
+    private val emails: EmailRepository,
+    private val documents: DocumentRepository,
     @ApplicationContext private val appContext: Context,
 ) {
     private val lock = Any()
@@ -200,6 +239,10 @@ class VoiceActionHandler @Inject constructor(
             VoiceActionIntents.ASK_BILL_QUESTION -> startBillQuestion(text, heard)
             VoiceActionIntents.CANCEL_REMINDER -> startCancelReminder(text)
             VoiceActionIntents.ARCHIVE_BILL -> startArchiveBill(text)
+            VoiceActionIntents.EMAIL_BRIEFING -> speakEmailBriefing()
+            VoiceActionIntents.READ_DOCUMENT -> startReadDocument(text)
+            VoiceActionIntents.SCAN_BILL -> guideBillCapture()
+            VoiceActionIntents.COMPLETE_ROUTINE -> startCompleteRoutine(text)
             else -> ActionTurn(appContext.getString(R.string.error_generic))
         }
     }
@@ -223,6 +266,9 @@ class VoiceActionHandler @Inject constructor(
             is PendingCancelConfirm -> followUpCancelConfirm(current, norm)
             is PendingArchiveChoice -> followUpArchiveChoice(current, norm, text)
             is PendingArchiveConfirm -> followUpArchiveConfirm(current, norm)
+            is PendingDocChoice -> followUpDocChoice(current, norm, text)
+            is PendingCompleteChoice -> followUpCompleteChoice(current, norm, text)
+            is PendingCompleteConfirm -> followUpCompleteConfirm(current, norm)
         }
     }
 
@@ -292,6 +338,37 @@ class VoiceActionHandler @Inject constructor(
         }
         if (isConfirm(norm)) return save(current)
         return ActionTurn(archiveConfirmQuestion(current.target))
+    }
+
+    private fun followUpDocChoice(current: PendingDocChoice, norm: String, text: String): ActionTurn {
+        if (isCancel(norm)) {
+            clear()
+            return ActionTurn(appContext.getString(R.string.voice_dismissed))
+        }
+        selectCandidate(current.candidates, text, DocumentEntity::title)?.let {
+            return readDocument(it)
+        }
+        return ActionTurn(docChoiceQuestion(current.candidates))
+    }
+
+    private fun followUpCompleteChoice(current: PendingCompleteChoice, norm: String, text: String): ActionTurn {
+        if (isCancel(norm)) {
+            clear()
+            return ActionTurn(appContext.getString(R.string.voice_keep))
+        }
+        selectCandidate(current.candidates, text, RoutineEntity::title)?.let {
+            return confirmComplete(it, current.heard)
+        }
+        return ActionTurn(completeChoiceQuestion(current.candidates))
+    }
+
+    private suspend fun followUpCompleteConfirm(current: PendingCompleteConfirm, norm: String): ActionTurn {
+        if (isCancel(norm)) {
+            clear()
+            return ActionTurn(appContext.getString(R.string.voice_keep))
+        }
+        if (isConfirm(norm)) return save(current)
+        return ActionTurn(completeConfirmQuestion(current.target))
     }
 
     /** Silent discard (screen exit). In-flight saves complete like manual. */
@@ -566,7 +643,9 @@ class VoiceActionHandler @Inject constructor(
         is PendingBillChoice -> billChoiceQuestion(draft.candidates)
         is PendingCancelChoice -> cancelChoiceQuestion(draft.candidates)
         is PendingArchiveChoice -> archiveChoiceQuestion(draft.candidates)
-        is PendingCancelConfirm, is PendingArchiveConfirm -> null
+        is PendingDocChoice -> docChoiceQuestion(draft.candidates)
+        is PendingCompleteChoice -> completeChoiceQuestion(draft.candidates)
+        is PendingCancelConfirm, is PendingArchiveConfirm, is PendingCompleteConfirm -> null
     }
 
     private fun readBack(draft: PendingAction): String = when (draft) {
@@ -594,6 +673,9 @@ class VoiceActionHandler @Inject constructor(
         is PendingCancelConfirm -> cancelConfirmQuestion(draft.target)
         is PendingArchiveChoice -> archiveChoiceQuestion(draft.candidates)
         is PendingArchiveConfirm -> archiveConfirmQuestion(draft.target)
+        is PendingDocChoice -> docChoiceQuestion(draft.candidates)
+        is PendingCompleteChoice -> completeChoiceQuestion(draft.candidates)
+        is PendingCompleteConfirm -> completeConfirmQuestion(draft.target)
     }
 
     // Milestone 2: briefing, bill Q&A, reminder create/cancel, bill archive
@@ -750,6 +832,97 @@ class VoiceActionHandler @Inject constructor(
         return ActionTurn(archiveConfirmQuestion(target))
     }
 
+    // Milestone 3: email briefing, document reading, capture guidance, routine completion
+
+    /**
+     * Spoken email briefing over the local inbox (demo-seeded until Gmail
+     * lands). Read-only: nothing is marked read. Sample data is announced.
+     */
+    private suspend fun speakEmailBriefing(): ActionTurn {
+        runCatching { emails.seedDemoInboxIfEmpty() }
+        val all = emails.observeAll().first()
+        if (all.isEmpty()) {
+            return ActionTurn(appContext.getString(R.string.voice_email_none))
+        }
+        val parts = mutableListOf(
+            if (all.size == 1) "Sample inbox: 1 email." else "Sample inbox: ${all.size} emails.",
+        )
+        all.take(BRIEFING_MAX).forEach {
+            val urgency = it.urgency.lowercase()
+            val urgent = if (urgency == "high" || urgency == "urgent") "${it.urgency} urgency from " else "From "
+            parts.add("$urgent${it.sender}: ${it.subject}.")
+        }
+        if (all.size > BRIEFING_MAX) parts.add("and ${all.size - BRIEFING_MAX} more.")
+        return ActionTurn(parts.joinToString(" "))
+    }
+
+    /**
+     * Reads a SAVED document's content aloud. With no saved match, guides
+     * into the capture flow instead of inventing content.
+     */
+    private suspend fun startReadDocument(text: String): ActionTurn {
+        val all = documents.observeAll().first()
+        if (all.isEmpty()) return guideDocCapture()
+        val matches = matchLabels(all, text, DocumentEntity::title)
+        return when {
+            matches.size == 1 -> readDocument(matches[0])
+            all.size == 1 -> readDocument(all[0])
+            else -> {
+                val candidates = matches.ifEmpty { all }.take(MAX_CHOICES)
+                synchronized(lock) { pending = PendingDocChoice(candidates, listOf(text)) }
+                ActionTurn(docChoiceQuestion(candidates))
+            }
+        }
+    }
+
+    private fun readDocument(doc: DocumentEntity): ActionTurn {
+        clear()
+        val summary = doc.summary.trim()
+        if (summary.isEmpty() && doc.keyPoints.isEmpty()) {
+            return ActionTurn(appContext.getString(R.string.voice_doc_no_content))
+        }
+        val parts = mutableListOf(appContext.getString(R.string.voice_doc_summary_of, doc.title))
+        if (summary.isNotEmpty()) parts.add(summary)
+        doc.keyPoints.take(3).forEach { parts.add(it) }
+        doc.deadline?.let { parts.add("Deadline ${prettyDate(it)}.") }
+        return ActionTurn(parts.joinToString(" "))
+    }
+
+    /** New documents/bills: spoken guidance + the camera in the matching mode. */
+    private fun guideDocCapture(): ActionTurn =
+        ActionTurn(
+            appContext.getString(R.string.voice_doc_capture),
+            navigateTo = Routes.camera(Routes.MODE_DOC),
+        )
+
+    private fun guideBillCapture(): ActionTurn =
+        ActionTurn(
+            appContext.getString(R.string.voice_bill_capture),
+            navigateTo = Routes.camera(Routes.MODE_BILL),
+        )
+
+    private suspend fun startCompleteRoutine(text: String): ActionTurn {
+        val all = routines.dueToday()
+        if (all.isEmpty()) {
+            return ActionTurn(appContext.getString(R.string.voice_routine_none_due))
+        }
+        val matches = matchLabels(all, text, RoutineEntity::title)
+        return when {
+            matches.size == 1 -> confirmComplete(matches[0], listOf(text))
+            all.size == 1 -> confirmComplete(all[0], listOf(text))
+            else -> {
+                val candidates = matches.ifEmpty { all }.take(MAX_CHOICES)
+                synchronized(lock) { pending = PendingCompleteChoice(candidates, listOf(text)) }
+                ActionTurn(completeChoiceQuestion(candidates))
+            }
+        }
+    }
+
+    private fun confirmComplete(target: RoutineEntity, heard: List<String>): ActionTurn {
+        synchronized(lock) { pending = PendingCompleteConfirm(target, heard) }
+        return ActionTurn(completeConfirmQuestion(target))
+    }
+
     // Record matching + spoken options
 
     /** Word-overlap match on provider/title, strongest first. Pure. */
@@ -801,6 +974,21 @@ class VoiceActionHandler @Inject constructor(
 
     private fun archiveChoiceQuestion(candidates: List<BillEntity>): String =
         billChoiceQuestion(candidates)
+
+    private fun docChoiceQuestion(candidates: List<DocumentEntity>): String =
+        appContext.getString(
+            R.string.voice_doc_which,
+            candidates.mapIndexed { i, doc -> "${i + 1}. ${doc.title}" }.joinToString("; "),
+        )
+
+    private fun completeChoiceQuestion(candidates: List<RoutineEntity>): String =
+        appContext.getString(
+            R.string.voice_routine_which,
+            candidates.mapIndexed { i, routine -> "${i + 1}. ${routine.title}" }.joinToString("; "),
+        )
+
+    private fun completeConfirmQuestion(target: RoutineEntity): String =
+        appContext.getString(R.string.voice_routine_confirm, target.title)
 
     private fun cancelConfirmQuestion(target: ReminderEntity): String =
         appContext.getString(
@@ -858,8 +1046,10 @@ class VoiceActionHandler @Inject constructor(
                 is PendingReminder -> saveReminder(current)
                 is PendingCancelConfirm -> executeCancel(current.target)
                 is PendingArchiveConfirm -> executeArchive(current.target)
+                is PendingCompleteConfirm -> executeComplete(current.target)
                 // Choice states never reach save (a bare "yes" re-asks).
-                is PendingBillChoice, is PendingCancelChoice, is PendingArchiveChoice ->
+                is PendingBillChoice, is PendingCancelChoice, is PendingArchiveChoice,
+                is PendingDocChoice, is PendingCompleteChoice ->
                     ActionTurn(appContext.getString(R.string.error_generic))
             }
         } finally {
@@ -972,6 +1162,41 @@ class VoiceActionHandler @Inject constructor(
         runCatching { bills.archive(target.id) }.getOrNull()
             ?: return ActionTurn(appContext.getString(R.string.voice_action_save_failed))
         return ActionTurn(appContext.getString(R.string.voice_archived), saved = true)
+    }
+
+    /**
+     * Same complete + reschedule-next the routine detail screen runs: stale
+     * reminders drop, the rolled-forward due time schedules. A scheduling
+     * failure is reported instead of silently missing the next reminder.
+     */
+    private suspend fun executeComplete(target: RoutineEntity): ActionTurn {
+        runCatching { routines.complete(target.id) }.getOrNull()
+            ?: return ActionTurn(appContext.getString(R.string.voice_action_save_failed))
+        val done = appContext.getString(R.string.voice_routine_done, target.title)
+        return try {
+            runCatching {
+                reminders.scheduledFor(ReminderEntity.KIND_ROUTINE, target.id).forEach {
+                    scheduler.cancel(it.id)
+                }
+            }
+            val updated = routines.getById(target.id)
+            val nextDue = updated?.nextDueMillis
+            if (nextDue != null && nextDue > System.currentTimeMillis()) {
+                val id = reminders.create(
+                    kind = ReminderEntity.KIND_ROUTINE,
+                    title = updated.title,
+                    triggerAtMillis = nextDue,
+                    referenceId = target.id,
+                )
+                scheduler.schedule(id)
+            }
+            ActionTurn(done, saved = true)
+        } catch (e: Exception) {
+            ActionTurn(
+                "$done ${appContext.getString(R.string.voice_action_schedule_warn)}",
+                saved = true,
+            )
+        }
     }
 
     // Input matching

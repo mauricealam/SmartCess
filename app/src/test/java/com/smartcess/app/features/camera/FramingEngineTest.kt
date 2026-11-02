@@ -13,7 +13,8 @@ class FramingEngineTest {
         offsetY: Float = 0f,
         skewDegrees: Float = 0f,
         meanLuminance: Float = 0.6f,
-    ) = FramingInput(hasText, coverage, offsetX, offsetY, skewDegrees, meanLuminance)
+        minEdgeMargin: Float = 1f,
+    ) = FramingInput(hasText, coverage, offsetX, offsetY, skewDegrees, meanLuminance, minEdgeMargin)
 
     @Test
     fun noText_whenNoBlocks() {
@@ -142,6 +143,38 @@ class FramingEngineTest {
         assertEquals(
             FramingCondition.READY,
             FramingEngine.evaluate(input(offsetX = 0.11f, offsetY = -0.11f)),
+        )
+    }
+
+    @Test
+    fun edgeCropped_whenTextTouchesFrameEdge() {
+        assertEquals(
+            FramingCondition.EDGE_CROPPED,
+            FramingEngine.evaluate(input(minEdgeMargin = 0.0f)),
+        )
+    }
+
+    @Test
+    fun priority_overflow_beatsEdgeMargin() {
+        assertEquals(
+            FramingCondition.TOO_CLOSE,
+            FramingEngine.evaluate(input(coverage = 0.97f, minEdgeMargin = 0.0f)),
+        )
+    }
+
+    @Test
+    fun priority_edgeMargin_beatsOffCenter() {
+        assertEquals(
+            FramingCondition.EDGE_CROPPED,
+            FramingEngine.evaluate(input(offsetX = 0.3f, minEdgeMargin = 0.01f)),
+        )
+    }
+
+    @Test
+    fun ready_whenMarginClear() {
+        assertEquals(
+            FramingCondition.READY,
+            FramingEngine.evaluate(input(minEdgeMargin = 0.2f)),
         )
     }
 }

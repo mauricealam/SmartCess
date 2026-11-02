@@ -54,7 +54,7 @@ fun SmartCessNavGraph(
                     }
                 },
                 onScanBill = {
-                    navController.navigate(Routes.CAMERA) {
+                    navController.navigate(Routes.camera(Routes.MODE_BILL)) {
                         popUpTo(Routes.ONBOARDING) { inclusive = true }
                     }
                 },
@@ -65,7 +65,7 @@ fun SmartCessNavGraph(
             HomeScreen(
                 onTalk = { navController.navigate(Routes.VOICE) },
                 onToday = { navController.navigate(Routes.BRIEFING) },
-                onScanBill = { navController.navigate(Routes.CAMERA) },
+                onScanBill = { navController.navigate(Routes.camera(Routes.MODE_BILL)) },
                 onBills = { navController.navigate(Routes.BILLS) },
                 onDocuments = { navController.navigate(Routes.DOCUMENTS) },
                 onAppointments = { navController.navigate(Routes.APPOINTMENTS) },
@@ -80,12 +80,20 @@ fun SmartCessNavGraph(
                 onNavigate = { route -> navController.navigate(route) },
             )
         }
-        composable(Routes.CAMERA) {
+        composable(
+            route = Routes.CAMERA_ROUTE,
+            arguments = listOf(navArgument(Routes.ARG_MODE) { defaultValue = Routes.MODE_BILL }),
+        ) {
             CameraScreen(
                 onBack = { navController.popBackStack() },
-                onCaptured = { billId ->
-                    navController.navigate(Routes.billResult(billId)) {
-                        popUpTo(Routes.CAMERA) { inclusive = true }
+                onCaptured = { result ->
+                    val route = if (result.isDocument) {
+                        Routes.docResult(result.id)
+                    } else {
+                        Routes.billResult(result.id)
+                    }
+                    navController.navigate(route) {
+                        popUpTo(Routes.CAMERA_ROUTE) { inclusive = true }
                     }
                 },
             )
@@ -93,7 +101,7 @@ fun SmartCessNavGraph(
         composable(Routes.BILLS) {
             BillsScreen(
                 onBill = { billId -> navController.navigate(Routes.billResult(billId)) },
-                onScan = { navController.navigate(Routes.CAMERA) },
+                onScan = { navController.navigate(Routes.camera(Routes.MODE_BILL)) },
                 onBack = { navController.popBackStack() },
             )
         }
@@ -104,7 +112,7 @@ fun SmartCessNavGraph(
             BillResultScreen(
                 billId = backStackEntry.arguments?.getLong(Routes.ARG_BILL_ID) ?: -1L,
                 onCompare = { billId -> navController.navigate(Routes.comparison(billId)) },
-                onRescan = { navController.navigate(Routes.CAMERA) },
+                onRescan = { navController.navigate(Routes.camera(Routes.MODE_BILL)) },
                 onBack = { navController.popBackStack() },
             )
         }
@@ -142,7 +150,7 @@ fun SmartCessNavGraph(
         composable(Routes.DOCUMENTS) {
             DocumentsScreen(
                 onDocument = { id -> navController.navigate(Routes.docResult(id)) },
-                onScan = { navController.navigate(Routes.CAMERA) },
+                onScan = { navController.navigate(Routes.camera(Routes.MODE_DOC)) },
                 onBack = { navController.popBackStack() },
             )
         }
