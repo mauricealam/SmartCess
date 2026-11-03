@@ -370,6 +370,9 @@ class CameraViewModel @Inject constructor(
         if (state.phase == CameraPhase.CAPTURING || state.phase == CameraPhase.PROCESSING) return false
         stopVoiceCapture()
         _uiState.update { it.copy(phase = CameraPhase.CAPTURING, errorRes = null, voiceCapture = false) }
+        // Instant beep + vibration: the command registered, hold still.
+        // Words follow once the image is secured (see extractAndSave).
+        cues.recordingStarted()
         val outputDir = File(context.cacheDir, captureDir()).apply { mkdirs() }
         val rawFile = File(outputDir, "${captureMode}_raw_${System.currentTimeMillis()}.jpg")
         val options = ImageCapture.OutputFileOptions.Builder(rawFile).build()
@@ -648,7 +651,8 @@ class CameraViewModel @Inject constructor(
 
     private fun extractAndSave(rawFile: File) {
         _uiState.update { it.copy(phase = CameraPhase.PROCESSING) }
-        announce(if (isDocumentMode) R.string.camera_processing_doc else R.string.camera_processing)
+        // Image secured: the user can move the phone; extraction runs on the file.
+        announce(if (isDocumentMode) R.string.camera_captured_doc else R.string.camera_captured_bill)
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 var outFile: File? = null

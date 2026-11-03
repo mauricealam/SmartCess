@@ -61,6 +61,8 @@
     <string name="camera_title_bill" translatable="true">Scan bill</string>
     <string name="camera_title_doc" translatable="true">Scan document</string>
     <string name="camera_processing_doc" translatable="true">Processing your document.</string>
+    <string name="camera_captured_bill" translatable="true">Captured. You can move your phone. Processing your bill.</string>
+    <string name="camera_captured_doc" translatable="true">Captured. You can move your phone. Processing your document.</string>
     <string name="camera_review_title" translatable="true">Review before saving</string>
     <string name="camera_review_save" translatable="true">Save</string>
     <string name="camera_review_discard" translatable="true">Discard and retake</string>
