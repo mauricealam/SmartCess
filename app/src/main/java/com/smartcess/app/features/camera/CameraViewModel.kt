@@ -17,6 +17,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.smartcess.app.R
+import com.smartcess.app.ui.format.SmartCessFormat
 import com.smartcess.app.core.ai.AiException
 import com.smartcess.app.core.ai.BillExtraction
 import com.smartcess.app.core.ai.ContentSafety
@@ -773,7 +774,8 @@ class CameraViewModel @Inject constructor(
                 R.string.camera_review_bill,
                 bill.provider.ifBlank { context.getString(R.string.bill_unknown_provider) },
                 billAmountText(bill),
-                bill.due_date.ifBlank { context.getString(R.string.bill_no_due_date) },
+                if (bill.due_date.isBlank()) context.getString(R.string.bill_no_due_date)
+                else SmartCessFormat.spokenDate(bill.due_date),
             )
             doc != null -> context.getString(
                 R.string.camera_review_doc,

@@ -24,4 +24,15 @@ class FormattersTest {
         val formatted = SmartCessFormat.isoDate("2026-11-20", Locale.US)
         assertTrue(formatted.contains("2026"))
     }
+
+    @Test
+    fun spokenDate_validInput_dayMonthYear() {
+        assertEquals("31 December 2026", SmartCessFormat.spokenDate("2026-12-31"))
+    }
+
+    @Test
+    fun spokenDate_invalidInput_returnsInput() {
+        assertEquals("31/12/2026", SmartCessFormat.spokenDate("31/12/2026"))
+        assertEquals("", SmartCessFormat.spokenDate(""))
+    }
 }

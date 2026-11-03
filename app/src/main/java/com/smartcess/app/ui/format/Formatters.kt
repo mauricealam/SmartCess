@@ -22,6 +22,15 @@ object SmartCessFormat {
         return date.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale))
     }
 
+    /**
+     * Spoken date ("31 December 2026"). US English like Talk's speech so the
+     * TTS voice pronounces month names reliably; falls back to [iso].
+     */
+    fun spokenDate(iso: String): String {
+        val date = runCatching { LocalDate.parse(iso) }.getOrNull() ?: return iso
+        return date.format(DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.US))
+    }
+
     fun instantDate(millis: Long, locale: Locale = Locale.getDefault()): String {
         val date = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
         return date.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale))
