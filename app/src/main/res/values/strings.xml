@@ -257,6 +257,7 @@
     <string name="email_empty" translatable="true">Your demo inbox is empty.</string>
     <string name="email_demo_note" translatable="true">Demo inbox on this device. Real Gmail and Outlook support is coming later.</string>
     <string name="email_from" translatable="true">From %1$s</string>
+    <string name="email_received" translatable="true">Received %1$s</string>
     <string name="email_deadline" translatable="true">Deadline: %1$s</string>
     <string name="email_briefing_label" translatable="true">Briefing</string>
     <string name="email_mark_read" translatable="true">Mark as read</string>

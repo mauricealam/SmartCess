@@ -1,13 +1,11 @@
 package com.smartcess.app.ui.components
 
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.smartcess.app.R
 
 /** Localized label for a spec urgency (low|normal|high|urgent). */
@@ -19,7 +17,10 @@ fun urgencyLabel(urgency: String): String = when (urgency.lowercase()) {
     else -> stringResource(R.string.urgency_normal)
 }
 
-/** Urgency chip with words (never color-only). Maps spec urgencies to labels. */
+/**
+ * Urgency chip with words (never color-only). Maps spec urgencies to labels.
+ * Display-only (no-op click), so no 48dp touch target: a real chip height.
+ */
 @Composable
 fun SmartCessUrgencyChip(
     urgency: String,
@@ -29,11 +30,14 @@ fun SmartCessUrgencyChip(
     AssistChip(
         onClick = {},
         label = { Text(label, style = MaterialTheme.typography.labelSmall) },
-        modifier = modifier.heightIn(min = 48.dp),
+        modifier = modifier,
     )
 }
 
-/** Generic status chip (overdue, due soon, today, offline, needs review). */
+/**
+ * Generic status chip (overdue, due soon, today, offline, needs review).
+ * Display-only (no-op click), so no 48dp touch target: a real chip height.
+ */
 @Composable
 fun SmartCessStatusChip(
     text: String,
@@ -42,6 +46,6 @@ fun SmartCessStatusChip(
     AssistChip(
         onClick = {},
         label = { Text(text, style = MaterialTheme.typography.labelSmall) },
-        modifier = modifier.heightIn(min = 48.dp),
+        modifier = modifier,
     )
 }

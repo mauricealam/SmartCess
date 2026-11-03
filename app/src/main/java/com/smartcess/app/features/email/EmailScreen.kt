@@ -2,6 +2,7 @@ package com.smartcess.app.features.email
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -16,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -138,6 +140,14 @@ private fun EmailCard(
             text = stringResource(R.string.email_from, email.sender),
             style = MaterialTheme.typography.bodyMedium,
         )
+        Text(
+            text = stringResource(
+                R.string.email_received,
+                SmartCessFormat.instantDate(email.receivedAt),
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Text(text = email.body, style = MaterialTheme.typography.bodyLarge)
         email.briefingNote?.let {
             Text(text = it, style = MaterialTheme.typography.bodyLarge)
         }
@@ -153,17 +163,23 @@ private fun EmailCard(
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
-        SmartCessUrgencyChip(urgency = email.urgency)
-        if (email.isRead) {
-            Text(
-                text = stringResource(R.string.email_is_read),
-                style = MaterialTheme.typography.labelSmall,
-            )
-        } else {
-            SmartCessTextAction(
-                text = stringResource(R.string.email_mark_read),
-                onClick = onMarkRead,
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SmartCessUrgencyChip(urgency = email.urgency)
+            if (email.isRead) {
+                Text(
+                    text = stringResource(R.string.email_is_read),
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            } else {
+                SmartCessTextAction(
+                    text = stringResource(R.string.email_mark_read),
+                    onClick = onMarkRead,
+                )
+            }
         }
         SmartCessSecondaryButton(
             text = stringResource(R.string.action_listen),
