@@ -101,6 +101,8 @@ data class CameraUiState(
      * Cleared on verdict and session end; never set while framing.
      */
     val lastHeard: String? = null,
+    /** Rescan warning awaiting a second explicit Save. Null when no duplicate. */
+    val duplicateWarning: String? = null,
     /** Diagnostic session: framing guidance runs, capture execution is disabled. */
     val demoNoCapture: Boolean = false,
     /** Temporary guidance-test diagnostics; null in normal sessions. */
@@ -233,6 +235,10 @@ class CameraViewModel @Inject constructor(
     private var docDraft: DocumentSummary? = null
     private var draftImagePath: String? = null
     private var draftOffline: Boolean = false
+    /** Duplicate warning shown for the current review: next Save commits. */
+    private var duplicateWarned: Boolean = false
+    /** Sync single-flight guard: the save body now suspends before clearing. */
+    private var confirmInFlight: Boolean = false
 
     init {
         viewModelScope.launch {
@@ -677,8 +683,12 @@ class CameraViewModel @Inject constructor(
         gate.stop()
         framingStartMs = 0L
         firstReadyLogged = false
+        duplicateWarned = false
         _uiState.update {
-            it.copy(phase = CameraPhase.FRAMING, errorRes = null, isOffline = false, reviewBody = null)
+            it.copy(
+                phase = CameraPhase.FRAMING, errorRes = null, isOffline = false,
+                reviewBody = null, duplicateWarning = null,
+            )
         }
     }
 
@@ -784,8 +794,12 @@ class CameraViewModel @Inject constructor(
             )
             else -> return
         }
+        duplicateWarned = false
         _uiState.update {
-            it.copy(phase = CameraPhase.REVIEW, reviewBody = body, isOffline = offline)
+            it.copy(
+                phase = CameraPhase.REVIEW, reviewBody = body, isOffline = offline,
+                duplicateWarning = null,
+            )
         }
         analytics.log(AnalyticsEvent.BILL_SCAN_COMPLETE, mapOf("saved" to "review"))
         presentReview(body, signInRequired)
@@ -822,25 +836,79 @@ class CameraViewModel @Inject constructor(
         val imagePath = draftImagePath
         val offline = draftOffline
         if (_uiState.value.phase != CameraPhase.REVIEW || (bill == null && doc == null)) return
+        if (confirmInFlight) return
+        confirmInFlight = true
         stopReviewListening()
-        clearDrafts()
         viewModelScope.launch {
+            try {
+                confirmSaveBody(bill, doc, imagePath, offline)
+            } finally {
+                // Post-completion calls are still blocked by the phase/draft
+                // guards; the warning path returns early so Save-again works.
+                confirmInFlight = false
+            }
+        }
+    }
+
+    private suspend fun confirmSaveBody(
+        bill: BillExtraction?,
+        doc: DocumentSummary?,
+        imagePath: String?,
+        offline: Boolean,
+    ) {
             val outcome = if (bill != null) {
                 val entity = toBillEntity(bill, imagePath)
+                if (!duplicateWarned) {
+                    val dupe = runCatching {
+                        bills.findPossibleDuplicate(entity.amount, entity.dueDate)
+                    }.getOrNull()
+                    if (dupe != null) {
+                        duplicateWarned = true
+                        warnDuplicate(dupe)
+                        return
+                    }
+                }
+                duplicateWarned = false
+                // Drafts clear only on a real save attempt: the warning path
+                // above must leave them intact for the second confirmation.
+                clearDrafts()
                 if (offline) bills.saveDraft(entity) else bills.save(entity)
             } else {
+                clearDrafts()
                 documents.save(toDocumentEntity(doc!!, imagePath))
             }
             val savedId = outcome.savedId
             if (outcome.validation.hasErrors || savedId == null) {
                 fail(R.string.error_extraction_failed, speak = true)
-                return@launch
+                return
             }
             analytics.log(AnalyticsEvent.BILL_SCAN_COMPLETE, mapOf("saved" to "true"))
             announce(R.string.camera_review_saved)
             _captured.emit(CaptureResult(savedId, doc != null))
-            _uiState.update { it.copy(phase = CameraPhase.FRAMING, reviewBody = null) }
+            _uiState.update { it.copy(phase = CameraPhase.FRAMING, reviewBody = null, duplicateWarning = null) }
+    }
+
+    /**
+     * Shows + speaks the rescan warning and re-arms review listening so the
+     * user can say save again (commit) or delete (discard). Persists nothing.
+     */
+    private fun warnDuplicate(dupe: BillEntity) {
+        val amount = SmartCessFormat.money(dupe.amount, dupe.currency)
+        _uiState.update {
+            it.copy(
+                duplicateWarning = context.getString(
+                    R.string.camera_review_duplicate_banner,
+                    dupe.provider, amount, SmartCessFormat.isoDate(dupe.dueDate),
+                ),
+            )
         }
+        gate.speak(
+            context.getString(
+                R.string.camera_review_duplicate_speak,
+                dupe.provider, amount, SmartCessFormat.spokenDate(dupe.dueDate),
+            ),
+        )
+        startReviewListening()
     }
 
     /** Discards the unconfirmed draft and returns to framing. Persists nothing. */
@@ -860,7 +928,8 @@ class CameraViewModel @Inject constructor(
         stopReviewListening()
         runCatching { draftImagePath?.let { File(it).delete() } }
         clearDrafts()
-        _uiState.update { it.copy(reviewBody = null) }
+        duplicateWarned = false
+        _uiState.update { it.copy(reviewBody = null, duplicateWarning = null) }
         gate.speak(context.getString(R.string.camera_review_deleted)) {
             _reviewCancelled.tryEmit(Unit)
         }
@@ -975,7 +1044,13 @@ class CameraViewModel @Inject constructor(
             doc != null -> "doc:%s".format(doc.title)
             else -> return
         }
-        _uiState.update { it.copy(phase = CameraPhase.REVIEW, reviewBody = body, isOffline = offline) }
+        duplicateWarned = false
+        _uiState.update {
+            it.copy(
+                phase = CameraPhase.REVIEW, reviewBody = body, isOffline = offline,
+                duplicateWarning = null,
+            )
+        }
     }
 
     companion object {

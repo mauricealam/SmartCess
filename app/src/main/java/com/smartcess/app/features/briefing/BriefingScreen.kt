@@ -159,7 +159,7 @@ fun BriefingScreen(
             }
         }
         BriefingSection(
-            title = stringResource(R.string.briefing_section_email),
+            title = stringResource(R.string.briefing_section_email_sample),
             count = state.urgentEmails.size,
         ) {
             state.urgentEmails.forEach { email ->
@@ -189,7 +189,11 @@ fun BriefingScreen(
         ) {
             state.routines.forEach { routine ->
                 SmartCessListItem(
-                    title = stringResource(R.string.routine_item_desc, routine.title, routine.scheduleRule),
+                    title = stringResource(
+                        R.string.routine_item_desc,
+                        routine.title,
+                        SmartCessFormat.routineSchedule(routine.scheduleRule),
+                    ),
                     onClick = { onRoutine(routine.id) },
                 )
             }
@@ -234,7 +238,7 @@ private fun buildSpokenBriefing(
         parts.add(overdueTemplate.format(it.provider, SmartCessFormat.money(it.amount, it.currency)))
     }
     state.billsDueSoon.forEach {
-        parts.add(dueTemplate.format(it.provider, SmartCessFormat.isoDate(it.dueDate)))
+        parts.add(dueTemplate.format(it.provider, SmartCessFormat.spokenDate(it.dueDate)))
     }
     state.appointments.forEach { parts.add(it.title) }
     state.urgentEmails.forEach { parts.add(emailTemplate.format(it.subject, it.sender)) }

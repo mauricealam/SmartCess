@@ -28,4 +28,11 @@ class BriefingPromptTest {
         assertTrue(instruction.contains("actual local time"))
         assertTrue(instruction.contains("never say morning at night"))
     }
+
+    @Test
+    fun briefingPrompt_requiresGrammarAndNoRepetition() {
+        val instruction = SparkPrompts.briefing("now=Sunday, 2026-11-01 21:30,overdue=1").instruction
+        assertTrue(instruction.contains("start by reviewing"))
+        assertTrue(instruction.contains("State each fact once"))
+    }
 }

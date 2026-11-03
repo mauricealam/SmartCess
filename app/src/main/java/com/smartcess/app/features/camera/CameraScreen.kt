@@ -245,6 +245,7 @@ private fun CameraPreviewContent(
                 ReviewBlock(
                     body = reviewBody,
                     listening = uiState.reviewListening,
+                    warning = uiState.duplicateWarning,
                     onSave = viewModel::confirmSave,
                     onDiscard = viewModel::discardDraft,
                 )
@@ -333,6 +334,7 @@ private fun CameraPreviewContent(
 private fun ReviewBlock(
     body: String,
     listening: Boolean,
+    warning: String?,
     onSave: () -> Unit,
     onDiscard: () -> Unit,
 ) {
@@ -353,6 +355,7 @@ private fun ReviewBlock(
             modifier = Modifier.semantics { heading() },
         )
         Text(text = body, style = MaterialTheme.typography.bodyLarge)
+        warning?.let { Banner(text = it) }
         if (listening) {
             Text(
                 text = stringResource(R.string.camera_review_listening),

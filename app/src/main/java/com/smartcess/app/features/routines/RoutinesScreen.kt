@@ -23,6 +23,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.smartcess.app.R
+import com.smartcess.app.ui.format.SmartCessFormat
 import com.smartcess.app.data.local.entity.RoutineEntity
 import com.smartcess.app.ui.components.BannerKind
 import com.smartcess.app.ui.components.SmartCessBanner
@@ -89,11 +90,11 @@ fun RoutinesScreen(
                     val missed = routine.isMissed()
                     SmartCessListItem(
                         title = routine.title,
-                        subtitle = routine.scheduleRule,
+                        subtitle = SmartCessFormat.routineSchedule(routine.scheduleRule),
                         contentDescription = stringResource(
                             R.string.routine_item_desc,
                             routine.title,
-                            routine.scheduleRule,
+                            SmartCessFormat.routineSchedule(routine.scheduleRule),
                         ) + if (missed) ". " + stringResource(R.string.routine_missed) else "",
                         onClick = { onRoutine(routine.id) },
                         trailing = {

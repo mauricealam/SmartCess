@@ -15,6 +15,7 @@ import com.smartcess.app.core.voice.PttAudioSpec
 import com.smartcess.app.core.voice.RecordedAudio
 import com.smartcess.app.core.voice.TalkCues
 import com.smartcess.app.core.voice.TalkRecorder
+import com.smartcess.app.data.local.entity.BillEntity
 import com.smartcess.app.data.local.entity.UserPreferencesEntity
 import com.smartcess.app.data.repository.BillRepository
 import com.smartcess.app.data.repository.DocumentRepository
@@ -145,6 +146,7 @@ class CameraViewModelTest {
         fakeSpeaker = FakeSpeaker()
         gate = CameraSpeechGate(fakeSpeaker).also { it.clock = { clockNow } }
         coEvery { prefs.get() } returns UserPreferencesEntity()
+        coEvery { bills.findPossibleDuplicate(any(), any()) } returns null
     }
 
     @After
@@ -280,6 +282,90 @@ class CameraViewModelTest {
         coVerify(exactly = 1) { bills.saveDraft(any()) }
         coVerify(exactly = 0) { bills.save(any()) }
         coVerify(exactly = 0) { documents.save(any()) }
+    }
+
+    // Duplicate rescan guard
+
+    /** Already saved under the registered company name; the rescan reads the trading name. */
+    private fun savedSescoBill() = BillEntity(
+        id = 3, provider = "SYARIKAT SESCO BERHAD", amount = 184.1,
+        currency = "MYR", dueDate = "2026-09-03", confidence = 0.9,
+        summary = "Electricity bill.",
+    )
+
+    private fun rescanSescoBill() = BillExtraction(
+        provider = "Sarawak Energy", amount = 184.1, currency = "MYR",
+        due_date = "2026-09-03", confidence = 0.9,
+    )
+
+    @Test
+    fun confirmSave_possibleDuplicate_warnsAndSavesNothing() = runTest {
+        coEvery { bills.save(any()) } returns ok(7L)
+        coEvery { bills.findPossibleDuplicate(any(), any()) } returns savedSescoBill()
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        // Deny the mic so the warning path stays loop-free in this test.
+        vm.micPermissionCheck = { false }
+        vm.seedReviewForTest(bill = rescanSescoBill())
+        advanceUntilIdle()
+        vm.confirmSave()
+        advanceUntilIdle()
+        coVerify(exactly = 0) { bills.save(any()) }
+        coVerify(exactly = 1) { bills.findPossibleDuplicate(184.1, "2026-09-03") }
+        assertEquals(CameraPhase.REVIEW, vm.uiState.value.phase)
+        assertNotNull(vm.uiState.value.duplicateWarning)
+        assertFalse(vm.uiState.value.reviewListening)
+    }
+
+    @Test
+    fun confirmSave_secondSaveAfterWarning_commitsOnce() = runTest {
+        coEvery { bills.save(any()) } returns ok(7L)
+        coEvery { bills.findPossibleDuplicate(any(), any()) } returns savedSescoBill()
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        vm.micPermissionCheck = { false }
+        vm.seedReviewForTest(bill = rescanSescoBill())
+        advanceUntilIdle()
+        vm.confirmSave()
+        advanceUntilIdle()
+        vm.confirmSave()
+        advanceUntilIdle()
+        coVerify(exactly = 1) { bills.save(any()) }
+        coVerify(exactly = 1) { bills.findPossibleDuplicate(any(), any()) }
+        assertEquals(CameraPhase.FRAMING, vm.uiState.value.phase)
+        assertNull(vm.uiState.value.duplicateWarning)
+    }
+
+    @Test
+    fun discardDraft_afterDuplicateWarning_savesNothingAndClears() = runTest {
+        coEvery { bills.findPossibleDuplicate(any(), any()) } returns savedSescoBill()
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        vm.micPermissionCheck = { false }
+        vm.seedReviewForTest(bill = rescanSescoBill())
+        advanceUntilIdle()
+        vm.confirmSave()
+        advanceUntilIdle()
+        assertNotNull(vm.uiState.value.duplicateWarning)
+        vm.discardDraft()
+        advanceUntilIdle()
+        coVerify(exactly = 0) { bills.save(any()) }
+        coVerify(exactly = 0) { bills.saveDraft(any()) }
+        assertEquals(CameraPhase.FRAMING, vm.uiState.value.phase)
+        assertNull(vm.uiState.value.duplicateWarning)
+    }
+
+    @Test
+    fun confirmSave_docMode_neverChecksBillDuplicates() = runTest {
+        coEvery { documents.save(any()) } returns ok(9L)
+        val vm = viewModel(Routes.MODE_DOC)
+        advanceUntilIdle()
+        vm.seedReviewForTest(doc = DocumentSummary(title = "Lease", summary = "Twelve months."))
+        advanceUntilIdle()
+        vm.confirmSave()
+        advanceUntilIdle()
+        coVerify(exactly = 1) { documents.save(any()) }
+        coVerify(exactly = 0) { bills.findPossibleDuplicate(any(), any()) }
     }
 
     @Test

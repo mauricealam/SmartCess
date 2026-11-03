@@ -28,6 +28,14 @@ interface BillDao {
     @Query("SELECT * FROM bills WHERE provider = :provider AND archived = 0 AND id != :excludeId ORDER BY dueDate DESC LIMIT 1")
     suspend fun previousFor(provider: String, excludeId: Long): BillEntity?
 
+    /**
+     * Rescan guard: the same physical bill can extract under different
+     * provider names ("Sarawak Energy" vs "SYARIKAT SESCO BERHAD"), so the
+     * match key is amount + due date, never the provider string.
+     */
+    @Query("SELECT * FROM bills WHERE archived = 0 AND amount = :amount AND dueDate = :dueDate ORDER BY id DESC LIMIT 1")
+    suspend fun findPossibleDuplicate(amount: Double, dueDate: String): BillEntity?
+
     @Query("UPDATE bills SET archived = 1, updatedAt = :now WHERE id = :id")
     suspend fun archive(id: Long, now: Long = System.currentTimeMillis())
 

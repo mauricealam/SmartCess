@@ -80,7 +80,7 @@ fun RoutineDetailScreen(
             Text(text = routine.title, style = MaterialTheme.typography.titleMedium)
             SmartCessListItem(
                 title = routineKindLabel(routine.kind),
-                subtitle = routine.scheduleRule,
+                subtitle = SmartCessFormat.routineSchedule(routine.scheduleRule),
             )
             Text(
                 text = stringResource(R.string.routine_streak, routine.streakCount),

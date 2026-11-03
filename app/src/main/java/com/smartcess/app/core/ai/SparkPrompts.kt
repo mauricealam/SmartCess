@@ -131,6 +131,8 @@ urgency, suggested_action, reference_id}], briefing (spoken, at most 3 urgent it
 Order: overdue bills, bills due within 7 days, appointments today/tomorrow,
 urgent email, document deadlines, routines due.
 Greet for the actual local time in "now" (good morning/afternoon/evening, night after 10pm) — never say morning at night.
+Write grammatical plain sentences ("start by reviewing", never "start with reviewing").
+State each fact once; never repeat the same item in two sentences.
 $GLOBAL_RULES""",
         input = "Today: $todayData",
     )

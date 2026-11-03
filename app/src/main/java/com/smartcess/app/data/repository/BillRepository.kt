@@ -25,6 +25,10 @@ class BillRepository @Inject constructor(private val dao: BillDao) {
     suspend fun previousFor(provider: String, excludeId: Long): BillEntity? =
         dao.previousFor(provider, excludeId)
 
+    /** Rescan guard for camera review: same amount + due date already saved. */
+    suspend fun findPossibleDuplicate(amount: Double, dueDate: String): BillEntity? =
+        dao.findPossibleDuplicate(amount, dueDate)
+
     /** Validates then saves. Returns the row id plus issues; callers must surface issues. */
     suspend fun save(bill: BillEntity): SaveOutcome {
         val result = validateBill(
