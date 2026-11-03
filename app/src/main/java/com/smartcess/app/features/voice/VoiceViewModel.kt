@@ -487,6 +487,7 @@ class VoiceViewModel @Inject constructor(
         fun routeForIntent(intent: String): String? = when (intent) {
             "daily_briefing" -> Routes.BRIEFING
             "scan_bill" -> Routes.CAMERA
+            "scan_document" -> Routes.CAMERA
             "read_document" -> Routes.DOCUMENTS
             "email_briefing" -> Routes.EMAIL
             "ask_bill_question" -> Routes.BILLS
@@ -503,6 +504,7 @@ class VoiceViewModel @Inject constructor(
         fun confirmationRes(intent: String): Int = when (intent) {
             "daily_briefing" -> R.string.talk_open_briefing
             "scan_bill" -> R.string.talk_open_camera
+            "scan_document" -> R.string.talk_open_camera
             "read_document" -> R.string.talk_open_documents
             "email_briefing" -> R.string.talk_open_email
             "ask_bill_question", "create_reminder", "cancel_reminder", "archive_bill" -> R.string.talk_open_bills

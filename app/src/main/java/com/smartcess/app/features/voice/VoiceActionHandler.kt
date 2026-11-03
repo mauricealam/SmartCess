@@ -42,8 +42,9 @@ import java.util.concurrent.TimeoutException
 
 /**
  * Intents the voice executor completes end-to-end (Milestones 1-3).
- * COMPLETE_ROUTINE is fast-route-only: the AI classifier vocabulary has no
- * completion intent, so only crisp "mark X done" commands trigger it.
+ * COMPLETE_ROUTINE and SCAN_AMBIGUOUS are fast-route-only: the AI
+ * classifier vocabulary has neither, so only crisp local patterns
+ * trigger them ("mark X done", ambiguous "scan …").
  */
 object VoiceActionIntents {
     const val ADD_APPOINTMENT = "add_appointment"
@@ -56,12 +57,15 @@ object VoiceActionIntents {
     const val EMAIL_BRIEFING = "email_briefing"
     const val READ_DOCUMENT = "read_document"
     const val SCAN_BILL = "scan_bill"
+    const val SCAN_DOCUMENT = "scan_document"
+    const val SCAN_AMBIGUOUS = "scan_ambiguous"
     const val COMPLETE_ROUTINE = "complete_routine"
     const val GUIDE_TEST = "guide_test"
     private val ALL = setOf(
         ADD_APPOINTMENT, ADD_ROUTINE, DAILY_BRIEFING, ASK_BILL_QUESTION,
         CREATE_REMINDER, CANCEL_REMINDER, ARCHIVE_BILL, EMAIL_BRIEFING,
-        READ_DOCUMENT, SCAN_BILL, COMPLETE_ROUTINE, GUIDE_TEST,
+        READ_DOCUMENT, SCAN_BILL, SCAN_DOCUMENT, SCAN_AMBIGUOUS,
+        COMPLETE_ROUTINE, GUIDE_TEST,
     )
     fun isAction(intent: String): Boolean = intent in ALL
 }
@@ -178,6 +182,12 @@ private data class PendingCompleteConfirm(
     override val taskTurns: List<String> = emptyList(),
 ) : PendingAction
 
+/** Ambiguous scan request awaiting a bill-or-document pick. Navigates only. */
+private data class PendingScanChoice(
+    override val heard: List<String>,
+    override val taskTurns: List<String> = emptyList(),
+) : PendingAction
+
 /**
  * Executes voice actions end-to-end: extract details from speech, ask for
  * missing slots across follow-up turns, read back the exact proposal, and
@@ -243,6 +253,8 @@ class VoiceActionHandler @Inject constructor(
             VoiceActionIntents.EMAIL_BRIEFING -> speakEmailBriefing()
             VoiceActionIntents.READ_DOCUMENT -> startReadDocument(text)
             VoiceActionIntents.SCAN_BILL -> guideBillCapture()
+            VoiceActionIntents.SCAN_DOCUMENT -> guideDocCapture()
+            VoiceActionIntents.SCAN_AMBIGUOUS -> askScanChoice(text)
             VoiceActionIntents.COMPLETE_ROUTINE -> startCompleteRoutine(text)
             VoiceActionIntents.GUIDE_TEST -> guideTest()
             else -> ActionTurn(appContext.getString(R.string.error_generic))
@@ -269,6 +281,7 @@ class VoiceActionHandler @Inject constructor(
             is PendingArchiveChoice -> followUpArchiveChoice(current, norm, text)
             is PendingArchiveConfirm -> followUpArchiveConfirm(current, norm)
             is PendingDocChoice -> followUpDocChoice(current, norm, text)
+            is PendingScanChoice -> followUpScanChoice(norm)
             is PendingCompleteChoice -> followUpCompleteChoice(current, norm, text)
             is PendingCompleteConfirm -> followUpCompleteConfirm(current, norm)
         }
@@ -643,6 +656,7 @@ class VoiceActionHandler @Inject constructor(
         }
         // Choice states re-ask by number/name; confirms are complete.
         is PendingBillChoice -> billChoiceQuestion(draft.candidates)
+        is PendingScanChoice -> appContext.getString(R.string.voice_scan_choice)
         is PendingCancelChoice -> cancelChoiceQuestion(draft.candidates)
         is PendingArchiveChoice -> archiveChoiceQuestion(draft.candidates)
         is PendingDocChoice -> docChoiceQuestion(draft.candidates)
@@ -678,6 +692,7 @@ class VoiceActionHandler @Inject constructor(
         is PendingDocChoice -> docChoiceQuestion(draft.candidates)
         is PendingCompleteChoice -> completeChoiceQuestion(draft.candidates)
         is PendingCompleteConfirm -> completeConfirmQuestion(draft.target)
+        is PendingScanChoice -> appContext.getString(R.string.voice_scan_choice)
     }
 
     // Milestone 2: briefing, bill Q&A, reminder create/cancel, bill archive
@@ -903,6 +918,34 @@ class VoiceActionHandler @Inject constructor(
             navigateTo = Routes.camera(Routes.MODE_BILL),
         )
 
+    /**
+     * Genuinely ambiguous scan ("scan this"): ask which scanner instead of
+     * guessing. The pick routes on the follow-up; a bare "yes" picks
+     * nothing and re-asks.
+     */
+    private fun askScanChoice(text: String): ActionTurn {
+        synchronized(lock) { pending = PendingScanChoice(heard = listOf(text)) }
+        return ActionTurn(appContext.getString(R.string.voice_scan_choice))
+    }
+
+    private fun followUpScanChoice(norm: String): ActionTurn {
+        if (isCancel(norm)) {
+            clear()
+            return ActionTurn(appContext.getString(R.string.voice_dismissed))
+        }
+        val bill = SCAN_BILL_WORDS.containsMatchIn(norm)
+        val doc = SCAN_DOC_WORDS.containsMatchIn(norm)
+        if (bill && !doc) {
+            clear()
+            return guideBillCapture()
+        }
+        if (doc && !bill) {
+            clear()
+            return guideDocCapture()
+        }
+        return ActionTurn(appContext.getString(R.string.voice_scan_choice))
+    }
+
     /** Diagnostic session: guidance runs, capture execution is disabled. */
     private fun guideTest(): ActionTurn =
         ActionTurn(
@@ -1058,7 +1101,7 @@ class VoiceActionHandler @Inject constructor(
                 is PendingCompleteConfirm -> executeComplete(current.target)
                 // Choice states never reach save (a bare "yes" re-asks).
                 is PendingBillChoice, is PendingCancelChoice, is PendingArchiveChoice,
-                is PendingDocChoice, is PendingCompleteChoice ->
+                is PendingDocChoice, is PendingCompleteChoice, is PendingScanChoice ->
                     ActionTurn(appContext.getString(R.string.error_generic))
             }
         } finally {
@@ -1265,6 +1308,14 @@ class VoiceActionHandler @Inject constructor(
             "GBP" to "pounds", "SGD" to "Singapore dollars", "JPY" to "yen",
             "CNY" to "yuan", "INR" to "rupees", "AUD" to "Australian dollars",
         )
+
+        /**
+         * Scanner pick words (mirrors the fast-path mention sets, minus the
+         * scan verb itself so "scan it" re-asks instead of routing doc).
+         */
+        private val SCAN_BILL_WORDS = Regex("\\bbills?\\b")
+        private val SCAN_DOC_WORDS =
+            Regex("\\b(documents?|docs?|papers?|letters?|forms?|files?|receipts?)\\b")
 
         /** Filler words ignored when matching providers/titles. */
         private val MATCH_STOPWORDS = setOf(

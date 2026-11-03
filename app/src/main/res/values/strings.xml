@@ -53,6 +53,11 @@
     <string name="framing_hold_straight_doc" translatable="true">Hold the phone straight over the page.</string>
     <string name="framing_unavailable_doc" translatable="true">Automatic framing is unavailable. Position the page in the frame and tap capture when ready.</string>
     <string name="framing_edge_cropped" translatable="true">Words reach the edge of the frame. Move the phone back slightly.</string>
+    <string name="framing_edge_left" translatable="true">Words reach the edge of the frame. Move the phone back slightly and to the left.</string>
+    <string name="framing_edge_right" translatable="true">Words reach the edge of the frame. Move the phone back slightly and to the right.</string>
+    <string name="framing_edge_up" translatable="true">Words reach the edge of the frame. Move the phone back slightly and up a little.</string>
+    <string name="framing_edge_down" translatable="true">Words reach the edge of the frame. Move the phone back slightly and down a little.</string>
+    <string name="framing_ready_demo" translatable="true">Ready. Framing looks good.</string>
     <string name="camera_title_bill" translatable="true">Scan bill</string>
     <string name="camera_title_doc" translatable="true">Scan document</string>
     <string name="camera_processing_doc" translatable="true">Processing your document.</string>
@@ -63,6 +68,8 @@
     <string name="camera_review_bill" translatable="true">Bill from %1$s, %2$s, due %3$s. Save it?</string>
     <string name="camera_review_doc" translatable="true">%1$s. %2$s Save it?</string>
     <string name="camera_demo_no_capture" translatable="true">Guidance test. Capture is disabled in this session.</string>
+    <string name="camera_demo_no_capture_bill" translatable="true">Guidance test. Bill scanner. Capture is disabled in this session.</string>
+    <string name="camera_demo_no_capture_doc" translatable="true">Guidance test. Document scanner. Capture is disabled in this session.</string>
     <string name="camera_not_ready" translatable="true">Not ready yet. %1$s</string>
     <string name="camera_review_listening" translatable="true">Listening: say yes to save, or no to discard.</string>
     <string name="voice_guide_test" translatable="true">Guidance test. Capture is disabled. Point the camera at a page and follow the spoken directions.</string>
@@ -424,8 +431,9 @@
     <string name="voice_doc_which" translatable="true">Which document? %1$s</string>
     <string name="voice_doc_no_content" translatable="true">This document has no readable summary yet.</string>
     <string name="voice_doc_summary_of" translatable="true">Here is the summary of %1$s.</string>
-    <string name="voice_doc_capture" translatable="true">I do not have that document saved. Opening the camera so you can scan it. Hold the page steady in front of the camera.</string>
+    <string name="voice_doc_capture" translatable="true">I do not have that document saved. Opening the document scanner so you can scan it. Hold the page steady in front of the camera.</string>
     <string name="voice_bill_capture" translatable="true">Opening the bill scanner. Hold the bill steady in front of the camera.</string>
+    <string name="voice_scan_choice" translatable="true">Should I open the bill scanner or the document scanner?</string>
     <string name="voice_routine_none_due" translatable="true">No routines are due.</string>
     <string name="voice_routine_which" translatable="true">Which routine? %1$s</string>
     <string name="voice_routine_confirm" translatable="true">Mark %1$s done? Say yes to confirm, or no to keep it.</string>

@@ -5,13 +5,23 @@ package com.smartcess.app.features.camera
  * thresholds are unit-testable on the JVM (spec: framing-threshold tests).
  *
  * Priority (spec: no-text > far/close > off-center > tilt > lighting):
- * NO_TEXT -> TOO_FAR / TOO_CLOSE -> EDGE_CROPPED -> OFF_* -> TILTED -> TOO_DARK -> READY.
+ * NO_TEXT -> TOO_FAR / TOO_CLOSE -> EDGE_* -> OFF_* -> TILTED -> TOO_DARK -> READY.
+ *
+ * EDGE_LEFT/RIGHT/UP/DOWN are compound states: detected text is near the
+ * image boundary AND off-center on the dominant axis, so one instruction
+ * carries both the back-off and the shift. Plain EDGE_CROPPED means the
+ * text is near an edge while centered. "Edge" always means detected text
+ * near the boundary — never proof about the physical page.
  */
 enum class FramingCondition {
     NO_TEXT,
     TOO_FAR,
     TOO_CLOSE,
     EDGE_CROPPED,
+    EDGE_LEFT,
+    EDGE_RIGHT,
+    EDGE_UP,
+    EDGE_DOWN,
     OFF_LEFT,
     OFF_RIGHT,
     OFF_UP,
@@ -94,19 +104,39 @@ object FramingEngine {
         if (!input.hasText) return FramingCondition.NO_TEXT
         if (input.coverage < MIN_COVERAGE) return FramingCondition.TOO_FAR
         if (input.coverage > MAX_COVERAGE) return FramingCondition.TOO_CLOSE
-        if (input.minEdgeMargin < MIN_EDGE_MARGIN) return FramingCondition.EDGE_CROPPED
-        val offX = kotlin.math.abs(input.offsetX) > CENTER_TOLERANCE
-        val offY = kotlin.math.abs(input.offsetY) > CENTER_TOLERANCE
-        if (offX || offY) {
-            // Fix the worse axis first so guidance stays one instruction at a time.
-            return if (kotlin.math.abs(input.offsetX) >= kotlin.math.abs(input.offsetY)) {
-                if (input.offsetX < 0) FramingCondition.OFF_LEFT else FramingCondition.OFF_RIGHT
-            } else {
-                if (input.offsetY < 0) FramingCondition.OFF_UP else FramingCondition.OFF_DOWN
-            }
-        }
+        if (input.minEdgeMargin < MIN_EDGE_MARGIN) return edgeCondition(input)
+        val off = offDirection(input)
+        if (off != null) return off
         if (input.skewDegrees > MAX_SKEW_DEGREES) return FramingCondition.TILTED
         if (input.meanLuminance < MIN_LUMINANCE) return FramingCondition.TOO_DARK
         return FramingCondition.READY
+    }
+
+    /**
+     * Edge proximity plus the dominant off-center axis (same axis rule as
+     * [offDirection]), so a close off-center frame reports both facts.
+     */
+    private fun edgeCondition(input: FramingInput): FramingCondition {
+        val offX = kotlin.math.abs(input.offsetX) > CENTER_TOLERANCE
+        val offY = kotlin.math.abs(input.offsetY) > CENTER_TOLERANCE
+        if (!offX && !offY) return FramingCondition.EDGE_CROPPED
+        return if (kotlin.math.abs(input.offsetX) >= kotlin.math.abs(input.offsetY)) {
+            if (input.offsetX < 0) FramingCondition.EDGE_LEFT else FramingCondition.EDGE_RIGHT
+        } else {
+            if (input.offsetY < 0) FramingCondition.EDGE_UP else FramingCondition.EDGE_DOWN
+        }
+    }
+
+    /** Dominant off-center direction, or null when inside tolerance. */
+    private fun offDirection(input: FramingInput): FramingCondition? {
+        val offX = kotlin.math.abs(input.offsetX) > CENTER_TOLERANCE
+        val offY = kotlin.math.abs(input.offsetY) > CENTER_TOLERANCE
+        if (!offX && !offY) return null
+        // Fix the worse axis first so guidance stays one instruction at a time.
+        return if (kotlin.math.abs(input.offsetX) >= kotlin.math.abs(input.offsetY)) {
+            if (input.offsetX < 0) FramingCondition.OFF_LEFT else FramingCondition.OFF_RIGHT
+        } else {
+            if (input.offsetY < 0) FramingCondition.OFF_UP else FramingCondition.OFF_DOWN
+        }
     }
 }

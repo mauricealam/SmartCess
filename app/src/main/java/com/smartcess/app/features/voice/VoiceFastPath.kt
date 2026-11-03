@@ -80,9 +80,16 @@ object VoiceFastPath {
         ) {
             return VoiceActionIntents.GUIDE_TEST
         }
-        // "scan this" captures (bill or paper land on the same camera flow).
-        if (has("\\bscan\\b")) return VoiceActionIntents.SCAN_BILL
         val mentionsDoc = has("\\b(documents?|docs?|papers?|letters?|forms?|files?|scans?|receipts?)\\b")
+        // Paper nouns WITHOUT the scan verb (which would self-match): scan
+        // routing is explicit — bill words -> bill scanner, document words
+        // -> document scanner, neither/both -> ask which scanner.
+        val mentionsPaper = has("\\b(documents?|docs?|papers?|letters?|forms?|files?|receipts?)\\b")
+        if (has("\\bscan\\b")) {
+            if (mentionsPaper && !mentionsBill) return VoiceActionIntents.SCAN_DOCUMENT
+            if (mentionsBill && !mentionsPaper) return VoiceActionIntents.SCAN_BILL
+            return VoiceActionIntents.SCAN_AMBIGUOUS
+        }
         if (
             ((has("\\bread\\b") || has("\\bopen\\b") || has("\\bshow\\b")) && mentionsDoc) ||
             (mentionsDoc && has("\\b(summary|summarize|summarise|what)\\b")) ||
@@ -90,6 +97,10 @@ object VoiceFastPath {
         ) {
             return VoiceActionIntents.READ_DOCUMENT
         }
+        // "Save my document" files a new scan. Never bare "save" (a pending
+        // review confirmation owns that via follow-up precedence), and never
+        // bill-side ("save on my bill" is money advice, not a scanner).
+        if (has("\\bsave\\b") && mentionsDoc && !mentionsBill) return VoiceActionIntents.SCAN_DOCUMENT
         if (
             has("\\b(emails?|inbox|mail)\\b") &&
             (has("\\b(brief|briefing|read|check|unread|new|summary)\\b") || has("\\bwhat\\b"))

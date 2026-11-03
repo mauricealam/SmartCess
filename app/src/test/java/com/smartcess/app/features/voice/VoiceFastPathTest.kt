@@ -59,8 +59,8 @@ class VoiceFastPathTest {
         assertEquals("read_document", VoiceFastPath.route("summarize my document"))
         assertEquals("read_document", VoiceFastPath.route("what does my lease say"))
         assertEquals("read_document", VoiceFastPath.route("show my papers"))
-        assertEquals("scan_bill", VoiceFastPath.route("scan this"))
         assertEquals("scan_bill", VoiceFastPath.route("scan my bill"))
+        assertEquals("scan_bill", VoiceFastPath.route("scan this bill"))
         assertEquals("guide_test", VoiceFastPath.route("guidance test"))
         assertEquals("guide_test", VoiceFastPath.route("test the camera"))
         assertEquals("guide_test", VoiceFastPath.route("camera test"))
@@ -77,6 +77,28 @@ class VoiceFastPathTest {
         assertNull(VoiceFastPath.route("don't mark vitamins done"))
         assertNull(VoiceFastPath.route("summarize my bill")) // fuzzy: AI decides
         assertNull(VoiceFastPath.route("read my bill")) // fuzzy: AI decides
+    }
+
+    @Test
+    fun route_scanRouting_explicit() {
+        assertEquals("scan_bill", VoiceFastPath.route("scan this bill"))
+        assertEquals("scan_document", VoiceFastPath.route("scan this letter"))
+        assertEquals("scan_document", VoiceFastPath.route("scan my document"))
+        assertEquals("scan_document", VoiceFastPath.route("scan this form"))
+        assertEquals("scan_ambiguous", VoiceFastPath.route("scan this"))
+        assertEquals("scan_ambiguous", VoiceFastPath.route("scan it"))
+        assertEquals("scan_ambiguous", VoiceFastPath.route("scan my bill and letter"))
+    }
+
+    @Test
+    fun route_saveDocument_scansSaveStaysOut() {
+        assertEquals("scan_document", VoiceFastPath.route("save my document"))
+        // Saved-content reads and bare confirmations never become scans.
+        assertEquals("read_document", VoiceFastPath.route("read my saved document"))
+        assertNull(VoiceFastPath.route("save"))
+        assertNull(VoiceFastPath.route("save it"))
+        // Bill-side "save" is money advice, not a scanner: AI decides.
+        assertNull(VoiceFastPath.route("save money on my bill"))
     }
 
     // Datetimes

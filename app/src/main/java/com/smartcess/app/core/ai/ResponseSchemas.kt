@@ -44,6 +44,7 @@ object ResponseSchemas {
     private val intents = arrayOf(
         "daily_briefing",
         "scan_bill",
+        "scan_document",
         "read_document",
         "email_briefing",
         "ask_bill_question",

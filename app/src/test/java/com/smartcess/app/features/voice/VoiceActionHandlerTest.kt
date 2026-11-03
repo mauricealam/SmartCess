@@ -764,10 +764,72 @@ class VoiceActionHandlerTest {
 
     @Test
     fun scanBill_guidesCapture() = runTest {
-        val turn = handler.start("scan_bill", "scan this")
+        val turn = handler.start("scan_bill", "scan this bill")
         assertEquals("literal", turn.speak)
         assertEquals("camera?mode=bill&capture=on", turn.navigateTo)
         assertFalse(handler.hasPending)
+    }
+
+    @Test
+    fun scanDocument_guidesDocCapture() = runTest {
+        val turn = handler.start("scan_document", "save my document")
+        assertEquals("literal", turn.speak)
+        assertEquals("camera?mode=doc&capture=on", turn.navigateTo)
+        assertFalse(handler.hasPending)
+    }
+
+    @Test
+    fun scanAmbiguous_asksThenRoutesPick() = runTest {
+        val asked = handler.start("scan_ambiguous", "scan this")
+        assertEquals("literal", asked.speak) // bill-or-document question
+        assertNull(asked.navigateTo)
+        assertTrue(handler.hasPending)
+        coVerify(exactly = 0) { appointments.save(any()) }
+
+        val bill = handler.followUp("the bill")!!
+        assertEquals("camera?mode=bill&capture=on", bill.navigateTo)
+        assertFalse(handler.hasPending)
+    }
+
+    @Test
+    fun scanAmbiguous_docPick_routesDoc_cancelDismisses() = runTest {
+        handler.start("scan_ambiguous", "scan it")
+        val doc = handler.followUp("document scanner")!!
+        assertEquals("camera?mode=doc&capture=on", doc.navigateTo)
+        assertFalse(handler.hasPending)
+
+        handler.start("scan_ambiguous", "scan this")
+        val dismissed = handler.followUp("never mind")!!
+        assertEquals("literal", dismissed.speak)
+        assertNull(dismissed.navigateTo)
+        assertFalse(handler.hasPending)
+    }
+
+    @Test
+    fun scanAmbiguous_bareYesReasks() = runTest {
+        handler.start("scan_ambiguous", "scan this")
+        val reasked = handler.followUp("yes")!!
+        assertEquals("literal", reasked.speak)
+        assertNull(reasked.navigateTo)
+        assertTrue(handler.hasPending) // still waiting for a real pick
+        // The scan verb alone must not self-match the document set.
+        val reasked2 = handler.followUp("scan it")!!
+        assertNull(reasked2.navigateTo)
+        assertTrue(handler.hasPending)
+    }
+
+    @Test
+    fun saveWord_withPendingDraft_confirmsInsteadOfScanning() = runTest {
+        coEvery { spark.extractAppointment(any()) } returns appt()
+        handler.start("add_appointment", "dentist tomorrow")
+        assertTrue(handler.hasPending)
+        coEvery { appointments.save(any()) } returns SaveOutcome(7L, ok)
+        // "save" answers the pending read-back; it must not open a scanner.
+        val saved = handler.followUp("save")!!
+        assertTrue(saved.saved)
+        assertNull(saved.navigateTo)
+        assertFalse(handler.hasPending)
+        coVerify(exactly = 1) { appointments.save(any()) }
     }
 
     @Test

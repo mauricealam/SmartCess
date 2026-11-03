@@ -112,6 +112,10 @@ class GuidancePlayer @Inject constructor(
             FramingCondition.TOO_FAR,
             FramingCondition.TOO_CLOSE,
             FramingCondition.EDGE_CROPPED,
+            FramingCondition.EDGE_LEFT,
+            FramingCondition.EDGE_RIGHT,
+            FramingCondition.EDGE_UP,
+            FramingCondition.EDGE_DOWN,
             FramingCondition.TILTED,
             -> longArrayOf(0, TICK_MS, GAP_MS, TICK_MS)
             FramingCondition.TOO_DARK -> longArrayOf(0, TICK_MS, GAP_MS, TICK_MS, GAP_MS, TICK_MS)

@@ -64,8 +64,8 @@ android {
         applicationId = "com.smartcess.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.0.0-cam.5"
+        versionCode = 6
+        versionName = "1.0.0-cam.6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "META_API_KEY", "\"$metaApiKey\"")
         buildConfigField("String", "META_API_BASE_URL", "\"$metaApiBaseUrl\"")

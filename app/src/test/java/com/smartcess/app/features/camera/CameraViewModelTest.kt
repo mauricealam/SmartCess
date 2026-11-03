@@ -24,6 +24,8 @@ import com.smartcess.app.navigation.Routes
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
+import io.mockk.slot
+import com.smartcess.app.R
 import io.mockk.confirmVerified
 import io.mockk.mockk
 import io.mockk.verify
@@ -635,6 +637,47 @@ class CameraViewModelTest {
         assertEquals(FramingCondition.TOO_FAR, diag!!.condition)
         assertEquals(GuidanceOutcome.COOLDOWN_SUPPRESSED, diag.outcome)
         assertEquals(1_500L, diag.cooldownMs)
+    }
+
+    // Compound edge guidance + demo READY phrase
+
+    @Test
+    fun compoundEdge_requestsDirectionalPhrase() = runTest {
+        val requested = slot<FramingCondition>()
+        every { guidance.guide(capture(requested), any()) } returns GuidanceOutcome.SPOKEN
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        vm.seedDiagFrameForTest(
+            FramingInput(hasText = true, coverage = 0.5f, offsetX = -0.3f, minEdgeMargin = 0.0f),
+            FrameMeta(width = 480, height = 640, rotation = 0, blocks = 30),
+        )
+        advanceUntilIdle()
+        assertEquals(FramingCondition.EDGE_LEFT, requested.captured)
+        assertEquals(R.string.framing_edge_left, vm.uiState.value.instructionRes)
+    }
+
+    @Test
+    fun demoReady_requestsDemoPhrase_normalKeepsCaptureInvite() = runTest {
+        every { guidance.guide(any(), any()) } returns GuidanceOutcome.SPOKEN
+        val ready = FramingInput(
+            hasText = true, coverage = 0.5f, offsetX = 0.02f, offsetY = -0.02f,
+            minEdgeMargin = 0.2f,
+        )
+        val meta = FrameMeta(width = 480, height = 640, rotation = 0, blocks = 16)
+        val normal = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        normal.seedDiagFrameForTest(ready, meta)
+        advanceUntilIdle()
+        assertEquals(FramingCondition.READY, normal.uiState.value.condition)
+        assertEquals(R.string.framing_ready, normal.uiState.value.instructionRes)
+
+        val demo = viewModel(Routes.MODE_BILL, Routes.CAPTURE_OFF)
+        advanceUntilIdle()
+        demo.logDiag = {}
+        demo.seedDiagFrameForTest(ready, meta)
+        advanceUntilIdle()
+        assertEquals(FramingCondition.READY, demo.uiState.value.condition)
+        assertEquals(R.string.framing_ready_demo, demo.uiState.value.instructionRes)
     }
 }
 

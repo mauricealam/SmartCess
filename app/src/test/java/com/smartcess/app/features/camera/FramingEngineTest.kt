@@ -164,9 +164,69 @@ class FramingEngineTest {
 
     @Test
     fun priority_edgeMargin_beatsOffCenter() {
+        // Edge still wins, but now carries the off-center axis with it.
+        assertEquals(
+            FramingCondition.EDGE_RIGHT,
+            FramingEngine.evaluate(input(offsetX = 0.3f, minEdgeMargin = 0.01f)),
+        )
+    }
+
+    @Test
+    fun edgeCompound_eachDirection() {
+        assertEquals(
+            FramingCondition.EDGE_LEFT,
+            FramingEngine.evaluate(input(offsetX = -0.3f, minEdgeMargin = 0.0f)),
+        )
+        assertEquals(
+            FramingCondition.EDGE_RIGHT,
+            FramingEngine.evaluate(input(offsetX = 0.3f, minEdgeMargin = 0.0f)),
+        )
+        assertEquals(
+            FramingCondition.EDGE_UP,
+            FramingEngine.evaluate(input(offsetY = -0.3f, minEdgeMargin = 0.0f)),
+        )
+        assertEquals(
+            FramingCondition.EDGE_DOWN,
+            FramingEngine.evaluate(input(offsetY = 0.3f, minEdgeMargin = 0.0f)),
+        )
+    }
+
+    @Test
+    fun edgeCompound_dominantAxisWins() {
+        // Same worse-axis-first rule as plain OFF_*.
+        assertEquals(
+            FramingCondition.EDGE_LEFT,
+            FramingEngine.evaluate(input(offsetX = -0.4f, offsetY = 0.2f, minEdgeMargin = 0.0f)),
+        )
+        assertEquals(
+            FramingCondition.EDGE_DOWN,
+            FramingEngine.evaluate(input(offsetX = -0.2f, offsetY = 0.4f, minEdgeMargin = 0.0f)),
+        )
+    }
+
+    @Test
+    fun edgeCompound_centeredStaysPlain() {
         assertEquals(
             FramingCondition.EDGE_CROPPED,
-            FramingEngine.evaluate(input(offsetX = 0.3f, minEdgeMargin = 0.01f)),
+            FramingEngine.evaluate(input(offsetX = 0.05f, offsetY = -0.05f, minEdgeMargin = 0.0f)),
+        )
+    }
+
+    @Test
+    fun recovery_edgeToDirectionToReady() {
+        // Backing off clears the margin: compound -> plain direction...
+        assertEquals(
+            FramingCondition.EDGE_LEFT,
+            FramingEngine.evaluate(input(offsetX = -0.3f, minEdgeMargin = 0.0f)),
+        )
+        assertEquals(
+            FramingCondition.OFF_LEFT,
+            FramingEngine.evaluate(input(offsetX = -0.3f, minEdgeMargin = 0.2f)),
+        )
+        // ...then centering reaches READY.
+        assertEquals(
+            FramingCondition.READY,
+            FramingEngine.evaluate(input(offsetX = -0.05f, minEdgeMargin = 0.2f)),
         )
     }
 

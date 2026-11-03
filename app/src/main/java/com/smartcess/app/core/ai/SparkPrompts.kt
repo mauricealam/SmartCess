@@ -33,8 +33,9 @@ Question: "$question""""
 
     fun intent(text: String, context: String? = null): SparkPrompt = SparkPrompt(
         instruction = """Classify the voice command into one intent:
-daily_briefing, scan_bill, read_document, email_briefing, ask_bill_question,
+daily_briefing, scan_bill, scan_document, read_document, email_briefing, ask_bill_question,
 create_reminder, cancel_reminder, archive_bill, add_appointment, add_routine, general_question.
+Use scan_bill only for bills, scan_document for letters/pages/forms, read_document for saved content.
 $GLOBAL_RULES""",
         input = if (context.isNullOrBlank()) {
             """Command: "$text""""

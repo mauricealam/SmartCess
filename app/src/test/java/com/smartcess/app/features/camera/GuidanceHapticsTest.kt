@@ -26,6 +26,10 @@ class GuidanceHapticsTest {
             FramingCondition.TOO_FAR,
             FramingCondition.TOO_CLOSE,
             FramingCondition.EDGE_CROPPED,
+            FramingCondition.EDGE_LEFT,
+            FramingCondition.EDGE_RIGHT,
+            FramingCondition.EDGE_UP,
+            FramingCondition.EDGE_DOWN,
             FramingCondition.TILTED,
         ).forEach {
             assertArrayEquals(longArrayOf(0, 35, 80, 35), patternFor(it))

@@ -231,7 +231,12 @@ class CameraViewModel @Inject constructor(
         imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(context), analyzer)
         if (!captureAllowed && !demoAnnounced) {
             demoAnnounced = true
-            gate.speak(context.getString(R.string.camera_demo_no_capture))
+            gate.speak(
+                context.getString(
+                    if (isDocumentMode) R.string.camera_demo_no_capture_doc
+                    else R.string.camera_demo_no_capture_bill,
+                ),
+            )
         }
     }
 
@@ -258,7 +263,7 @@ class CameraViewModel @Inject constructor(
         if (framingStartMs == 0L) framingStartMs = System.currentTimeMillis()
         val condition = FramingEngine.evaluate(input)
         val previous = _uiState.value.condition
-        val res = FramingPhrases.stringRes(condition, isDocumentMode)
+        val res = FramingPhrases.stringRes(condition, isDocumentMode, captureAllowed)
         _uiState.update {
             it.copy(
                 condition = condition,
@@ -338,7 +343,12 @@ class CameraViewModel @Inject constructor(
      */
     fun capture(): Boolean {
         if (!captureAllowed) {
-            gate.speak(context.getString(R.string.camera_demo_no_capture))
+            gate.speak(
+                context.getString(
+                    if (isDocumentMode) R.string.camera_demo_no_capture_doc
+                    else R.string.camera_demo_no_capture_bill,
+                ),
+            )
             return false
         }
         val state = _uiState.value
