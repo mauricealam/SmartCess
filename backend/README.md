@@ -2,6 +2,8 @@
 
 Thin, stateless proxy between the SmartCess Android app and the Meta Model
 API. The Meta key lives here (environment variable) and never reaches phones.
+Production runs on Render in Singapore (`https://smartcess-sg.onrender.com`):
+the region matters — Meta chat models 404 from some other Render regions.
 
 - `POST /api/auth/google` — exchange a Google ID token for a session pair.
 - `POST /api/auth/refresh` — rotate the session pair.

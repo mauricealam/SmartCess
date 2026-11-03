@@ -27,3 +27,7 @@ backend/.venv/
 __pycache__/
 .pytest_cache/
 *.pyc
+
+# Local-only authoring material (kept out of GitHub by owner request)
+DEMO_SCRIPT.md
+smartcess complete specs kit.pdf
