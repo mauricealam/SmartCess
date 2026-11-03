@@ -61,38 +61,40 @@ class BriefingViewModel @Inject constructor(
                 _state.value = BriefingUiState(loading = false, errorRes = R.string.error_generic)
                 return@launch
             }
-            var aiBriefing: String? = null
-            var offline = false
-            var signIn = false
-            if (!data.isEmpty) {
-                aiBriefing = runCatching {
-                    spark.dailyBriefing(
-                        SparkPrompts.briefingContext(
-                            overdue = data.overdueBills.size,
-                            dueSoon = data.billsDueSoon.size,
-                            appointments = data.appointments.size,
-                            urgentEmail = data.urgentEmails.size,
-                            documents = data.documentsWithDeadlines.size,
-                            routines = data.routinesDue.size,
-                        ),
-                    ).briefing.ifBlank { null }
-                }.getOrElse { e ->
-                    if (e is OfflineModeException) offline = true
-                    if (e is SessionExpiredException) signIn = true
-                    null
-                }
-            }
+            // Saved records render immediately: the AI summary streams in after
+            // and must never gate the list (cold backends take 15s+).
             _state.value = BriefingUiState(
                 loading = false,
-                offline = offline,
-                signInRequired = signIn,
-                aiBriefing = aiBriefing,
                 overdueBills = data.overdueBills,
                 billsDueSoon = data.billsDueSoon,
                 appointments = data.appointments,
                 urgentEmails = data.urgentEmails,
                 documents = data.documentsWithDeadlines,
                 routines = data.routinesDue,
+            )
+            if (data.isEmpty) return@launch
+            var offline = false
+            var signIn = false
+            val aiBriefing = runCatching {
+                spark.dailyBriefing(
+                    SparkPrompts.briefingContext(
+                        overdue = data.overdueBills.size,
+                        dueSoon = data.billsDueSoon.size,
+                        appointments = data.appointments.size,
+                        urgentEmail = data.urgentEmails.size,
+                        documents = data.documentsWithDeadlines.size,
+                        routines = data.routinesDue.size,
+                    ),
+                ).briefing.ifBlank { null }
+            }.getOrElse { e ->
+                if (e is OfflineModeException) offline = true
+                if (e is SessionExpiredException) signIn = true
+                null
+            }
+            _state.value = _state.value.copy(
+                offline = offline,
+                signInRequired = signIn,
+                aiBriefing = aiBriefing,
             )
         }
     }
