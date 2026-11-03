@@ -307,11 +307,12 @@ class VoiceActionHandler @Inject constructor(
             clear()
             return ActionTurn(appContext.getString(R.string.voice_dismissed))
         }
-        // A bare "yes" picks nothing; anything unrecognized re-asks.
+        // A bare "yes" picks nothing; anything unrecognized names the
+        // miss, then re-asks with the candidates (no identical loop).
         selectCandidate(current.candidates, text, BillEntity::provider)?.let {
             return answerBill(it, current.question)
         }
-        return ActionTurn(billChoiceQuestion(current.candidates))
+        return ActionTurn(noMatchQuestion(text, billChoiceQuestion(current.candidates)))
     }
 
     private fun followUpCancelChoice(current: PendingCancelChoice, norm: String, text: String): ActionTurn {
@@ -322,7 +323,7 @@ class VoiceActionHandler @Inject constructor(
         selectCandidate(current.candidates, text, ReminderEntity::title)?.let {
             return confirmCancel(it, current.heard)
         }
-        return ActionTurn(cancelChoiceQuestion(current.candidates))
+        return ActionTurn(noMatchQuestion(text, cancelChoiceQuestion(current.candidates)))
     }
 
     private suspend fun followUpCancelConfirm(current: PendingCancelConfirm, norm: String): ActionTurn {
@@ -343,7 +344,7 @@ class VoiceActionHandler @Inject constructor(
         selectCandidate(current.candidates, text, BillEntity::provider)?.let {
             return confirmArchive(it, current.heard)
         }
-        return ActionTurn(archiveChoiceQuestion(current.candidates))
+        return ActionTurn(noMatchQuestion(text, archiveChoiceQuestion(current.candidates)))
     }
 
     private suspend fun followUpArchiveConfirm(current: PendingArchiveConfirm, norm: String): ActionTurn {
@@ -363,7 +364,7 @@ class VoiceActionHandler @Inject constructor(
         selectCandidate(current.candidates, text, DocumentEntity::title)?.let {
             return readDocument(it)
         }
-        return ActionTurn(docChoiceQuestion(current.candidates))
+        return ActionTurn(noMatchQuestion(text, docChoiceQuestion(current.candidates)))
     }
 
     private fun followUpCompleteChoice(current: PendingCompleteChoice, norm: String, text: String): ActionTurn {
@@ -374,7 +375,7 @@ class VoiceActionHandler @Inject constructor(
         selectCandidate(current.candidates, text, RoutineEntity::title)?.let {
             return confirmComplete(it, current.heard)
         }
-        return ActionTurn(completeChoiceQuestion(current.candidates))
+        return ActionTurn(noMatchQuestion(text, completeChoiceQuestion(current.candidates)))
     }
 
     private suspend fun followUpCompleteConfirm(current: PendingCompleteConfirm, norm: String): ActionTurn {
@@ -1007,6 +1008,14 @@ class VoiceActionHandler @Inject constructor(
         val matches = matchLabels(all, text, label)
         return matches.singleOrNull()
     }
+
+    /**
+     * Names the miss before re-asking, so an unrecognized choice answer
+     * ("sarawak energy" when no provider matches) never loops an
+     * identical question. The pending choice stays for a retry or "cancel".
+     */
+    private fun noMatchQuestion(text: String, question: String): String =
+        appContext.getString(R.string.voice_choice_no_match, text.take(80)) + " " + question
 
     private fun billChoiceQuestion(candidates: List<BillEntity>): String =
         appContext.getString(

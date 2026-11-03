@@ -525,6 +525,73 @@ class VoiceActionHandlerTest {
     }
 
     @Test
+    fun billChoice_unknownName_namesMissAndReasks() = runTest {
+        every { bills.observeActive() } returns flowOf(
+            listOf(bill(id = 1L, provider = "City Electric"), bill(id = 2L, provider = "City Water")),
+        )
+        handler.start("ask_bill_question", "how much is the bill")
+        val reasked = handler.followUp("sarawak energy")!!
+        assertTrue(reasked.speak.contains("sarawak energy"))
+        assertTrue(reasked.speak.contains("1. City Electric"))
+        assertTrue(reasked.speak.contains("2. City Water"))
+        assertTrue(handler.hasPending)
+        // Retry with a listed number still resolves the original question.
+        val answered = handler.followUp("2")!!
+        assertTrue(answered.speak.contains("City Water"))
+        assertFalse(handler.hasPending)
+    }
+
+    @Test
+    fun cancelChoice_unknownName_namesMissAndReasks() = runTest {
+        coEvery { reminders.scheduled() } returns listOf(
+            scheduledReminder(id = 3L, title = "Call mom"),
+            scheduledReminder(id = 4L, title = "Pay rent"),
+        )
+        handler.start("cancel_reminder", "cancel reminder")
+        val reasked = handler.followUp("walk the dog")!!
+        assertTrue(reasked.speak.contains("walk the dog"))
+        assertTrue(reasked.speak.contains("1. Call mom"))
+        assertTrue(handler.hasPending)
+    }
+
+    @Test
+    fun archiveChoice_unknownName_namesMissAndReasks() = runTest {
+        every { bills.observeActive() } returns flowOf(
+            listOf(bill(id = 1L, provider = "City Electric"), bill(id = 2L, provider = "City Water")),
+        )
+        handler.start("archive_bill", "archive bill")
+        val reasked = handler.followUp("sarawak energy")!!
+        assertTrue(reasked.speak.contains("sarawak energy"))
+        assertTrue(reasked.speak.contains("2. City Water"))
+        assertTrue(handler.hasPending)
+    }
+
+    @Test
+    fun docChoice_unknownName_namesMissAndReasks() = runTest {
+        every { documents.observeAll() } returns flowOf(
+            listOf(doc(id = 1L, title = "Lease 2025"), doc(id = 2L, title = "Lease 2026")),
+        )
+        handler.start("read_document", "read document")
+        val reasked = handler.followUp("passport")!!
+        assertTrue(reasked.speak.contains("passport"))
+        assertTrue(reasked.speak.contains("1. Lease 2025"))
+        assertTrue(handler.hasPending)
+    }
+
+    @Test
+    fun completeChoice_unknownName_namesMissAndReasks() = runTest {
+        coEvery { routines.dueToday(any()) } returns listOf(
+            dueRoutine(id = 1L, title = "Vitamins"),
+            dueRoutine(id = 2L, title = "Stretch"),
+        )
+        handler.start("complete_routine", "mark done")
+        val reasked = handler.followUp("laundry")!!
+        assertTrue(reasked.speak.contains("laundry"))
+        assertTrue(reasked.speak.contains("1. Vitamins"))
+        assertTrue(handler.hasPending)
+    }
+
+    @Test
     fun reminder_complete_readsBackAndSaves() = runTest {
         // Fuzzy phrasing (no command verb) flows through AI extraction.
         coEvery { spark.extractReminder(any()) } returns

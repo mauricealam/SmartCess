@@ -416,7 +416,8 @@
     <string name="voice_action_routine_daily_only" translatable="true">I can only set up daily routines by voice so far. Please try again with a daily time, like every day at 8 AM.</string>
     <string name="voice_briefing_empty" translatable="true">Nothing needs your attention today.</string>
     <string name="voice_bill_none" translatable="true">You have no saved bills yet.</string>
-    <string name="voice_bill_which" translatable="true">Which bill? %1$s</string>
+    <string name="voice_bill_which" translatable="true">Which bill? Say the name or number. %1$s</string>
+    <string name="voice_choice_no_match" translatable="true">I couldn\'t find anything called %1$s.</string>
     <string name="voice_bill_answer" translatable="true">Your bill: %1$s.</string>
     <string name="voice_bill_no_answer" translatable="true">I could not find that on this bill.</string>
     <string name="voice_reminder_ask_title" translatable="true">What should I remind you about?</string>
