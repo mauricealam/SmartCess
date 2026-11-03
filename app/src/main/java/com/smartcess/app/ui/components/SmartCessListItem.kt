@@ -30,6 +30,8 @@ fun SmartCessListItem(
     contentDescription: String? = null,
     onClick: (() -> Unit)? = null,
     trailing: @Composable (() -> Unit)? = null,
+    /** False for the last row in a list (or before a section divider): no dangling line. */
+    showDivider: Boolean = true,
 ) {
     val clickable = if (onClick != null) {
         Modifier.clickable(onClickLabel = title, onClick = onClick)
@@ -53,9 +55,11 @@ fun SmartCessListItem(
             }
             trailing?.invoke()
         }
-        HorizontalDivider(
-            thickness = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant,
-        )
+        if (showDivider) {
+            HorizontalDivider(
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+        }
     }
 }

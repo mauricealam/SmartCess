@@ -22,5 +22,12 @@ interface EmailItemDao {
 
     @Query("UPDATE email_items SET isRead = 1 WHERE id = :id") suspend fun markRead(id: Long)
 
+    /**
+     * One-time demo refresh: only touches pristine seed rows (the inbox is
+     * read-only, so sender + subject + old body identifies our own seeds).
+     */
+    @Query("UPDATE email_items SET body = :newBody WHERE sender = :sender AND subject = :subject AND body = :oldBody")
+    suspend fun refreshSeedBody(sender: String, subject: String, oldBody: String, newBody: String): Int
+
     @Query("SELECT * FROM email_items ORDER BY receivedAt DESC") suspend fun all(): List<EmailItemEntity>
 }

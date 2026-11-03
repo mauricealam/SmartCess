@@ -169,7 +169,7 @@
     <string name="home_today_overdue" translatable="true">%1$s bill overdue</string>
     <string name="home_today_due_soon" translatable="true">%1$s due %2$s</string>
     <string name="home_today_appointment" translatable="true">%1$s at %2$s</string>
-    <string name="home_today_email" translatable="true">Urgent email from %2$s: %1$s</string>
+    <string name="home_today_email" translatable="true">Sample urgent email from %2$s: %1$s</string>
     <string name="home_today_routine" translatable="true">Routine due: %1$s</string>
     <string name="home_today_document" translatable="true">Document deadline: %1$s</string>
     <string name="queue_status_overdue" translatable="true">OVERDUE</string>
@@ -363,7 +363,7 @@
     <string name="settings_delete_button" translatable="true">Delete everything</string>
     <string name="settings_deleted" translatable="true">Everything deleted.</string>
     <string name="settings_about_title" translatable="true">About SmartCess</string>
-    <string name="settings_about_body" translatable="true">SmartCess turns inaccessible life admin into independent action. Built with co-designer Hillarry for blind and low-vision users.</string>
+    <string name="settings_about_body" translatable="true">SmartCess helps blind and low-vision users manage bills, appointments, routines, reminders, documents, and email by voice. Speak to get things done — the app always asks for your confirmation before saving anything.</string>
     <string name="settings_version" translatable="true">Version %1$s</string>
 
     <!-- Auth + backend -->

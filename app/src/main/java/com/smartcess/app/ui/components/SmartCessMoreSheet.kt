@@ -104,6 +104,7 @@ fun MoreSheetContent(
             title = stringResource(R.string.more_routines),
             contentDescription = stringResource(R.string.more_routines),
             onClick = onRoutines,
+            showDivider = false,
         )
         HorizontalDivider(
             color = MaterialTheme.colorScheme.outlineVariant,
@@ -113,6 +114,7 @@ fun MoreSheetContent(
             title = stringResource(R.string.more_settings),
             contentDescription = stringResource(R.string.more_settings),
             onClick = onSettings,
+            showDivider = false,
         )
     }
 }

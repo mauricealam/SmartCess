@@ -80,6 +80,7 @@ fun buildHomePreview(data: TodayData): HomeUiState {
                 ),
             )
         }
+        // All local emails are demo seeds until Gmail lands: the row says Sample.
         data.urgentEmails.forEach {
             add(
                 TodayPreviewItem(
