@@ -61,7 +61,7 @@ fun EmailScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         SmartCessTopBar(title = stringResource(R.string.email_title), onBack = onBack)
-        SmartCessBanner(message = stringResource(R.string.email_demo_note), kind = BannerKind.INFO)
+        SmartCessBanner(message = stringResource(R.string.email_gmail_note), kind = BannerKind.INFO)
         if (state.offline) {
             SmartCessBanner(message = stringResource(R.string.banner_offline), kind = BannerKind.OFFLINE)
         }

@@ -3,6 +3,7 @@ package com.smartcess.app.features.routines
 import java.time.Instant
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -40,5 +41,15 @@ class RoutineScheduleTest {
         val next = RoutinesViewModel.nextDailyOccurrence(8, 0, now, zone)
         assertEquals(Instant.parse("2026-10-28T08:00:00Z").toEpochMilli(), next)
         assertTrue(next > now)
+    }
+
+    @Test
+    fun isDailyRule_acceptsOnlyDailyHeads() {
+        assertTrue(RoutinesViewModel.isDailyRule("DAILY 08:00"))
+        assertTrue(RoutinesViewModel.isDailyRule("  daily 21:00 "))
+        assertFalse(RoutinesViewModel.isDailyRule("WEEKLY MON 09:00"))
+        assertFalse(RoutinesViewModel.isDailyRule("MONTHLY 01 09:00"))
+        assertFalse(RoutinesViewModel.isDailyRule("CUSTOM"))
+        assertFalse(RoutinesViewModel.isDailyRule(""))
     }
 }

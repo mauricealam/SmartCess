@@ -49,7 +49,7 @@ class EmailViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            emails.seedDemoInboxIfEmpty()
+            emails.pruneDemoSeeds()
             refreshBriefing()
         }
     }

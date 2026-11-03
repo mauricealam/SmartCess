@@ -761,7 +761,7 @@ class VoiceActionHandlerTest {
 
     @Test
     fun emailBriefing_announcesSample_readsNothing() = runTest {
-        coEvery { emails.seedDemoInboxIfEmpty() } returns Unit
+        coEvery { emails.pruneDemoSeeds() } returns Unit
         every { emails.observeAll() } returns flowOf(
             listOf(email(), email(sender = "City Clinic", subject = "Appointment reminder", urgency = "normal")),
         )
@@ -770,13 +770,13 @@ class VoiceActionHandlerTest {
         assertTrue(turn.speak.contains("high urgency from Tenaga Nasional"))
         assertTrue(turn.speak.contains("Appointment reminder"))
         assertFalse(handler.hasPending)
-        coVerify(exactly = 1) { emails.seedDemoInboxIfEmpty() }
+        coVerify(exactly = 1) { emails.pruneDemoSeeds() }
         coVerify(exactly = 0) { emails.markRead(any()) }
     }
 
     @Test
     fun emailBriefing_emptyInbox() = runTest {
-        coEvery { emails.seedDemoInboxIfEmpty() } returns Unit
+        coEvery { emails.pruneDemoSeeds() } returns Unit
         every { emails.observeAll() } returns flowOf(emptyList())
         val turn = handler.start("email_briefing", "check my email")
         assertEquals("literal", turn.speak)

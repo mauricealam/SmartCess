@@ -23,11 +23,17 @@ interface EmailItemDao {
     @Query("UPDATE email_items SET isRead = 1 WHERE id = :id") suspend fun markRead(id: Long)
 
     /**
-     * One-time demo refresh: only touches pristine seed rows (the inbox is
-     * read-only, so sender + subject + old body identifies our own seeds).
+     * Retired demo seeds, matched by exact sender + subject pairs (both the
+     * original and sample-prefixed bodies). The inbox is read-only, so no
+     * user mail can ever match these pairs.
      */
-    @Query("UPDATE email_items SET body = :newBody WHERE sender = :sender AND subject = :subject AND body = :oldBody")
-    suspend fun refreshSeedBody(sender: String, subject: String, oldBody: String, newBody: String): Int
+    @Query(
+        "DELETE FROM email_items WHERE " +
+            "(sender = 'Tenaga Nasional' AND subject = 'Your electricity bill is ready') OR " +
+            "(sender = 'City Clinic' AND subject = 'Appointment reminder') OR " +
+            "(sender = 'Parcel Express' AND subject = 'Delivery attempted')",
+    )
+    suspend fun deleteDemoSeeds(): Int
 
     @Query("SELECT * FROM email_items ORDER BY receivedAt DESC") suspend fun all(): List<EmailItemEntity>
 }

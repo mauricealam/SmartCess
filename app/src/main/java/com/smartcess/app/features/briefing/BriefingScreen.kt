@@ -158,6 +158,7 @@ fun BriefingScreen(
                 )
             }
         }
+        // Dormant until Gmail: no local mail exists, so this section never renders.
         BriefingSection(
             title = stringResource(R.string.briefing_section_email_sample),
             count = state.urgentEmails.size,

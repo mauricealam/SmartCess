@@ -254,8 +254,8 @@
     <string name="reminder_status" translatable="true">Status: %1$s</string>
 
     <!-- Email -->
-    <string name="email_empty" translatable="true">Your demo inbox is empty.</string>
-    <string name="email_demo_note" translatable="true">Demo inbox on this device. Real Gmail and Outlook support is coming later.</string>
+    <string name="email_empty" translatable="true">Your inbox is empty.</string>
+    <string name="email_gmail_note" translatable="true">Gmail and Outlook support is coming later.</string>
     <string name="email_from" translatable="true">From %1$s</string>
     <string name="email_received" translatable="true">Received %1$s</string>
     <string name="email_deadline" translatable="true">Deadline: %1$s</string>
@@ -326,6 +326,7 @@
     <string name="routine_schedule_label" translatable="true">Schedule (for example: DAILY 08:00)</string>
     <string name="routine_notes_label" translatable="true">Notes</string>
     <string name="routine_saved" translatable="true">Routine saved.</string>
+    <string name="routine_rule_daily_only" translatable="true">Only daily routines are supported for now. Use DAILY and a time, like DAILY 08:00.</string>
     <string name="routine_complete" translatable="true">Mark done</string>
     <string name="routine_completed" translatable="true">Done. Well done keeping on track.</string>
     <string name="routine_streak" translatable="true">%1$d day streak</string>

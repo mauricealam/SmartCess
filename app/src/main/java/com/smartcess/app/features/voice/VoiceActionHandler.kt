@@ -857,7 +857,7 @@ class VoiceActionHandler @Inject constructor(
      * lands). Read-only: nothing is marked read. Sample data is announced.
      */
     private suspend fun speakEmailBriefing(): ActionTurn {
-        runCatching { emails.seedDemoInboxIfEmpty() }
+        runCatching { emails.pruneDemoSeeds() }
         val all = emails.observeAll().first()
         if (all.isEmpty()) {
             return ActionTurn(appContext.getString(R.string.voice_email_none))

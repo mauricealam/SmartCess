@@ -85,6 +85,12 @@ class RoutinesViewModel @Inject constructor(
             _form.value = form.copy(fieldErrorRes = R.string.error_generic)
             return
         }
+        // The scheduler only understands daily rules: never confirm a weekly
+        // routine and schedule it daily. Voice already refuses non-daily.
+        if (!isDailyRule(form.scheduleRule)) {
+            _form.value = form.copy(fieldErrorRes = R.string.routine_rule_daily_only)
+            return
+        }
         viewModelScope.launch {
             val rule = form.scheduleRule.trim().uppercase()
             val minutes = parseScheduleMinutes(rule) ?: prefs.get().defaultReminderTime
@@ -122,6 +128,10 @@ class RoutinesViewModel @Inject constructor(
     }
 
     companion object {
+        /** Only DAILY heads are schedulable; WEEKLY/MONTHLY/CUSTOM are refused at save. */
+        fun isDailyRule(rule: String): Boolean =
+            rule.trim().uppercase().startsWith("DAILY")
+
         private val TIME_IN_RULE = Regex("(\\d{1,2}):(\\d{2})")
 
         /** HH:MM inside a rule like "DAILY 08:00", as minutes since midnight. Null when absent. */
