@@ -601,11 +601,72 @@ class CameraViewModelTest {
         vm.presentReview("Save it?")
         advanceUntilIdle()
         voiceApi.hear("not sure", "not ok")
-        finishSpeech()
-        advanceUntilIdle() // uncertainty ignored, "not ok" discards
+        finishSpeech() // prompt done -> loop starts
+        advanceTimeBy(2_000) // uncertainty reprompts, loop gated on it
+        finishSpeech() // reprompt done -> listening resumes
+        advanceTimeBy(2_000) // "not ok" discards
         assertEquals(2, voiceApi.calls) // both utterances were heard
         assertEquals(CameraPhase.FRAMING, vm.uiState.value.phase)
         coVerify(exactly = 0) { bills.save(any()) }
+    }
+
+    @Test
+    fun reviewCommands_none_repromptsThenSaves() = runTest {
+        coEvery { bills.save(any()) } returns ok(7L)
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        recorder.autoStopNow = true
+        vm.seedReviewForTest(bill = BillExtraction(provider = "City Electric", amount = 42.0))
+        vm.presentReview("Save it?")
+        advanceUntilIdle()
+        voiceApi.hear("hmm maybe", "yes")
+        finishSpeech() // prompt done -> loop starts
+        advanceTimeBy(2_000) // unmatched words -> reprompt speaks
+        assertEquals("hmm maybe", vm.uiState.value.lastHeard)
+        assertEquals(2, fakeSpeaker.spoken.size) // prompt + reprompt
+        finishSpeech() // reprompt done -> listening resumes
+        advanceTimeBy(2_000) // "yes" ends the loop
+        assertEquals(2, voiceApi.calls)
+        coVerify(exactly = 1) { bills.save(any()) }
+        assertNull(vm.uiState.value.lastHeard) // cleared on verdict
+        assertFalse(vm.uiState.value.reviewListening)
+    }
+
+    @Test
+    fun reviewCommands_mixedCap_shared() = runTest {
+        coEvery { bills.save(any()) } returns ok(7L)
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        recorder.autoStopNow = true
+        vm.seedReviewForTest(bill = BillExtraction(provider = "City Electric", amount = 42.0))
+        vm.presentReview("Save it?")
+        advanceUntilIdle()
+        voiceApi.queue.add(unclearError())
+        voiceApi.hear("hmm", "hmm", "yes")
+        finishSpeech()
+        advanceTimeBy(2_000) // unclear -> reprompt#1
+        finishSpeech()
+        advanceTimeBy(2_000) // unmatched -> reprompt#2
+        finishSpeech()
+        advanceTimeBy(2_000) // capped quiet, then "yes" saves
+        assertEquals(4, voiceApi.calls)
+        coVerify(exactly = 1) { bills.save(any()) }
+        assertEquals(4, fakeSpeaker.spoken.size) // prompt + 2 reprompts + saved
+    }
+
+    @Test
+    fun framingHeardNonCapture_ignoredSilently() = runTest {
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        recorder.autoStopNow = true
+        vm.setVoiceCaptureEnabled(true)
+        advanceTimeBy(3_000) // default "hello there" has no capture word
+        assertTrue(vm.uiState.value.voiceCapture)
+        assertTrue(fakeSpeaker.spoken.isEmpty())
+        assertNull(vm.uiState.value.lastHeard) // review-only display
+        assertTrue(startsAtLeast(2))
+        vm.setVoiceCaptureEnabled(false)
+        advanceUntilIdle()
     }
 
     @Test
@@ -642,8 +703,10 @@ class CameraViewModelTest {
         vm.presentReview("Save it?")
         advanceUntilIdle()
         voiceApi.hear("don't delete it", "no")
-        finishSpeech()
-        advanceUntilIdle() // negation ignored, "no" discards
+        finishSpeech() // prompt done -> loop starts
+        advanceTimeBy(2_000) // negation reprompts, loop gated on it
+        finishSpeech() // reprompt done -> listening resumes
+        advanceTimeBy(2_000) // "no" discards
         assertEquals(2, voiceApi.calls) // both utterances were heard
         assertFalse(cancelled.isCompleted) // no cancel was emitted
         cancelled.cancel()

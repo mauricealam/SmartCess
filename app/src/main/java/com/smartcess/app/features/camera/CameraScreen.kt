@@ -249,6 +249,16 @@ private fun CameraPreviewContent(
                     onDiscard = viewModel::discardDraft,
                 )
             }
+            // Sighted transparency outside the TalkBack live-region: blind
+            // users get the spoken reprompt instead of chatter here.
+            val lastHeard = uiState.lastHeard
+            if (uiState.phase == CameraPhase.REVIEW && lastHeard != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.camera_review_heard, lastHeard),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
             OpsButton(
                 text = stringResource(
                     if (busy) {

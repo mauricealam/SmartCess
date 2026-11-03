@@ -94,6 +94,12 @@ data class CameraUiState(
     val reviewBody: String? = null,
     /** Review confirmation listening: saying yes/save or no/discard/retake acts. */
     val reviewListening: Boolean = false,
+    /**
+     * Last review transcript, for the on-screen "I heard" line (sighted
+     * transparency; TalkBack users get the spoken reprompt instead).
+     * Cleared on verdict and session end; never set while framing.
+     */
+    val lastHeard: String? = null,
     /** Diagnostic session: framing guidance runs, capture execution is disabled. */
     val demoNoCapture: Boolean = false,
     /** Temporary guidance-test diagnostics; null in normal sessions. */
@@ -206,8 +212,19 @@ class CameraViewModel @Inject constructor(
     private var listenGen = 0L
     /** Review session id: a confirmation applies only to its own capture. */
     private var reviewId = 0L
-    /** Consecutive garbled review answers; bounds the spoken reprompt. */
+    /** Consecutive unusable review answers (garbled or unmatched). */
     private var consecutiveUnclear = 0
+
+    /**
+     * Spoken review reprompt, capped so noise can't nag forever.
+     * Genuine silence resets the cap (see the review loop).
+     */
+    private fun repromptReview() {
+        if (consecutiveUnclear < MAX_CONSECUTIVE_REPROMPT) {
+            consecutiveUnclear++
+            announce(R.string.camera_review_reprompt)
+        }
+    }
 
     // Unconfirmed extraction drafts. Only confirmSave() persists, and each
     // mode touches only its own repository.
@@ -469,7 +486,7 @@ class CameraViewModel @Inject constructor(
         reviewJob?.cancel()
         val gen = ++listenGen
         val id = reviewId
-        _uiState.update { it.copy(reviewListening = true) }
+        _uiState.update { it.copy(reviewListening = true, lastHeard = null) }
         reviewJob = viewModelScope.launch {
             while (gen == listenGen && id == reviewId && _uiState.value.phase == CameraPhase.REVIEW) {
                 when (val heard = listenUtterance(gen)) {
@@ -479,6 +496,7 @@ class CameraViewModel @Inject constructor(
                         if (gen == listenGen && id == reviewId &&
                             _uiState.value.phase == CameraPhase.REVIEW && gate.commandsAllowed
                         ) {
+                            _uiState.update { it.copy(lastHeard = heard.text.take(120)) }
                             when (reviewCommand(heard.text)) {
                                 ReviewCommand.SAVE -> {
                                     stopReviewListening()
@@ -492,7 +510,9 @@ class CameraViewModel @Inject constructor(
                                     stopReviewListening()
                                     deleteDraft()
                                 }
-                                ReviewCommand.NONE -> Unit
+                                // Heard words, no command: the user tried but
+                                // STT garbled it — say so instead of silence.
+                                ReviewCommand.NONE -> repromptReview()
                             }
                         }
                     }
@@ -503,11 +523,7 @@ class CameraViewModel @Inject constructor(
                     is UtteranceResult.Unclear -> {
                         // The user demonstrably tried (an upload happened) but
                         // no words came back: say so instead of dead silence.
-                        // Capped so noise can't nag forever; Silence resets.
-                        if (consecutiveUnclear < MAX_CONSECUTIVE_REPROMPT) {
-                            consecutiveUnclear++
-                            announce(R.string.camera_review_reprompt)
-                        }
+                        repromptReview()
                     }
                     is UtteranceResult.Fatal -> {
                         stopReviewListening()
@@ -525,7 +541,7 @@ class CameraViewModel @Inject constructor(
         reviewJob?.cancel()
         reviewJob = null
         viewModelScope.launch(ioDispatcher) { runCatching { recorder.cancel() } }
-        _uiState.update { it.copy(reviewListening = false) }
+        _uiState.update { it.copy(reviewListening = false, lastHeard = null) }
     }
 
     private sealed interface UtteranceResult {
