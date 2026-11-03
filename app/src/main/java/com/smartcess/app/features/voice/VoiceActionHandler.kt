@@ -950,12 +950,23 @@ class VoiceActionHandler @Inject constructor(
         if (all.isEmpty()) {
             return ActionTurn(appContext.getString(R.string.voice_routine_none_due))
         }
-        val matches = matchLabels(all, text, RoutineEntity::title)
+        // dueToday is a rolling 24h window: a named routine may not be due
+        // yet. Name it explicitly instead of offering to complete it early.
+        val now = System.currentTimeMillis()
+        val named = matchLabels(all, text, RoutineEntity::title)
+        if (named.size == 1 && (named[0].nextDueMillis ?: 0L) > now) {
+            return ActionTurn(appContext.getString(R.string.voice_routine_not_due, named[0].title))
+        }
+        val due = all.filter { (it.nextDueMillis ?: 0L) <= now }
+        if (due.isEmpty()) {
+            return ActionTurn(appContext.getString(R.string.voice_routine_none_due))
+        }
+        val matches = matchLabels(due, text, RoutineEntity::title)
         return when {
             matches.size == 1 -> confirmComplete(matches[0], listOf(text))
-            all.size == 1 -> confirmComplete(all[0], listOf(text))
+            due.size == 1 -> confirmComplete(due[0], listOf(text))
             else -> {
-                val candidates = matches.ifEmpty { all }.take(MAX_CHOICES)
+                val candidates = matches.ifEmpty { due }.take(MAX_CHOICES)
                 synchronized(lock) { pending = PendingCompleteChoice(candidates, listOf(text)) }
                 ActionTurn(completeChoiceQuestion(candidates))
             }
@@ -963,6 +974,11 @@ class VoiceActionHandler @Inject constructor(
     }
 
     private fun confirmComplete(target: RoutineEntity, heard: List<String>): ActionTurn {
+        // Defensive: the due set was filtered at choice time, but time may
+        // have passed while the user deliberated. Never complete early.
+        if ((target.nextDueMillis ?: 0L) > System.currentTimeMillis()) {
+            return ActionTurn(appContext.getString(R.string.voice_routine_not_due, target.title))
+        }
         synchronized(lock) { pending = PendingCompleteConfirm(target, heard) }
         return ActionTurn(completeConfirmQuestion(target))
     }

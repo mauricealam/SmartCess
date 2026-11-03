@@ -1,6 +1,7 @@
 package com.smartcess.app.features.bills
 
 import com.smartcess.app.core.ai.Speaker
+import com.smartcess.app.R
 import com.smartcess.app.core.work.ReminderScheduler
 import com.smartcess.app.data.local.entity.BillEntity
 import com.smartcess.app.data.local.entity.ReminderEntity
@@ -19,6 +20,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -97,5 +99,21 @@ class BillResultViewModelTest {
         assertTrue(done)
         coVerify { scheduler.cancel(5L) }
         coVerify { bills.delete(11L) }
+    }
+
+    @Test
+    fun confirmReminder_pastTrigger_reportsPassedAndCreatesNothing() = runTest(testDispatcher) {
+        coEvery { bills.getById(any()) } returns bill().copy(dueDate = "2026-01-01")
+        val vm = viewModel()
+        vm.load(11L)
+        advanceUntilIdle()
+
+        vm.confirmReminder(3)
+        advanceUntilIdle()
+
+        assertEquals(R.string.reminder_time_passed, vm.state.value.errorRes)
+        coVerify(exactly = 0) {
+            reminders.create(kind = any(), title = any(), triggerAtMillis = any(), referenceId = any())
+        }
     }
 }

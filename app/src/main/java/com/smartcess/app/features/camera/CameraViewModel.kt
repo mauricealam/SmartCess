@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Base64
-import android.util.Log
 import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import androidx.camera.core.ImageAnalysis
@@ -103,10 +102,6 @@ data class CameraUiState(
     val lastHeard: String? = null,
     /** Rescan warning awaiting a second explicit Save. Null when no duplicate. */
     val duplicateWarning: String? = null,
-    /** Diagnostic session: framing guidance runs, capture execution is disabled. */
-    val demoNoCapture: Boolean = false,
-    /** Temporary guidance-test diagnostics; null in normal sessions. */
-    val diag: FramingDiag? = null,
 )
 
 /**
@@ -144,15 +139,8 @@ class CameraViewModel @Inject constructor(
     val captureMode: String = normalizeMode(savedStateHandle.get<String>(Routes.ARG_MODE))
     val isDocumentMode: Boolean = captureMode == Routes.MODE_DOC
 
-    /**
-     * Diagnostic switch: capture=off disables capture execution (touch and
-     * voice) while guidance keeps running. Missing/invalid values keep
-     * normal behavior.
-     */
-    val captureAllowed: Boolean = normalizeCapture(savedStateHandle.get<String>(Routes.ARG_CAPTURE))
-
     private val _uiState = MutableStateFlow(
-        CameraUiState(isDocument = isDocumentMode, demoNoCapture = !captureAllowed),
+        CameraUiState(isDocument = isDocumentMode),
     )
     val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()
 
@@ -185,19 +173,8 @@ class CameraViewModel @Inject constructor(
         TextFramingAnalyzer(
             onResult = ::onFramingInput,
             onError = { onAnalyzerError() },
-            onFrameMeta = { lastFrameMeta = it },
         )
     }
-
-    /**
-     * Temporary guidance-test log sink. Numbers and condition names only —
-     * never OCR text, images, or document content. Tests override this
-     * (android.util.Log is a stub on the JVM).
-     */
-    internal var logDiag: (String) -> Unit = { msg -> Log.d(TAG_DIAG, msg) }
-    private var lastFrameMeta = FrameMeta()
-    private var lastDiagLogMs = 0L
-    private var lastDiagCondition: FramingCondition? = null
 
     private var framingStartMs = 0L
     private var firstReadyLogged = false
@@ -205,8 +182,9 @@ class CameraViewModel @Inject constructor(
     private var stableCondition: FramingCondition? = null
     private var voiceJob: Job? = null
     private var reviewJob: Job? = null
+    /** In-flight capture extraction: cancelled when the session ends. */
+    private var extractionJob: Job? = null
     private var analyzerBound = false
-    private var demoAnnounced = false
     /**
      * Recognition generation: every arming/disarm bumps it, and each
      * collector dispatches only while its generation is current. Stale
@@ -261,15 +239,6 @@ class CameraViewModel @Inject constructor(
         firstReadyLogged = false
         stableCondition = null
         imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(context), analyzer)
-        if (!captureAllowed && !demoAnnounced) {
-            demoAnnounced = true
-            gate.speak(
-                context.getString(
-                    if (isDocumentMode) R.string.camera_demo_no_capture_doc
-                    else R.string.camera_demo_no_capture_bill,
-                ),
-            )
-        }
     }
 
     /**
@@ -281,6 +250,8 @@ class CameraViewModel @Inject constructor(
     fun onSessionEnd() {
         stopVoiceCapture()
         stopReviewListening()
+        extractionJob?.cancel()
+        extractionJob = null
         guidance.stop()
         guidance.reset()
         framingStartMs = 0L
@@ -294,11 +265,10 @@ class CameraViewModel @Inject constructor(
     private fun onFramingInput(input: FramingInput) {
         if (_uiState.value.phase != CameraPhase.FRAMING) return
         if (framingStartMs == 0L) framingStartMs = System.currentTimeMillis()
-        val raw = FramingEngine.evaluate(input)
         val condition = FramingEngine.update(input, stableCondition)
         stableCondition = condition
         val previous = _uiState.value.condition
-        val res = FramingPhrases.stringRes(condition, isDocumentMode, captureAllowed)
+        val res = FramingPhrases.stringRes(condition, isDocumentMode)
         _uiState.update {
             it.copy(
                 condition = condition,
@@ -306,8 +276,7 @@ class CameraViewModel @Inject constructor(
                 captureEnabled = condition == FramingCondition.READY || it.framingUnavailable,
             )
         }
-        val outcome = guidance.guide(condition, context.getString(res))
-        if (_uiState.value.demoNoCapture) publishDiag(input, condition, outcome, raw)
+        guidance.guide(condition, context.getString(res))
         if (condition != previous) {
             viewModelScope.launch {
                 val metadata = mutableMapOf("condition" to condition.name)
@@ -320,52 +289,8 @@ class CameraViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Temporary guidance-test diagnostics: overlay state every frame, logcat
-     * on condition change (or every [DIAG_LOG_MS]). Numbers and condition
-     * names only — never OCR text, images, or document content.
-     */
-    private fun publishDiag(
-        input: FramingInput,
-        condition: FramingCondition,
-        outcome: GuidanceOutcome,
-        raw: FramingCondition,
-    ) {
-        val meta = lastFrameMeta
-        val diag = FramingDiag(
-            frameWidth = meta.width,
-            frameHeight = meta.height,
-            rotation = meta.rotation,
-            blocks = meta.blocks,
-            coverage = input.coverage,
-            offsetX = input.offsetX,
-            offsetY = input.offsetY,
-            margin = input.minEdgeMargin,
-            condition = condition,
-            raw = raw,
-            outcome = outcome,
-            gateAllowed = gate.commandsAllowed,
-        )
-        _uiState.update { it.copy(diag = diag) }
-        val now = System.currentTimeMillis()
-        if (condition != lastDiagCondition || now - lastDiagLogMs >= DIAG_LOG_MS) {
-            lastDiagCondition = condition
-            lastDiagLogMs = now
-            logDiag(
-                "frame=${meta.width}x${meta.height} rot=${meta.rotation} " +
-                    "blocks=${meta.blocks} cov=${"%.3f".format(input.coverage)} " +
-                    "off=${"%.3f".format(input.offsetX)}/${"%.3f".format(input.offsetY)} " +
-                    "margin=${"%.3f".format(input.minEdgeMargin)} cond=$condition raw=$raw " +
-                    "spoke=$outcome gate=${gate.commandsAllowed}",
-            )
-        }
-    }
-
     @VisibleForTesting
-    internal fun seedDiagFrameForTest(input: FramingInput, meta: FrameMeta) {
-        lastFrameMeta = meta
-        onFramingInput(input)
-    }
+    internal fun seedFrameForTest(input: FramingInput) = onFramingInput(input)
 
     private fun onAnalyzerError() {
         // ML Kit failed: fall back to manual capture with a spoken hint.
@@ -377,20 +302,10 @@ class CameraViewModel @Inject constructor(
 
     /**
      * Touch capture. Enabled when READY, or always once framing is
-     * unavailable. The diagnostic no-capture session blocks here: both
-     * touch and voice capture funnel through this single choke point.
-     * Returns true when a capture actually started.
+     * unavailable. Both touch and voice capture funnel through this
+     * single choke point. Returns true when a capture actually started.
      */
     fun capture(): Boolean {
-        if (!captureAllowed) {
-            gate.speak(
-                context.getString(
-                    if (isDocumentMode) R.string.camera_demo_no_capture_doc
-                    else R.string.camera_demo_no_capture_bill,
-                ),
-            )
-            return false
-        }
         val state = _uiState.value
         if (!state.captureEnabled) return false
         if (state.phase == CameraPhase.CAPTURING || state.phase == CameraPhase.PROCESSING) return false
@@ -451,7 +366,7 @@ class CameraViewModel @Inject constructor(
                         ) {
                             if (onVoiceCaptureCommand()) {
                                 _uiState.update { it.copy(voiceCapture = false) }
-                            } else if (captureAllowed) {
+                            } else {
                                 speakNotReady()
                             }
                         }
@@ -701,7 +616,8 @@ class CameraViewModel @Inject constructor(
         _uiState.update { it.copy(phase = CameraPhase.PROCESSING) }
         // Image secured: the user can move the phone; extraction runs on the file.
         announce(if (isDocumentMode) R.string.camera_captured_doc else R.string.camera_captured_bill)
-        viewModelScope.launch {
+        extractionJob?.cancel()
+        extractionJob = viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 var outFile: File? = null
                 try {
@@ -1059,8 +975,6 @@ class CameraViewModel @Inject constructor(
         private const val OCR_HINT_MAX = 500
         private const val CAPTURE_WORD = "capture"
         private const val REVIEW_SUMMARY_MAX = 200
-        const val TAG_DIAG = "FramingDiag"
-        private const val DIAG_LOG_MS = 2_000L
         const val UPLOAD_TIMEOUT_MS = 45_000L
         private const val AUTO_STOP_POLL_MS = 200L
         private const val GATE_WAIT_MS = 300L
@@ -1073,9 +987,6 @@ class CameraViewModel @Inject constructor(
         /** Only "doc" selects document mode; missing/invalid values mean bill. */
         fun normalizeMode(raw: String?): String =
             if (raw == Routes.MODE_DOC) Routes.MODE_DOC else Routes.MODE_BILL
-
-        /** Only capture=off disables capture; missing/invalid values keep it enabled. */
-        fun normalizeCapture(raw: String?): Boolean = raw != Routes.CAPTURE_OFF
     }
 
     private fun captureDir(): String =

@@ -14,9 +14,9 @@ class VoiceRoutingTest {
     }
 
     @Test
-    fun scanIntent_routesToCamera() {
-        assertEquals(Routes.CAMERA, VoiceViewModel.routeForIntent("scan_bill"))
-        assertEquals(Routes.CAMERA, VoiceViewModel.routeForIntent("scan_document"))
+    fun scanIntent_routesToCameraWithMode() {
+        assertEquals(Routes.camera(Routes.MODE_BILL), VoiceViewModel.routeForIntent("scan_bill"))
+        assertEquals(Routes.camera(Routes.MODE_DOC), VoiceViewModel.routeForIntent("scan_document"))
     }
 
     @Test

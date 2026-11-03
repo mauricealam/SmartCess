@@ -22,23 +22,10 @@ import kotlin.math.atan2
  * the main thread; the analyzer never blocks the camera pipeline because
  * overlapping frames are dropped while one recognition is in flight.
  */
-/**
- * Raw facts about one analyzed frame. Dimensions, rotation, and block
- * count only — never text content. Delivered ahead of [FramingInput] so
- * guidance-test diagnostics can pair them.
- */
-data class FrameMeta(
-    val width: Int = 0,
-    val height: Int = 0,
-    val rotation: Int = 0,
-    val blocks: Int = 0,
-)
-
 class TextFramingAnalyzer(
     private val onResult: (FramingInput) -> Unit,
     private val onError: (Throwable) -> Unit = {},
     private val sampleEvery: Int = DEFAULT_SAMPLE_EVERY,
-    private val onFrameMeta: (FrameMeta) -> Unit = {},
 ) : ImageAnalysis.Analyzer {
 
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
@@ -78,14 +65,6 @@ class TextFramingAnalyzer(
             .addOnSuccessListener { visionText ->
                 lastRecognizedText = visionText.text
                 val result = toFramingInput(visionText, width, height, luminance, rotation)
-                onFrameMeta(
-                    FrameMeta(
-                        width = width,
-                        height = height,
-                        rotation = rotation,
-                        blocks = visionText.textBlocks.count { it.boundingBox != null },
-                    ),
-                )
                 onResult(result)
             }
             .addOnFailureListener { e -> onError(e) }

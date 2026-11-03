@@ -146,7 +146,7 @@ class BillResultViewModel @Inject constructor(
             val spec = ReminderScheduler.billReminderSpec(bill.id, bill.provider, dueMillis, daysBefore)
             val triggerAt = spec.third
             if (triggerAt <= System.currentTimeMillis()) {
-                _state.value = _state.value.copy(errorRes = R.string.error_generic)
+                _state.value = _state.value.copy(errorRes = R.string.reminder_time_passed)
                 return@launch
             }
             val id = reminders.create(

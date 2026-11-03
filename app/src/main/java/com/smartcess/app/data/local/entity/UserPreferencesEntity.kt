@@ -15,6 +15,7 @@ data class UserPreferencesEntity(
     val samEnabled: Boolean = false,
     val imageGenEnabled: Boolean = false,
     val analyticsOptIn: Boolean = false,
+    /** Reserved: no crash reporter exists yet, so no toggle writes it. */
     val crashOptIn: Boolean = false,
     val highContrast: Boolean = false,
     val largeText: Boolean = false,

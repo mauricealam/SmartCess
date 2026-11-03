@@ -75,10 +75,6 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { prefs.setAnalyticsOptIn(optIn) }
     }
 
-    fun setCrashOptIn(optIn: Boolean) {
-        viewModelScope.launch { prefs.update { it.copy(crashOptIn = optIn) } }
-    }
-
     fun setHighContrast(enabled: Boolean) {
         viewModelScope.launch { prefs.update { it.copy(highContrast = enabled) } }
     }

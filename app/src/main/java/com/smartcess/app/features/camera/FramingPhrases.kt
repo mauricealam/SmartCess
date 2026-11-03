@@ -13,7 +13,6 @@ object FramingPhrases {
     fun stringRes(
         condition: FramingCondition,
         isDocument: Boolean = false,
-        captureAllowed: Boolean = true,
     ): Int = when (condition) {
         FramingCondition.NO_TEXT ->
             if (isDocument) R.string.framing_no_text_doc else R.string.framing_no_text
@@ -32,8 +31,6 @@ object FramingPhrases {
         FramingCondition.TILTED ->
             if (isDocument) R.string.framing_hold_straight_doc else R.string.framing_hold_straight
         FramingCondition.TOO_DARK -> R.string.framing_too_dark
-        // Capture-disabled sessions never invite a capture that cannot run.
-        FramingCondition.READY ->
-            if (captureAllowed) R.string.framing_ready else R.string.framing_ready_demo
+        FramingCondition.READY -> R.string.framing_ready
     }
 }

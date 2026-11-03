@@ -1,6 +1,7 @@
 package com.smartcess.app.features.appointments
 
 import android.content.Context
+import com.smartcess.app.R
 import com.smartcess.app.core.work.ReminderScheduler
 import com.smartcess.app.data.local.entity.AppointmentEntity
 import com.smartcess.app.data.repository.AppointmentRepository
@@ -16,6 +17,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -83,5 +85,31 @@ class AppointmentDetailViewModelTest {
 
         assertEquals(0, hookCalls)
         coVerify { appointments.delete(21L) }
+    }
+
+    @Test
+    fun confirmTravelReminder_pastTrigger_reportsPassed() = runTest(testDispatcher) {
+        coEvery { appointments.getById(any()) } returns appt(eventId = null)
+        val vm = viewModel()
+        vm.load(21L)
+        advanceUntilIdle()
+
+        vm.confirmTravelReminder(60)
+        advanceUntilIdle()
+
+        assertEquals(R.string.reminder_time_passed, vm.state.value.messageRes)
+    }
+
+    @Test
+    fun calendarDenial_permanentThenTemporary_togglesSettingsFlag() = runTest(testDispatcher) {
+        val vm = viewModel()
+
+        vm.onCalendarPermanentlyDenied()
+        assertEquals(R.string.appt_calendar_denied_forever, vm.state.value.messageRes)
+        assertTrue(vm.state.value.calendarSettings)
+
+        vm.onCalendarDenied()
+        assertEquals(R.string.appt_calendar_denied, vm.state.value.messageRes)
+        assertFalse(vm.state.value.calendarSettings)
     }
 }

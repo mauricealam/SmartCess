@@ -88,7 +88,6 @@ fun SmartCessNavGraph(
             route = Routes.CAMERA_ROUTE,
             arguments = listOf(
                 navArgument(Routes.ARG_MODE) { defaultValue = Routes.MODE_BILL },
-                navArgument(Routes.ARG_CAPTURE) { defaultValue = "on" },
             ),
         ) {
             CameraScreen(

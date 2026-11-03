@@ -154,10 +154,9 @@ class CameraViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun viewModel(mode: String? = null, capture: String? = null): CameraViewModel {
+    private fun viewModel(mode: String? = null): CameraViewModel {
         val args = mutableMapOf<String, String>()
         if (mode != null) args[Routes.ARG_MODE] = mode
-        if (capture != null) args[Routes.ARG_CAPTURE] = capture
         return CameraViewModel(
             context = mockk<Context>(relaxed = true),
             spark = mockk<SparkClient>(relaxed = true),
@@ -883,103 +882,7 @@ class CameraViewModelTest {
         coVerify(exactly = 1) { bills.save(any()) }
     }
 
-    // Diagnostic no-capture session
-
-    @Test
-    fun normalizeCapture_onlyOffDisables() {
-        assertTrue(CameraViewModel.normalizeCapture(null))
-        assertTrue(CameraViewModel.normalizeCapture("on"))
-        assertTrue(CameraViewModel.normalizeCapture("xyz"))
-        assertFalse(CameraViewModel.normalizeCapture(Routes.CAPTURE_OFF))
-    }
-
-    @Test
-    fun demoMode_captureBlocked_announced() = runTest {
-        val vm = viewModel(Routes.MODE_BILL, Routes.CAPTURE_OFF)
-        advanceUntilIdle()
-        assertTrue(vm.uiState.value.demoNoCapture)
-        vm.capture()
-        advanceUntilIdle()
-        assertEquals(CameraPhase.FRAMING, vm.uiState.value.phase)
-        assertTrue(fakeSpeaker.spoken.isNotEmpty())
-        coVerify(exactly = 0) { bills.save(any()) }
-        coVerify(exactly = 0) { documents.save(any()) }
-    }
-
-    @Test
-    fun normalMode_captureNotBlockedByDefault() = runTest {
-        val vm = viewModel(Routes.MODE_BILL)
-        advanceUntilIdle()
-        assertFalse(vm.uiState.value.demoNoCapture)
-    }
-
-    // Temporary guidance-test diagnostics
-
-    @Test
-    fun diag_populatedInGuidanceTest_only() = runTest {
-        every { guidance.guide(any(), any()) } returns GuidanceOutcome.SPOKEN
-        val normal = viewModel(Routes.MODE_BILL)
-        advanceUntilIdle()
-        normal.seedDiagFrameForTest(
-            FramingInput(hasText = true, coverage = 0.5f, offsetX = -0.3f, minEdgeMargin = 0.1f),
-            FrameMeta(width = 1280, height = 720, rotation = 0, blocks = 12),
-        )
-        advanceUntilIdle()
-        assertNull(normal.uiState.value.diag)
-
-        val demo = viewModel(Routes.MODE_BILL, Routes.CAPTURE_OFF)
-        advanceUntilIdle()
-        val logged = mutableListOf<String>()
-        demo.logDiag = { logged.add(it) }
-        demo.seedDiagFrameForTest(
-            FramingInput(hasText = true, coverage = 0.5f, offsetX = -0.3f, minEdgeMargin = 0.1f),
-            FrameMeta(width = 1280, height = 720, rotation = 0, blocks = 12),
-        )
-        advanceUntilIdle()
-        val diag = demo.uiState.value.diag
-        assertNotNull(diag)
-        diag!!
-        assertEquals(1280, diag.frameWidth)
-        assertEquals(720, diag.frameHeight)
-        assertEquals(0, diag.rotation)
-        assertEquals(12, diag.blocks)
-        assertEquals(0.5f, diag.coverage)
-        assertEquals(-0.3f, diag.offsetX)
-        assertEquals(FramingCondition.OFF_LEFT, diag.condition)
-        assertEquals(GuidanceOutcome.SPOKEN, diag.outcome)
-        assertTrue(diag.gateAllowed)
-        assertEquals(1, logged.size)
-        val line = logged[0]
-        assertTrue(line.contains("frame=1280x720"))
-        assertTrue(line.contains("rot=0"))
-        assertTrue(line.contains("blocks=12"))
-        assertTrue(line.contains("cond=OFF_LEFT"))
-        assertTrue(line.contains("spoke=SPOKEN"))
-    }
-
-    @Test
-    fun diag_logThrottled_sameCondition() = runTest {
-        every { guidance.guide(any(), any()) } returns GuidanceOutcome.LATCHED
-        val demo = viewModel(Routes.MODE_BILL, Routes.CAPTURE_OFF)
-        advanceUntilIdle()
-        val logged = mutableListOf<String>()
-        demo.logDiag = { logged.add(it) }
-        val input = FramingInput(hasText = true, coverage = 0.05f, minEdgeMargin = 0.2f)
-        val meta = FrameMeta(width = 1280, height = 720, rotation = 0, blocks = 4)
-        demo.seedDiagFrameForTest(input, meta)
-        demo.seedDiagFrameForTest(input, meta)
-        demo.seedDiagFrameForTest(input, meta)
-        advanceUntilIdle()
-        // Same condition within the window: one log line, live overlay kept.
-        assertEquals(1, logged.size)
-        assertTrue(logged[0].contains("cond=TOO_FAR"))
-        val diag = demo.uiState.value.diag
-        assertNotNull(diag)
-        assertEquals(FramingCondition.TOO_FAR, diag!!.condition)
-        assertEquals(GuidanceOutcome.LATCHED, diag.outcome)
-    }
-
-    // Compound edge guidance + demo READY phrase
+    // Compound edge guidance
 
     @Test
     fun compoundEdge_requestsDirectionalPhrase() = runTest {
@@ -987,9 +890,8 @@ class CameraViewModelTest {
         every { guidance.guide(capture(requested), any()) } returns GuidanceOutcome.SPOKEN
         val vm = viewModel(Routes.MODE_BILL)
         advanceUntilIdle()
-        vm.seedDiagFrameForTest(
+        vm.seedFrameForTest(
             FramingInput(hasText = true, coverage = 0.5f, offsetX = -0.3f, minEdgeMargin = 0.0f),
-            FrameMeta(width = 480, height = 640, rotation = 0, blocks = 30),
         )
         advanceUntilIdle()
         assertEquals(FramingCondition.EDGE_LEFT, requested.captured)
@@ -997,58 +899,40 @@ class CameraViewModelTest {
     }
 
     @Test
-    fun hysteresis_dither_holdsStable_reportsRaw() = runTest {
+    fun hysteresis_dither_holdsStable_untilBandClears() = runTest {
         every { guidance.guide(any(), any()) } returns GuidanceOutcome.SPOKEN
-        val demo = viewModel(Routes.MODE_BILL, Routes.CAPTURE_OFF)
+        val vm = viewModel(Routes.MODE_BILL)
         advanceUntilIdle()
-        demo.logDiag = {}
-        val meta = FrameMeta(width = 480, height = 640, rotation = 0, blocks = 8)
         // Far, then a dither flicker that passes entry but not the exit band.
-        demo.seedDiagFrameForTest(
+        vm.seedFrameForTest(
             FramingInput(hasText = true, coverage = 0.10f, minEdgeMargin = 0.2f),
-            meta,
         )
-        demo.seedDiagFrameForTest(
+        vm.seedFrameForTest(
             FramingInput(hasText = true, coverage = 0.16f, minEdgeMargin = 0.2f),
-            meta,
         )
         advanceUntilIdle()
-        assertEquals(FramingCondition.TOO_FAR, demo.uiState.value.condition)
-        val held = demo.uiState.value.diag
-        assertNotNull(held)
-        assertEquals(FramingCondition.TOO_FAR, held!!.condition)
-        assertEquals(FramingCondition.READY, held.raw)
+        assertEquals(FramingCondition.TOO_FAR, vm.uiState.value.condition)
         // Clearing the band releases to the new condition.
-        demo.seedDiagFrameForTest(
+        vm.seedFrameForTest(
             FramingInput(hasText = true, coverage = 0.19f, minEdgeMargin = 0.2f),
-            meta,
         )
         advanceUntilIdle()
-        assertEquals(FramingCondition.READY, demo.uiState.value.condition)
+        assertEquals(FramingCondition.READY, vm.uiState.value.condition)
     }
 
     @Test
-    fun demoReady_requestsDemoPhrase_normalKeepsCaptureInvite() = runTest {
+    fun ready_requestsCaptureInvite() = runTest {
         every { guidance.guide(any(), any()) } returns GuidanceOutcome.SPOKEN
         val ready = FramingInput(
             hasText = true, coverage = 0.5f, offsetX = 0.02f, offsetY = -0.02f,
             minEdgeMargin = 0.2f,
         )
-        val meta = FrameMeta(width = 480, height = 640, rotation = 0, blocks = 16)
-        val normal = viewModel(Routes.MODE_BILL)
+        val vm = viewModel(Routes.MODE_BILL)
         advanceUntilIdle()
-        normal.seedDiagFrameForTest(ready, meta)
+        vm.seedFrameForTest(ready)
         advanceUntilIdle()
-        assertEquals(FramingCondition.READY, normal.uiState.value.condition)
-        assertEquals(R.string.framing_ready, normal.uiState.value.instructionRes)
-
-        val demo = viewModel(Routes.MODE_BILL, Routes.CAPTURE_OFF)
-        advanceUntilIdle()
-        demo.logDiag = {}
-        demo.seedDiagFrameForTest(ready, meta)
-        advanceUntilIdle()
-        assertEquals(FramingCondition.READY, demo.uiState.value.condition)
-        assertEquals(R.string.framing_ready_demo, demo.uiState.value.instructionRes)
+        assertEquals(FramingCondition.READY, vm.uiState.value.condition)
+        assertEquals(R.string.framing_ready, vm.uiState.value.instructionRes)
     }
 }
 

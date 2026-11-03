@@ -449,9 +449,16 @@ class VoiceViewModel @Inject constructor(
         val gen = turnGen
         speaker.speak(text) {
             _state.update { it.copy(speaking = false) }
-            if (expectReply && gen == turnGen && autoTurns < maxAutoTurns) {
-                autoTurns++
-                autoListen()
+            if (!expectReply) return@speak
+            // Audio-tail guard (mirrors the camera gate): TTS completion
+            // fires slightly before the tail fades; opening the mic instantly
+            // risks hearing our own last syllable as the user's reply.
+            viewModelScope.launch {
+                delay(TTS_TAIL_GUARD_MS)
+                if (gen == turnGen && autoTurns < maxAutoTurns) {
+                    autoTurns++
+                    autoListen()
+                }
             }
         }
     }
@@ -478,6 +485,8 @@ class VoiceViewModel @Inject constructor(
     companion object {
         const val UPLOAD_TIMEOUT_MS = 45_000L
         private const val AUTO_STOP_POLL_MS = 200L
+        /** Audio-tail guard before auto-listen (mirrors the camera speech gate). */
+        internal const val TTS_TAIL_GUARD_MS = 400L
 
         /**
          * Intent -> owning module route (spec voice/touch parity). Intents that need
@@ -486,8 +495,8 @@ class VoiceViewModel @Inject constructor(
          */
         fun routeForIntent(intent: String): String? = when (intent) {
             "daily_briefing" -> Routes.BRIEFING
-            "scan_bill" -> Routes.CAMERA
-            "scan_document" -> Routes.CAMERA
+            "scan_bill" -> Routes.camera(Routes.MODE_BILL)
+            "scan_document" -> Routes.camera(Routes.MODE_DOC)
             "read_document" -> Routes.DOCUMENTS
             "email_briefing" -> Routes.EMAIL
             "ask_bill_question" -> Routes.BILLS

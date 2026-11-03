@@ -2,6 +2,10 @@ package com.smartcess.app.features.voice
 
 import android.content.Context
 import com.smartcess.app.R
+import com.smartcess.app.core.ai.OfflineModeException
+import com.smartcess.app.core.ai.RateLimitedException
+import com.smartcess.app.core.ai.SessionExpiredException
+import java.util.concurrent.TimeoutException
 import com.smartcess.app.core.ai.AppointmentExtraction
 import com.smartcess.app.core.ai.ReminderExtraction
 import com.smartcess.app.core.ai.RoutineHelp
@@ -31,6 +35,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import io.mockk.clearMocks
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -150,7 +155,8 @@ class VoiceActionHandlerTest {
     private fun dueRoutine(
         id: Long = 1L,
         title: String = "Vitamins",
-        nextDue: Long = System.currentTimeMillis() + 3_600_000L,
+        // Genuinely due: voice must refuse routines whose time hasn't come.
+        nextDue: Long = System.currentTimeMillis() - 3_600_000L,
     ) = RoutineEntity(
         id = id, title = title, kind = "MEDICATION",
         scheduleRule = "DAILY 08:00", nextDueMillis = nextDue,
@@ -331,6 +337,24 @@ class VoiceActionHandlerTest {
         val turn = handler.start("add_appointment", "dentist tomorrow")
         assertEquals("literal", turn.speak)
         assertFalse(handler.hasPending)
+        verify { ctx.getString(R.string.error_generic) }
+    }
+
+    @Test
+    fun extractionFailure_mapsKnownErrorsToSpeech() = runTest {
+        val cases = listOf(
+            SessionExpiredException() to R.string.auth_sign_in_required,
+            RateLimitedException() to R.string.error_rate_limit,
+            TimeoutException() to R.string.voice_timeout,
+            OfflineModeException() to R.string.voice_api_unavailable,
+        )
+        cases.forEach { (error, expectedRes) ->
+            clearMocks(ctx, spark)
+            every { ctx.getString(any()) } returns "literal"
+            coEvery { spark.extractAppointment(any()) } throws error
+            handler.start("add_appointment", "dentist tomorrow")
+            verify { ctx.getString(expectedRes) }
+        }
     }
 
     @Test
@@ -815,7 +839,7 @@ class VoiceActionHandlerTest {
         every { documents.observeAll() } returns flowOf(emptyList())
         val turn = handler.start("read_document", "read my lease")
         assertEquals("literal", turn.speak)
-        assertEquals("camera?mode=doc&capture=on", turn.navigateTo)
+        assertEquals("camera?mode=doc", turn.navigateTo)
         assertFalse(handler.hasPending)
     }
 
@@ -833,7 +857,7 @@ class VoiceActionHandlerTest {
     fun scanBill_guidesCapture() = runTest {
         val turn = handler.start("scan_bill", "scan this bill")
         assertEquals("literal", turn.speak)
-        assertEquals("camera?mode=bill&capture=on", turn.navigateTo)
+        assertEquals("camera?mode=bill", turn.navigateTo)
         assertFalse(handler.hasPending)
     }
 
@@ -841,7 +865,7 @@ class VoiceActionHandlerTest {
     fun scanDocument_guidesDocCapture() = runTest {
         val turn = handler.start("scan_document", "save my document")
         assertEquals("literal", turn.speak)
-        assertEquals("camera?mode=doc&capture=on", turn.navigateTo)
+        assertEquals("camera?mode=doc", turn.navigateTo)
         assertFalse(handler.hasPending)
     }
 
@@ -854,7 +878,7 @@ class VoiceActionHandlerTest {
         coVerify(exactly = 0) { appointments.save(any()) }
 
         val bill = handler.followUp("the bill")!!
-        assertEquals("camera?mode=bill&capture=on", bill.navigateTo)
+        assertEquals("camera?mode=bill", bill.navigateTo)
         assertFalse(handler.hasPending)
     }
 
@@ -862,7 +886,7 @@ class VoiceActionHandlerTest {
     fun scanAmbiguous_docPick_routesDoc_cancelDismisses() = runTest {
         handler.start("scan_ambiguous", "scan it")
         val doc = handler.followUp("document scanner")!!
-        assertEquals("camera?mode=doc&capture=on", doc.navigateTo)
+        assertEquals("camera?mode=doc", doc.navigateTo)
         assertFalse(handler.hasPending)
 
         handler.start("scan_ambiguous", "scan this")
@@ -948,6 +972,27 @@ class VoiceActionHandlerTest {
     fun completeRoutine_noneDue() = runTest {
         coEvery { routines.dueToday(any()) } returns emptyList()
         val turn = handler.start("complete_routine", "mark vitamins done")
+        assertEquals("literal", turn.speak)
+        assertFalse(handler.hasPending)
+    }
+
+    @Test
+    fun completeRoutine_namedButNotDue_namesItAndSavesNothing() = runTest {
+        coEvery { routines.dueToday(any()) } returns listOf(
+            dueRoutine(nextDue = System.currentTimeMillis() + 3_600_000L),
+        )
+        val turn = handler.start("complete_routine", "mark vitamins done")
+        assertEquals("fmt[Vitamins]", turn.speak)
+        assertFalse(handler.hasPending)
+        coVerify(exactly = 0) { routines.complete(any()) }
+    }
+
+    @Test
+    fun completeRoutine_onlyFutureDue_reportsNoneDue() = runTest {
+        coEvery { routines.dueToday(any()) } returns listOf(
+            dueRoutine(nextDue = System.currentTimeMillis() + 3_600_000L),
+        )
+        val turn = handler.start("complete_routine", "mark done")
         assertEquals("literal", turn.speak)
         assertFalse(handler.hasPending)
     }

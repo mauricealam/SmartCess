@@ -3,6 +3,10 @@ package com.smartcess.app.features.voice
 import android.content.Context
 import com.smartcess.app.R
 import com.smartcess.app.core.ai.AiException
+import com.smartcess.app.core.ai.OfflineModeException
+import com.smartcess.app.core.ai.RateLimitedException
+import com.smartcess.app.core.ai.SessionExpiredException
+import java.util.concurrent.TimeoutException
 import com.smartcess.app.core.ai.IntentResult
 import com.smartcess.app.core.ai.Speaker
 import com.smartcess.app.core.ai.SparkClient
@@ -39,6 +43,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.test.StandardTestDispatcher
+import io.mockk.clearMocks
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -231,10 +236,13 @@ class PushToTalkTest {
         assertEquals("Which document?", vm.state.value.message)
         assertEquals(listOf("Which document?"), speaker.spoken)
         assertNull(vm.state.value.errorRes)
-        // Hands-free turn-taking: the question's end restarts listening.
+        // Hands-free turn-taking: the question's end restarts listening
+        // once the TTS tail guard elapses.
         assertEquals(1, recorder.starts)
         speaker.completeSpeech()
         assertFalse(vm.state.value.speaking)
+        advanceTimeBy(VoiceViewModel.TTS_TAIL_GUARD_MS)
+        runCurrent()
         assertTrue(vm.state.value.recording)
         assertEquals(2, recorder.starts)
     }
@@ -614,6 +622,52 @@ class PushToTalkTest {
     }
 
     @Test
+    fun voiceClassifyFailure_mapsEachError() = runTest {
+        val cases = listOf(
+            OfflineModeException() to R.string.voice_api_unavailable,
+            SessionExpiredException() to R.string.auth_sign_in_required,
+            RateLimitedException() to R.string.error_rate_limit,
+            TimeoutException() to R.string.voice_timeout,
+            AiException("unclear") to R.string.voice_not_clear,
+            RuntimeException("down") to R.string.error_generic,
+        )
+        cases.forEach { (error, expectedRes) ->
+            clearMocks(spark)
+            recorder.rec = RecordedAudio(recordedFile(), peak = 5000, durationMs = 1200)
+            voiceApi.response = TranscribeResponse("hello there", 900, 1)
+            coEvery { spark.classifyIntent(any(), any()) } throws error
+            val vm = viewModel()
+            vm.startTalk()
+            runCurrent()
+            vm.stopTalk()
+            advanceUntilIdle()
+            assertEquals(expectedRes, vm.state.value.errorRes)
+        }
+    }
+
+    @Test
+    fun autoListen_waitsForTtsTailGuard() = runTest {
+        recorder.rec = RecordedAudio(recordedFile(), peak = 5000, durationMs = 1200)
+        voiceApi.response = TranscribeResponse("my documents", 900, 1)
+        coEvery { spark.classifyIntent(any(), any()) } returns
+            IntentResult(intent = "general_question", confidence = 0.9, clarifying_question = "Which document?")
+        val vm = viewModel()
+        vm.startTalk()
+        runCurrent()
+        vm.stopTalk()
+        advanceUntilIdle()
+        assertEquals("Which document?", vm.state.value.message)
+        // TTS completes: the mic must stay shut through the tail guard.
+        speaker.completeSpeech()
+        advanceTimeBy(VoiceViewModel.TTS_TAIL_GUARD_MS - 1)
+        runCurrent()
+        assertFalse(vm.state.value.recording)
+        advanceTimeBy(1)
+        runCurrent()
+        assertTrue(vm.state.value.recording)
+    }
+
+    @Test
     fun actionIntentWithClassifierQuestion_routesToHandler_keepsTaskAlive() = runTest {
         // Regression: the classifier's question must not orphan an action
         // task — the executor owns all of its follow-ups.
@@ -677,8 +731,10 @@ class PushToTalkTest {
         vm.onTypedChange("my documents")
         vm.submitTyped()
         advanceUntilIdle()
-        // First completion auto-listens (allowance 1).
+        // First completion auto-listens (allowance 1) past the tail guard.
         speaker.completeSpeech()
+        advanceTimeBy(VoiceViewModel.TTS_TAIL_GUARD_MS)
+        runCurrent()
         assertTrue(vm.state.value.recording)
         // Answer the auto turn; the next completion is capped.
         recorder.rec = RecordedAudio(recordedFile(), peak = 5000, durationMs = 1100)
@@ -687,6 +743,9 @@ class PushToTalkTest {
         advanceUntilIdle()
         assertEquals("Which document?", vm.state.value.message)
         speaker.completeSpeech()
+        // Past the tail guard the cap still holds the mic shut.
+        advanceTimeBy(VoiceViewModel.TTS_TAIL_GUARD_MS)
+        runCurrent()
         assertFalse(vm.state.value.recording)
         assertEquals(1, recorder.starts)
         // A deliberate tap restarts the allowance.

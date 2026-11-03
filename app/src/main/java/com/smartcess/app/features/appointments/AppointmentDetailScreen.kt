@@ -1,7 +1,11 @@
 package com.smartcess.app.features.appointments
 
 import android.Manifest
+import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +42,7 @@ import com.smartcess.app.ui.components.SmartCessConfirmDialog
 import com.smartcess.app.ui.components.SmartCessListItem
 import com.smartcess.app.ui.components.SmartCessPrimaryButton
 import com.smartcess.app.ui.components.SmartCessSecondaryButton
+import com.smartcess.app.ui.components.SmartCessTextAction
 import com.smartcess.app.ui.components.SmartCessTopBar
 import com.smartcess.app.ui.format.SmartCessFormat
 
@@ -58,7 +63,15 @@ fun AppointmentDetailScreen(
     val calendarLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        if (granted) viewModel.confirmCalendar() else viewModel.onCalendarDenied()
+        if (granted) {
+            viewModel.confirmCalendar()
+        } else if ((context as? Activity)
+            ?.shouldShowRequestPermissionRationale(Manifest.permission.WRITE_CALENDAR) == false
+        ) {
+            viewModel.onCalendarPermanentlyDenied()
+        } else {
+            viewModel.onCalendarDenied()
+        }
     }
     fun hasCalendarPermission(): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CALENDAR) ==
@@ -92,6 +105,18 @@ fun AppointmentDetailScreen(
         }
         state.messageRes?.let {
             SmartCessBanner(message = stringResource(it), kind = BannerKind.INFO)
+        }
+        if (state.calendarSettings) {
+            SmartCessTextAction(
+                text = stringResource(R.string.appt_open_settings),
+                onClick = {
+                    context.startActivity(
+                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.fromParts("package", context.packageName, null)
+                        },
+                    )
+                },
+            )
         }
         SmartCessCard(heading = appt.title) {
             Text(text = appt.title, style = MaterialTheme.typography.titleMedium)

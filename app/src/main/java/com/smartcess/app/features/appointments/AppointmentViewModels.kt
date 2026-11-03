@@ -147,6 +147,7 @@ data class AppointmentDetailUiState(
     val appointment: AppointmentEntity? = null,
     val notFound: Boolean = false,
     val messageRes: Int? = null,
+    val calendarSettings: Boolean = false,
 )
 
 @HiltViewModel
@@ -177,16 +178,22 @@ class AppointmentDetailViewModel @Inject constructor(
     fun confirmCalendar() {
         val appt = _state.value.appointment ?: return
         if (appt.calendarEventId != null) {
-            _state.value = _state.value.copy(messageRes = R.string.appt_calendar_saved)
+            _state.value = _state.value.copy(
+                messageRes = R.string.appt_calendar_saved, calendarSettings = false,
+            )
             return
         }
         viewModelScope.launch {
             val eventId = runCatching { insertCalendarEvent(appt) }.getOrNull()
             if (eventId == null) {
-                _state.value = _state.value.copy(messageRes = R.string.appt_calendar_local_warn)
+                _state.value = _state.value.copy(
+                    messageRes = R.string.appt_calendar_local_warn, calendarSettings = false,
+                )
             } else {
                 appointments.setCalendarEvent(appt.id, eventId)
-                _state.value = _state.value.copy(messageRes = R.string.appt_calendar_saved)
+                _state.value = _state.value.copy(
+                    messageRes = R.string.appt_calendar_saved, calendarSettings = false,
+                )
             }
             load(appt.id)
         }
@@ -231,7 +238,16 @@ class AppointmentDetailViewModel @Inject constructor(
 
     /** Shown when calendar permission is denied: the appointment stays local. */
     fun onCalendarDenied() {
-        _state.value = _state.value.copy(messageRes = R.string.appt_calendar_denied)
+        _state.value = _state.value.copy(
+            messageRes = R.string.appt_calendar_denied, calendarSettings = false,
+        )
+    }
+
+    /** Permanent ("don't ask again") denial: point at system Settings. */
+    fun onCalendarPermanentlyDenied() {
+        _state.value = _state.value.copy(
+            messageRes = R.string.appt_calendar_denied_forever, calendarSettings = true,
+        )
     }
 
     /** Travel reminder only after the caller confirms the offset. */
@@ -239,7 +255,7 @@ class AppointmentDetailViewModel @Inject constructor(
         val appt = _state.value.appointment ?: return
         val triggerAt = appt.startMillis - minutesBefore * 60L * 1000L
         if (triggerAt <= System.currentTimeMillis()) {
-            _state.value = _state.value.copy(messageRes = R.string.error_generic)
+            _state.value = _state.value.copy(messageRes = R.string.reminder_time_passed)
             return
         }
         viewModelScope.launch {

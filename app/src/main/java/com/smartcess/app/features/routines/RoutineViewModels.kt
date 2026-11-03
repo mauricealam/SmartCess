@@ -108,15 +108,19 @@ class RoutinesViewModel @Inject constructor(
             if (outcome.validation.hasErrors || savedId == null) {
                 _form.value = form.copy(errorRes = R.string.error_generic)
             } else {
-                scheduleRoutineReminder(savedId, form.title.trim(), nextDue)
-                _form.value = RoutineFormState(messageRes = R.string.routine_saved)
+                val reminderOk = scheduleRoutineReminder(savedId, form.title.trim(), nextDue)
+                _form.value = RoutineFormState(
+                    messageRes = R.string.routine_saved,
+                    errorRes = if (reminderOk) null else R.string.routine_reminder_failed,
+                )
                 onSaved(savedId)
             }
         }
     }
 
-    private suspend fun scheduleRoutineReminder(routineId: Long, title: String, triggerAt: Long) {
-        runCatching {
+    /** False when the reminder could not be scheduled: the caller says so distinctly. */
+    private suspend fun scheduleRoutineReminder(routineId: Long, title: String, triggerAt: Long): Boolean {
+        return runCatching {
             val id = reminders.create(
                 kind = ReminderEntity.KIND_ROUTINE,
                 title = title,
@@ -124,7 +128,7 @@ class RoutinesViewModel @Inject constructor(
                 referenceId = routineId,
             )
             scheduler.schedule(id)
-        }
+        }.isSuccess
     }
 
     companion object {
@@ -190,21 +194,29 @@ class RoutineDetailViewModel @Inject constructor(
     /** Marks complete only after the caller confirms. Tracking only, never advice. */
     fun confirmComplete() {
         val routine = _state.value.routine ?: return
+        // Completing a future occurrence would roll its due even further out.
+        if ((routine.nextDueMillis ?: 0L) > System.currentTimeMillis()) {
+            _state.value = _state.value.copy(messageRes = R.string.routine_not_due)
+            return
+        }
         viewModelScope.launch {
             routines.complete(routine.id)
-            rescheduleNext(routine.id)
-            _state.value = _state.value.copy(messageRes = R.string.routine_completed)
+            val reminderOk = rescheduleNext(routine.id)
+            _state.value = _state.value.copy(
+                messageRes = if (reminderOk) R.string.routine_completed
+                else R.string.routine_completed_noremind,
+            )
             load(routine.id)
         }
     }
 
     /** Drops stale routine reminders and schedules the rolled-forward due time. */
-    private suspend fun rescheduleNext(routineId: Long) {
-        runCatching {
+    private suspend fun rescheduleNext(routineId: Long): Boolean {
+        return runCatching {
             reminders.scheduledFor(ReminderEntity.KIND_ROUTINE, routineId).forEach {
                 scheduler.cancel(it.id)
             }
-            val updated = routines.getById(routineId) ?: return
+            val updated = routines.getById(routineId) ?: return@runCatching true
             val nextDue = updated.nextDueMillis
             if (nextDue != null && nextDue > System.currentTimeMillis()) {
                 val id = reminders.create(
@@ -215,7 +227,7 @@ class RoutineDetailViewModel @Inject constructor(
                 )
                 scheduler.schedule(id)
             }
-        }
+        }.isSuccess
     }
 
     fun delete(onDone: () -> Unit) {

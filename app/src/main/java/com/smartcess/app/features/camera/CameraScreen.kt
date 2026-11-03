@@ -258,7 +258,7 @@ private fun CameraPreviewContent(
                 ),
                 onClick = viewModel::capture,
                 enabled = uiState.captureEnabled && !busy &&
-                    uiState.phase != CameraPhase.REVIEW && !uiState.demoNoCapture,
+                    uiState.phase != CameraPhase.REVIEW,
                 modifier = Modifier.fillMaxWidth(),
                 leadingContent = if (busy) {
                     {

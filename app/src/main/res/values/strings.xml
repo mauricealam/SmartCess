@@ -61,7 +61,6 @@
     <string name="framing_edge_right" translatable="true">Words reach the edge of the frame. Move the phone back slightly and to the right.</string>
     <string name="framing_edge_up" translatable="true">Words reach the edge of the frame. Move the phone back slightly and up a little.</string>
     <string name="framing_edge_down" translatable="true">Words reach the edge of the frame. Move the phone back slightly and down a little.</string>
-    <string name="framing_ready_demo" translatable="true">Ready. Framing looks good.</string>
     <string name="camera_title_bill" translatable="true">Scan bill</string>
     <string name="camera_title_doc" translatable="true">Scan document</string>
     <string name="camera_processing_doc" translatable="true">Processing your document.</string>
@@ -74,9 +73,6 @@
     <string name="camera_review_deleted" translatable="true">Deleted. Nothing was saved.</string>
     <string name="camera_review_bill" translatable="true">Bill from %1$s, %2$s, due %3$s. Say save, retake, or delete.</string>
     <string name="camera_review_doc" translatable="true">%1$s. %2$s Say save, retake, or delete.</string>
-    <string name="camera_demo_no_capture" translatable="true">Guidance test. Capture is disabled in this session.</string>
-    <string name="camera_demo_no_capture_bill" translatable="true">Guidance test. Bill scanner. Capture is disabled in this session.</string>
-    <string name="camera_demo_no_capture_doc" translatable="true">Guidance test. Document scanner. Capture is disabled in this session.</string>
     <string name="camera_not_ready" translatable="true">Not ready yet. %1$s</string>
     <string name="camera_review_listening" translatable="true">Listening: say save, retake, or delete.</string>
     <string name="camera_review_reprompt" translatable="true">Sorry, I didn\'t catch that. Say save, retake, or delete.</string>
@@ -229,6 +225,7 @@
         <item quantity="other">%1$d days before</item>
     </plurals>
     <string name="bill_reminder_set" translatable="true">Reminder set.</string>
+    <string name="reminder_time_passed" translatable="true">That reminder time has already passed.</string>
     <string name="bill_no_previous" translatable="true">No previous bill from this provider to compare.</string>
     <string name="bill_rescan" translatable="true">Rescan</string>
     <string name="bill_item_desc" translatable="true">%1$s, %2$s, due %3$s</string>
@@ -326,6 +323,9 @@
     <string name="routine_schedule_label" translatable="true">Schedule (for example: DAILY 08:00)</string>
     <string name="routine_notes_label" translatable="true">Notes</string>
     <string name="routine_saved" translatable="true">Routine saved.</string>
+    <string name="routine_reminder_failed" translatable="true">Routine saved, but its reminder could not be scheduled. The routine list still shows it as due.</string>
+    <string name="routine_completed_noremind" translatable="true">Marked done, but the next reminder could not be scheduled.</string>
+    <string name="routine_not_due" translatable="true">This routine is not due yet.</string>
     <string name="routine_rule_daily_only" translatable="true">Only daily routines are supported for now. Use DAILY and a time, like DAILY 08:00.</string>
     <string name="routine_complete" translatable="true">Mark done</string>
     <string name="routine_completed" translatable="true">Done. Well done keeping on track.</string>
@@ -355,8 +355,6 @@
     <string name="settings_large_text" translatable="true">Large text</string>
     <string name="settings_analytics" translatable="true">Share anonymous usage counts</string>
     <string name="settings_analytics_desc" translatable="true">Off by default. Only counts and flags, never your bills or words.</string>
-    <string name="settings_crash" translatable="true">Share crash reports</string>
-    <string name="settings_crash_desc" translatable="true">Off by default. Helps fix bugs, with no personal content.</string>
     <string name="settings_privacy_body" translatable="true">Your data stays on this device. The camera and microphone only run when you ask. SmartCess never pays, sends, submits, or calls without your explicit confirmation.</string>
     <string name="settings_export" translatable="true">Export my data</string>
     <string name="settings_export_done" translatable="true">Your data is ready to share.</string>
@@ -455,6 +453,7 @@
     <string name="voice_bill_capture" translatable="true">Opening the bill scanner. Hold the bill steady in front of the camera.</string>
     <string name="voice_scan_choice" translatable="true">Should I open the bill scanner or the document scanner?</string>
     <string name="voice_routine_none_due" translatable="true">No routines are due.</string>
+    <string name="voice_routine_not_due" translatable="true">%1$s is not due yet, so I left it alone.</string>
     <string name="voice_routine_which" translatable="true">Which routine? %1$s</string>
     <string name="voice_routine_confirm" translatable="true">Mark %1$s done? Say yes to confirm, or no to keep it.</string>
     <string name="voice_routine_done" translatable="true">Marked %1$s done.</string>
@@ -503,6 +502,8 @@
 
     <!-- Calendar -->
     <string name="appt_calendar_denied" translatable="true">Calendar permission was not granted. The appointment stays in SmartCess only.</string>
+    <string name="appt_calendar_denied_forever" translatable="true">Calendar permission is turned off. The appointment stays in SmartCess only. You can turn it on in system Settings.</string>
+    <string name="appt_open_settings" translatable="true">Open system settings</string>
     <string name="appt_calendar_local_warn" translatable="true">No device calendar found. The appointment stays in SmartCess only.</string>
 
     <!-- Misc spec gaps -->

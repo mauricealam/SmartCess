@@ -47,7 +47,7 @@ class GuidancePlayer @Inject constructor(
 
     /**
      * Requests guidance for [condition]. Returns what actually happened so
-     * the guidance-test diagnostics can show requested-vs-spoken; existing
+     * callers can tell spoken guidance apart from a latched repeat; existing
      * callers may ignore the result.
      */
     fun guide(condition: FramingCondition, instruction: String): GuidanceOutcome {

@@ -190,12 +190,7 @@ fun SettingsScreen(
                 checked = prefs.analyticsOptIn,
                 onChecked = viewModel::setAnalyticsOptIn,
             )
-            SettingSwitch(
-                title = stringResource(R.string.settings_crash),
-                subtitle = stringResource(R.string.settings_crash_desc),
-                checked = prefs.crashOptIn,
-                onChecked = viewModel::setCrashOptIn,
-            )
+            // NOTE: no crash toggle — no crash reporter exists to honor one.
         }
 
         SettingsSection(title = stringResource(R.string.settings_section_data)) {
