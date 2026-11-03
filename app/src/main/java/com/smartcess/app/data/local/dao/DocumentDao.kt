@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 interface DocumentDao {
     @Upsert suspend fun upsert(document: DocumentEntity): Long
     @Query("DELETE FROM documents") suspend fun deleteAll()
+    @Query("DELETE FROM documents WHERE id = :id") suspend fun deleteById(id: Long)
     @Query("SELECT * FROM documents WHERE id = :id") suspend fun getById(id: Long): DocumentEntity?
 
     @Query("SELECT * FROM documents ORDER BY createdAt DESC")

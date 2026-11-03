@@ -52,6 +52,7 @@ import com.smartcess.app.ui.components.OpsCommandBar
 import com.smartcess.app.ui.components.OpsQueueRow
 import com.smartcess.app.ui.components.SmartCessBanner
 import com.smartcess.app.ui.components.SmartCessCard
+import com.smartcess.app.ui.components.SmartCessConfirmDialog
 import com.smartcess.app.ui.components.SmartCessHomeHeader
 import com.smartcess.app.ui.components.SmartCessMoreSheet
 import com.smartcess.app.ui.components.SmartCessSecondaryButton
@@ -86,6 +87,10 @@ fun HomeScreen(
     onAppointments: () -> Unit,
     onRoutines: () -> Unit,
     onEmail: () -> Unit,
+    onBillDetail: (Long) -> Unit,
+    onAppointmentDetail: (Long) -> Unit,
+    onRoutineDetail: (Long) -> Unit,
+    onDocumentDetail: (Long) -> Unit,
     onSettings: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
@@ -94,6 +99,15 @@ fun HomeScreen(
     val health by viewModel.health.collectAsState()
     var showMore by remember { mutableStateOf(false) }
     val wide = isWideWindow()
+    val onItemClick: (TodayPreviewItem) -> Unit = { item ->
+        when (item.kind) {
+            TodayItemKind.BILL -> onBillDetail(item.id)
+            TodayItemKind.APPOINTMENT -> onAppointmentDetail(item.id)
+            TodayItemKind.ROUTINE -> onRoutineDetail(item.id)
+            TodayItemKind.DOCUMENT -> onDocumentDetail(item.id)
+            TodayItemKind.EMAIL -> onEmail()
+        }
+    }
 
     Box(
         modifier = modifier
@@ -112,6 +126,8 @@ fun HomeScreen(
                 onMore = { showMore = true },
                 onSettings = onSettings,
                 onRefresh = viewModel::refresh,
+                onItemClick = onItemClick,
+                onItemDelete = viewModel::deleteItem,
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 840.dp)
@@ -127,6 +143,8 @@ fun HomeScreen(
                 onMore = { showMore = true },
                 onSettings = onSettings,
                 onRefresh = viewModel::refresh,
+                onItemClick = onItemClick,
+                onItemDelete = viewModel::deleteItem,
                 modifier = Modifier.padding(16.dp),
             )
         }
@@ -167,6 +185,8 @@ private fun HomePortrait(
     onMore: () -> Unit,
     onSettings: () -> Unit,
     onRefresh: () -> Unit,
+    onItemClick: (TodayPreviewItem) -> Unit,
+    onItemDelete: (TodayPreviewItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -198,6 +218,8 @@ private fun HomePortrait(
             state = state,
             onToday = onToday,
             onRefresh = onRefresh,
+            onItemClick = onItemClick,
+            onItemDelete = onItemDelete,
             modifier = Modifier.weight(1f),
         )
         Spacer(Modifier.height(12.dp))
@@ -225,6 +247,8 @@ private fun HomeWide(
     onMore: () -> Unit,
     onSettings: () -> Unit,
     onRefresh: () -> Unit,
+    onItemClick: (TodayPreviewItem) -> Unit,
+    onItemDelete: (TodayPreviewItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -260,6 +284,8 @@ private fun HomeWide(
                 state = state,
                 onToday = onToday,
                 onRefresh = onRefresh,
+                onItemClick = onItemClick,
+                onItemDelete = onItemDelete,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -286,8 +312,11 @@ private fun TodayPanel(
     state: HomeUiState,
     onToday: () -> Unit,
     onRefresh: () -> Unit,
+    onItemClick: (TodayPreviewItem) -> Unit,
+    onItemDelete: (TodayPreviewItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var pendingDelete by remember { mutableStateOf<TodayPreviewItem?>(null) }
     Column(modifier = modifier.verticalScroll(rememberScrollState())) {
         SmartCessCard {
             Text(
@@ -340,6 +369,15 @@ private fun TodayPanel(
                         meta = full,
                         status = stringResource(statusFor(item.textRes)),
                         statusColor = statusColorFor(item.textRes),
+                        onClick = { onItemClick(item) },
+                        onDelete = if (item.kind == TodayItemKind.EMAIL) null
+                        else ({ pendingDelete = item }),
+                        deleteContentDescription = stringResource(
+                            R.string.home_today_delete_button,
+                            item.displayName.ifBlank {
+                                stringResource(R.string.home_today_delete_unnamed)
+                            },
+                        ),
                     )
                 }
                 if (state.extraCount > 0) {
@@ -363,6 +401,21 @@ private fun TodayPanel(
                 SmartCessTextAction(
                     text = stringResource(R.string.home_today_see_all),
                     onClick = onToday,
+                )
+            }
+            val doomed = pendingDelete
+            if (doomed != null) {
+                SmartCessConfirmDialog(
+                    title = stringResource(R.string.home_today_delete_title),
+                    message = stringResource(
+                        R.string.home_today_delete_message,
+                        doomed.displayName.ifBlank {
+                            stringResource(R.string.home_today_delete_unnamed)
+                        },
+                    ),
+                    confirmText = stringResource(R.string.action_delete),
+                    onConfirm = { pendingDelete = null; onItemDelete(doomed) },
+                    onDismiss = { pendingDelete = null },
                 )
             }
         }

@@ -71,6 +71,10 @@ fun SmartCessNavGraph(
                 onAppointments = { navController.navigate(Routes.APPOINTMENTS) },
                 onRoutines = { navController.navigate(Routes.ROUTINES) },
                 onEmail = { navController.navigate(Routes.EMAIL) },
+                onBillDetail = { id -> navController.navigate(Routes.billResult(id)) },
+                onAppointmentDetail = { id -> navController.navigate(Routes.appointment(id)) },
+                onRoutineDetail = { id -> navController.navigate(Routes.routine(id)) },
+                onDocumentDetail = { id -> navController.navigate(Routes.docResult(id)) },
                 onSettings = { navController.navigate(Routes.SETTINGS) },
             )
         }

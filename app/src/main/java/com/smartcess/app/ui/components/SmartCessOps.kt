@@ -3,6 +3,7 @@ package com.smartcess.app.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -16,9 +17,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -147,6 +150,10 @@ fun OpsButton(
  * information the sentence lacks — so title/meta never double-speak.
  */
 @Composable
+/**
+ * Queue row with optional tap-through and delete. The delete button sits
+ * outside the merged row semantics so TalkBack focuses it separately.
+ */
 fun OpsQueueRow(
     index: String,
     title: String,
@@ -154,6 +161,9 @@ fun OpsQueueRow(
     status: String,
     statusColor: Color,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
+    deleteContentDescription: String? = null,
 ) {
     val announcement = remember(meta, status) {
         if (status.isNotBlank() && !meta.contains(status, ignoreCase = true)) {
@@ -165,37 +175,57 @@ fun OpsQueueRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 64.dp)
-            .semantics(mergeDescendants = true) { contentDescription = announcement }
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .heightIn(min = 64.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = index,
-            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .then(
+                    if (onClick != null) Modifier.clickable(onClickLabel = title, onClick = onClick)
+                    else Modifier,
+                )
+                .semantics(mergeDescendants = true) { contentDescription = announcement }
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
             Text(
-                text = meta,
+                text = index,
                 style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = meta,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                text = status,
+                maxLines = 2,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                ),
+                color = statusColor,
+            )
         }
-        Text(
-            text = status,
-            maxLines = 2,
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-            ),
-            color = statusColor,
-        )
+        if (onDelete != null) {
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Filled.Delete,
+                    contentDescription = deleteContentDescription,
+                    tint = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
     }
 }
 

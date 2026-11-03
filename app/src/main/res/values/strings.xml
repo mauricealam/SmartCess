@@ -9,6 +9,10 @@
     <string name="home_talk_hint" translatable="true">Try: “What bills are due this week?”</string>
     <string name="home_today" translatable="true">Today</string>
     <string name="home_today_see_all" translatable="true">See all</string>
+    <string name="home_today_delete_title" translatable="true">Delete this item?</string>
+    <string name="home_today_delete_message" translatable="true">Delete %1$s? This cannot be undone.</string>
+    <string name="home_today_delete_button" translatable="true">Delete %1$s</string>
+    <string name="home_today_delete_unnamed" translatable="true">this item</string>
     <string name="home_today_refresh" translatable="true">Refresh</string>
     <string name="home_scan_bill" translatable="true">Scan bill</string>
     <string name="home_scan_bill_desc" translatable="true">Scan a bill. Opens the guided camera.</string>

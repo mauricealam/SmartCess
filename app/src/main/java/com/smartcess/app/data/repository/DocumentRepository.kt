@@ -20,5 +20,7 @@ class DocumentRepository @Inject constructor(private val dao: DocumentDao) {
         return SaveOutcome(dao.upsert(titled), result)
     }
 
+    suspend fun delete(id: Long) = dao.deleteById(id)
+
     suspend fun deleteAll() = dao.deleteAll()
 }
