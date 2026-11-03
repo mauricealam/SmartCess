@@ -510,7 +510,7 @@ private fun DiagPanel(diag: FramingDiag, isDocument: Boolean) {
         "frame=${diag.frameWidth}x${diag.frameHeight} rot=${diag.rotation} blocks=${diag.blocks}",
         "cov=${format3(diag.coverage)} off=${formatSigned3(diag.offsetX)}/${formatSigned3(diag.offsetY)}",
         "margin=${format3(diag.margin)} cond=${diag.condition.name}",
-        "spoke=${diag.outcome.name} gate=${if (diag.gateAllowed) "open" else "muted"} cool=${diag.cooldownMs}ms",
+        "spoke=${diag.outcome.name} gate=${if (diag.gateAllowed) "open" else "muted"}",
     )
     Text(
         text = lines.joinToString("\n"),

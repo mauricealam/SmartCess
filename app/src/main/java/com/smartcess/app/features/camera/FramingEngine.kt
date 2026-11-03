@@ -72,8 +72,6 @@ data class FramingDiag(
     val condition: FramingCondition = FramingCondition.NO_TEXT,
     val outcome: GuidanceOutcome = GuidanceOutcome.SPOKEN,
     val gateAllowed: Boolean = true,
-    /** Milliseconds of repeat-cooldown remaining for this condition. */
-    val cooldownMs: Long = 0L,
 )
 
 object FramingEngine {

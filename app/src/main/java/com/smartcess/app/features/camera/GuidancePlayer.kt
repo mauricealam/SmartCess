@@ -4,26 +4,25 @@ import android.content.Context
 import android.os.VibrationEffect
 import android.os.Vibrator
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /** What a [GuidancePlayer.guide] request actually did. */
 enum class GuidanceOutcome {
     SPOKEN,
-    COOLDOWN_SUPPRESSED,
-    READY_LATCHED,
+    LATCHED,
 }
 
 /**
  * Speaks one framing instruction at a time with haptic feedback.
  *
- * Anti-spam: a repeated condition re-speaks at most every [COOLDOWN_MS]
- * (spec: 3s); READY speaks once with a long pulse and latches until the
- * condition leaves READY. The speaker uses QUEUE_FLUSH, so a new
- * instruction always replaces the previous one instead of queueing.
- * All speech routes through the [CameraSpeechGate] so guidance can never
- * trigger voice capture.
+ * Speak-on-change only (hearing-fatigue rule): each condition speaks once
+ * per continuous occurrence — speech and haptics both fire on the change,
+ * repeats stay silent. A new condition (including recovery steps like
+ * EDGE_LEFT -> OFF_LEFT -> READY) always speaks immediately; the speaker
+ * uses QUEUE_FLUSH, so a new instruction replaces the previous one
+ * instead of queueing. All speech routes through the [CameraSpeechGate]
+ * so guidance can never trigger voice capture.
  */
 @Singleton
 class GuidancePlayer @Inject constructor(
@@ -32,8 +31,6 @@ class GuidancePlayer @Inject constructor(
 ) {
     private val vibrator: Vibrator? = context.getSystemService(Vibrator::class.java)
     private var lastCondition: FramingCondition? = null
-    private val lastSpokenAt = AtomicLong(0L)
-    private var readyLatched = false
 
     /**
      * Spec haptic preference, refreshed per camera session. Speech guidance
@@ -47,42 +44,24 @@ class GuidancePlayer @Inject constructor(
      * callers may ignore the result.
      */
     fun guide(condition: FramingCondition, instruction: String): GuidanceOutcome {
-        if (condition == FramingCondition.READY) {
-            if (readyLatched) return GuidanceOutcome.READY_LATCHED
-            readyLatched = true
-            lastCondition = condition
-            lastSpokenAt.set(System.currentTimeMillis())
-            pulse(READY_PULSE_MS)
-            gate.speak(instruction)
-            return GuidanceOutcome.SPOKEN
-        }
-        readyLatched = false
-        val now = System.currentTimeMillis()
-        if (condition == lastCondition && now - lastSpokenAt.get() < COOLDOWN_MS) {
-            return GuidanceOutcome.COOLDOWN_SUPPRESSED
-        }
+        if (condition == lastCondition) return GuidanceOutcome.LATCHED
         lastCondition = condition
-        lastSpokenAt.set(now)
-        pulseWave(patternFor(condition))
+        if (condition == FramingCondition.READY) {
+            pulse(READY_PULSE_MS)
+        } else {
+            pulseWave(patternFor(condition))
+        }
         gate.speak(instruction)
         return GuidanceOutcome.SPOKEN
-    }
-
-    /** Repeat-cooldown remaining for [condition] (0 when it would speak now). */
-    fun cooldownRemainingMs(condition: FramingCondition): Long {
-        if (condition != lastCondition) return 0L
-        return (COOLDOWN_MS - (System.currentTimeMillis() - lastSpokenAt.get())).coerceAtLeast(0L)
     }
 
     fun stop() {
         gate.stop()
     }
 
-    /** New camera session: forget latch/cooldown so Ready can announce again. */
+    /** New camera session: forget the latch so guidance speaks again. */
     fun reset() {
-        readyLatched = false
         lastCondition = null
-        lastSpokenAt.set(0L)
     }
 
     private fun pulse(millis: Long) {
@@ -101,7 +80,6 @@ class GuidancePlayer @Inject constructor(
     }
 
     companion object {
-        const val COOLDOWN_MS = 3_000L
         const val READY_PULSE_MS = 220L
 
         /**

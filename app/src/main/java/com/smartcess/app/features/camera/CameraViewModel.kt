@@ -304,7 +304,6 @@ class CameraViewModel @Inject constructor(
             condition = condition,
             outcome = outcome,
             gateAllowed = gate.commandsAllowed,
-            cooldownMs = guidance.cooldownRemainingMs(condition),
         )
         _uiState.update { it.copy(diag = diag) }
         val now = System.currentTimeMillis()

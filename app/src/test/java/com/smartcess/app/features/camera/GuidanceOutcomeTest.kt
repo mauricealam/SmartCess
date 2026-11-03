@@ -8,7 +8,7 @@ import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** guide() must report requested-vs-spoken for guidance-test diagnostics. */
+/** guide() speaks on change only; repeats latch silently (fatigue rule). */
 class GuidanceOutcomeTest {
 
     private fun player(speaker: Speaker): GuidancePlayer {
@@ -28,11 +28,16 @@ class GuidanceOutcomeTest {
     }
 
     @Test
-    fun repeatWithinCooldown_suppressed() {
+    fun repeat_latchesSilently() {
         val guidance = player(mockk(relaxed = true))
         guidance.guide(FramingCondition.TOO_FAR, "Closer.")
         assertEquals(
-            GuidanceOutcome.COOLDOWN_SUPPRESSED,
+            GuidanceOutcome.LATCHED,
+            guidance.guide(FramingCondition.TOO_FAR, "Closer."),
+        )
+        // Still latched no matter how long the condition persists.
+        assertEquals(
+            GuidanceOutcome.LATCHED,
             guidance.guide(FramingCondition.TOO_FAR, "Closer."),
         )
     }
@@ -48,14 +53,22 @@ class GuidanceOutcomeTest {
     }
 
     @Test
-    fun ready_secondRequest_latched() {
+    fun recoveryChain_speaksEachStepOnce() {
         val guidance = player(mockk(relaxed = true))
+        assertEquals(
+            GuidanceOutcome.SPOKEN,
+            guidance.guide(FramingCondition.EDGE_LEFT, "Back and left."),
+        )
+        assertEquals(
+            GuidanceOutcome.SPOKEN,
+            guidance.guide(FramingCondition.OFF_LEFT, "Left."),
+        )
         assertEquals(
             GuidanceOutcome.SPOKEN,
             guidance.guide(FramingCondition.READY, "Ready."),
         )
         assertEquals(
-            GuidanceOutcome.READY_LATCHED,
+            GuidanceOutcome.LATCHED,
             guidance.guide(FramingCondition.READY, "Ready."),
         )
     }
@@ -72,9 +85,13 @@ class GuidanceOutcomeTest {
     }
 
     @Test
-    fun cooldownRemaining_zeroForNewCondition() {
+    fun reset_clearsLatch() {
         val guidance = player(mockk(relaxed = true))
         guidance.guide(FramingCondition.TOO_FAR, "Closer.")
-        assertEquals(0L, guidance.cooldownRemainingMs(FramingCondition.OFF_LEFT))
+        guidance.reset()
+        assertEquals(
+            GuidanceOutcome.SPOKEN,
+            guidance.guide(FramingCondition.TOO_FAR, "Closer."),
+        )
     }
 }

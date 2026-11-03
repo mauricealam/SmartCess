@@ -575,7 +575,6 @@ class CameraViewModelTest {
     @Test
     fun diag_populatedInGuidanceTest_only() = runTest {
         every { guidance.guide(any(), any()) } returns GuidanceOutcome.SPOKEN
-        every { guidance.cooldownRemainingMs(any()) } returns 0L
         val normal = viewModel(Routes.MODE_BILL)
         advanceUntilIdle()
         normal.seedDiagFrameForTest(
@@ -617,8 +616,7 @@ class CameraViewModelTest {
 
     @Test
     fun diag_logThrottled_sameCondition() = runTest {
-        every { guidance.guide(any(), any()) } returns GuidanceOutcome.COOLDOWN_SUPPRESSED
-        every { guidance.cooldownRemainingMs(any()) } returns 1_500L
+        every { guidance.guide(any(), any()) } returns GuidanceOutcome.LATCHED
         val demo = viewModel(Routes.MODE_BILL, Routes.CAPTURE_OFF)
         advanceUntilIdle()
         val logged = mutableListOf<String>()
@@ -635,8 +633,7 @@ class CameraViewModelTest {
         val diag = demo.uiState.value.diag
         assertNotNull(diag)
         assertEquals(FramingCondition.TOO_FAR, diag!!.condition)
-        assertEquals(GuidanceOutcome.COOLDOWN_SUPPRESSED, diag.outcome)
-        assertEquals(1_500L, diag.cooldownMs)
+        assertEquals(GuidanceOutcome.LATCHED, diag.outcome)
     }
 
     // Compound edge guidance + demo READY phrase

@@ -31,7 +31,7 @@ class GuidanceResetTest {
     }
 
     @Test
-    fun reset_clearsCooldown() {
+    fun reset_clearsLatch() {
         val speaker = mockk<Speaker>(relaxed = true)
         val guidance = player(speaker)
         guidance.guide(FramingCondition.TOO_FAR, "Closer.")
