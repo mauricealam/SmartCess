@@ -206,6 +206,8 @@ class CameraViewModel @Inject constructor(
     private var listenGen = 0L
     /** Review session id: a confirmation applies only to its own capture. */
     private var reviewId = 0L
+    /** Consecutive garbled review answers; bounds the spoken reprompt. */
+    private var consecutiveUnclear = 0
 
     // Unconfirmed extraction drafts. Only confirmSave() persists, and each
     // mode touches only its own repository.
@@ -431,6 +433,9 @@ class CameraViewModel @Inject constructor(
                         }
                     }
                     is UtteranceResult.Silence -> Unit // no speech: listen again
+                    // Garbled window while framing: also listen again quietly.
+                    // (Review reprompts instead; see the review loop.)
+                    is UtteranceResult.Unclear -> Unit
                     is UtteranceResult.Fatal -> {
                         _uiState.update { it.copy(voiceCapture = false) }
                         stopVoiceCapture()
@@ -456,6 +461,7 @@ class CameraViewModel @Inject constructor(
      */
     @VisibleForTesting
     internal fun startReviewListening() {
+        consecutiveUnclear = 0
         if (!micGranted()) {
             _uiState.update { it.copy(reviewListening = false) }
             return
@@ -490,7 +496,19 @@ class CameraViewModel @Inject constructor(
                             }
                         }
                     }
-                    is UtteranceResult.Silence -> Unit // no verdict: listen again
+                    is UtteranceResult.Silence -> {
+                        // Genuinely quiet (not our own speech): fresh ears.
+                        if (gate.commandsAllowed) consecutiveUnclear = 0
+                    }
+                    is UtteranceResult.Unclear -> {
+                        // The user demonstrably tried (an upload happened) but
+                        // no words came back: say so instead of dead silence.
+                        // Capped so noise can't nag forever; Silence resets.
+                        if (consecutiveUnclear < MAX_CONSECUTIVE_REPROMPT) {
+                            consecutiveUnclear++
+                            announce(R.string.camera_review_reprompt)
+                        }
+                    }
                     is UtteranceResult.Fatal -> {
                         stopReviewListening()
                         announce(heard.res)
@@ -513,14 +531,17 @@ class CameraViewModel @Inject constructor(
     private sealed interface UtteranceResult {
         data class Heard(val text: String) : UtteranceResult
         data object Silence : UtteranceResult
+        /** An upload was made but the transcript was empty/unusable. */
+        data object Unclear : UtteranceResult
         data class Fatal(@StringRes val res: Int) : UtteranceResult
     }
 
     /**
      * One record-transcribe round. Never records while app speech is
      * audible (no paid call on our own TTS); drops recordings overlapped
-     * by speech at dispatch. Silence/unclear returns [UtteranceResult.Silence]
-     * for a quiet retry; auth/network/mic failures return [UtteranceResult.Fatal].
+     * by speech at dispatch. Mic silence returns [UtteranceResult.Silence],
+     * empty transcripts [UtteranceResult.Unclear]; auth/network/mic failures
+     * return [UtteranceResult.Fatal].
      */
     private suspend fun listenUtterance(gen: Long): UtteranceResult {
         repeat(GATE_WAIT_ROUNDS) {
@@ -572,7 +593,7 @@ class CameraViewModel @Inject constructor(
         } catch (e: UploadException) {
             return UtteranceResult.Fatal(e.messageRes)
         } catch (e: UnclearException) {
-            return UtteranceResult.Silence
+            return UtteranceResult.Unclear
         } catch (e: IOException) {
             return UtteranceResult.Fatal(R.string.error_generic)
         }
@@ -879,15 +900,25 @@ class CameraViewModel @Inject constructor(
             .replace(Regex("\\s+"), " ") + " "
         fun has(phrase: String): Boolean = norm.contains(" $phrase ")
         return when {
+            // STT-tolerant discard: "cancel" per the confirmation contract,
+            // "not ok" as dissatisfaction with the result. Checked first so
+            // waffling ("yeah no") conservatively does not save.
             has("do not save") || has("dont save") || has("not save") ||
+                has("not ok") || has("not okay") ||
                 has("discard") || has("retake") || has("take again") ||
-                has("no") || has("nope") -> ReviewCommand.DISCARD
-            // "don't delete it" is ignored, not misread as a verdict.
-            has("do not delete") || has("dont delete") || has("not delete") ->
-                ReviewCommand.NONE
-            has("delete") -> ReviewCommand.DELETE
-            has("save") || has("yes") || has("yeah") || has("yep") ||
-                has("confirm") -> ReviewCommand.SAVE
+                has("cancel") || has("again") ||
+                has("no") || has("nope") || has("nah") -> ReviewCommand.DISCARD
+            // Uncertainty is ignored, not misread as a verdict.
+            has("do not delete") || has("dont delete") || has("not delete") ||
+                has("not sure") -> ReviewCommand.NONE
+            // "remove" is delete's everyday synonym; "deleted" its STT echo.
+            has("delete") || has("remove") || has("deleted") -> ReviewCommand.DELETE
+            // STT-tolerant save: "safe" is "save" homophone-confused, "saved"
+            // its echo; ok/okay/sure/yup are everyday confirmations.
+            has("save") || has("safe") || has("saved") ||
+                has("yes") || has("yeah") || has("yep") || has("yup") ||
+                has("confirm") || has("ok") || has("okay") ||
+                has("sure") -> ReviewCommand.SAVE
             else -> ReviewCommand.NONE
         }
     }
@@ -940,6 +971,8 @@ class CameraViewModel @Inject constructor(
         const val UPLOAD_TIMEOUT_MS = 45_000L
         private const val AUTO_STOP_POLL_MS = 200L
         private const val GATE_WAIT_MS = 300L
+        /** Spoken review reprompts before going quiet against noise. */
+        private const val MAX_CONSECUTIVE_REPROMPT = 2
         private const val GATE_WAIT_ROUNDS = 20
         /** Breather between takes: lets guidance interleave, bounds call rate. */
         private const val INTER_UTTERANCE_MS = 250L

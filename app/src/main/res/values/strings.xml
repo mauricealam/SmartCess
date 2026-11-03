@@ -75,6 +75,7 @@
     <string name="camera_demo_no_capture_doc" translatable="true">Guidance test. Document scanner. Capture is disabled in this session.</string>
     <string name="camera_not_ready" translatable="true">Not ready yet. %1$s</string>
     <string name="camera_review_listening" translatable="true">Listening: say save, retake, or delete.</string>
+    <string name="camera_review_reprompt" translatable="true">Sorry, I didn\'t catch that. Say save, retake, or delete.</string>
     <string name="voice_guide_test" translatable="true">Guidance test. Capture is disabled. Point the camera at a page and follow the spoken directions.</string>
     <string name="bill_unknown_provider" translatable="true">unknown provider</string>
     <string name="bill_no_due_date" translatable="true">no date found</string>

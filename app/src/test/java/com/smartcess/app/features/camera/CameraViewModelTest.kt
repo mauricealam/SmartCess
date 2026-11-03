@@ -509,7 +509,7 @@ class CameraViewModelTest {
     }
 
     @Test
-    fun reviewCommands_unclear502_relistensThenSaves() = runTest {
+    fun reviewCommands_unclear502_repromptsThenSaves() = runTest {
         coEvery { bills.save(any()) } returns ok(7L)
         val vm = viewModel(Routes.MODE_BILL)
         advanceUntilIdle()
@@ -519,11 +519,93 @@ class CameraViewModelTest {
         advanceUntilIdle()
         voiceApi.queue.add(unclearError())
         voiceApi.hear("yes")
-        finishSpeech()
-        advanceUntilIdle() // unclear retried quietly, "yes" ends the loop
+        finishSpeech() // prompt done -> loop starts
+        advanceTimeBy(2_000) // unclear -> reprompt speaks, loop gated on it
+        assertEquals(2, fakeSpeaker.spoken.size) // prompt + reprompt, no wedge
+        finishSpeech() // reprompt done -> listening resumes
+        advanceTimeBy(2_000) // "yes" ends the loop
         assertEquals(2, voiceApi.calls)
         coVerify(exactly = 1) { bills.save(any()) }
+        assertEquals(3, fakeSpeaker.spoken.size) // + saved confirmation
         assertFalse(vm.uiState.value.reviewListening)
+    }
+
+    @Test
+    fun reviewCommands_unclearCap_goesQuiet() = runTest {
+        coEvery { bills.save(any()) } returns ok(7L)
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        recorder.autoStopNow = true
+        vm.seedReviewForTest(bill = BillExtraction(provider = "City Electric", amount = 42.0))
+        vm.presentReview("Save it?")
+        advanceUntilIdle()
+        repeat(3) { voiceApi.queue.add(unclearError()) }
+        voiceApi.hear("yes")
+        finishSpeech()
+        advanceTimeBy(2_000) // unclear#1 -> reprompt#1
+        finishSpeech()
+        advanceTimeBy(2_000) // unclear#2 -> reprompt#2
+        finishSpeech()
+        advanceTimeBy(2_000) // unclear#3 capped quiet, then "yes" saves
+        assertEquals(4, voiceApi.calls)
+        coVerify(exactly = 1) { bills.save(any()) }
+        assertEquals(4, fakeSpeaker.spoken.size) // prompt + 2 reprompts + saved
+        assertFalse(vm.uiState.value.reviewListening)
+    }
+
+    @Test
+    fun reviewCommands_tolerantWords_match() = runTest {
+        coEvery { bills.save(any()) } returns ok(7L)
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        recorder.autoStopNow = true
+        suspend fun verdict(word: String): CameraPhase {
+            vm.seedReviewForTest(bill = BillExtraction(provider = "City Electric", amount = 42.0))
+            vm.presentReview("Save it?")
+            advanceUntilIdle()
+            voiceApi.hear(word)
+            finishSpeech()
+            advanceUntilIdle() // verdict ends the loop
+            return vm.uiState.value.phase
+        }
+        assertEquals(CameraPhase.FRAMING, verdict("safe")) // "save" homophone
+        assertEquals(CameraPhase.FRAMING, verdict("ok")) // everyday confirm
+        assertEquals(CameraPhase.FRAMING, verdict("cancel")) // contract word
+        assertEquals(CameraPhase.FRAMING, verdict("again")) // retake shorthand
+        assertEquals(CameraPhase.FRAMING, verdict("nah")) // colloquial no
+        coVerify(exactly = 2) { bills.save(any()) } // safe + ok only
+    }
+
+    @Test
+    fun reviewCommands_remove_deletesNotDiscards() = runTest {
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        recorder.autoStopNow = true
+        vm.seedReviewForTest(bill = BillExtraction(provider = "City Electric", amount = 42.0))
+        vm.presentReview("Save it?")
+        advanceUntilIdle()
+        voiceApi.hear("remove it")
+        finishSpeech()
+        advanceUntilIdle()
+        assertNull(vm.uiState.value.reviewBody)
+        assertEquals(CameraPhase.REVIEW, vm.uiState.value.phase) // exit, not rescan
+        coVerify(exactly = 0) { bills.save(any()) }
+    }
+
+    @Test
+    fun reviewCommands_notSure_ignored_notOk_discards() = runTest {
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        recorder.autoStopNow = true
+        vm.seedReviewForTest(bill = BillExtraction(provider = "City Electric", amount = 42.0))
+        vm.presentReview("Save it?")
+        advanceUntilIdle()
+        voiceApi.hear("not sure", "not ok")
+        finishSpeech()
+        advanceUntilIdle() // uncertainty ignored, "not ok" discards
+        assertEquals(2, voiceApi.calls) // both utterances were heard
+        assertEquals(CameraPhase.FRAMING, vm.uiState.value.phase)
+        coVerify(exactly = 0) { bills.save(any()) }
     }
 
     @Test
