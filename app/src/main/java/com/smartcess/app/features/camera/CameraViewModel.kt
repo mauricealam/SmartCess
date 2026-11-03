@@ -72,7 +72,7 @@ import javax.inject.Named
 enum class CameraPhase { FRAMING, CAPTURING, PROCESSING, REVIEW, ERROR }
 
 /** Spoken review verdict. Anything else is ignored in REVIEW. */
-enum class ReviewCommand { SAVE, DISCARD, NONE }
+enum class ReviewCommand { SAVE, DISCARD, DELETE, NONE }
 
 /** Saved capture id plus which result screen owns it. */
 data class CaptureResult(val id: Long, val isDocument: Boolean)
@@ -150,6 +150,10 @@ class CameraViewModel @Inject constructor(
     /** Emits the saved id + result owner after the user confirms Save. */
     private val _captured = MutableSharedFlow<CaptureResult>(extraBufferCapacity = 1)
     val captured: SharedFlow<CaptureResult> = _captured.asSharedFlow()
+
+    /** Emits after a spoken/touch delete so the screen can exit the camera. */
+    private val _reviewCancelled = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val reviewCancelled: SharedFlow<Unit> = _reviewCancelled.asSharedFlow()
 
     // CameraX/ML Kit objects stay lazy so the review/save logic is
     // constructible on the JVM; the screen binds them via bindAnalyzer().
@@ -444,8 +448,8 @@ class CameraViewModel @Inject constructor(
 
     /**
      * Arms review confirmation listening after the spoken result finishes.
-     * Only yes/save (confirm) and no/discard/retake (discard) act, and only
-     * for the review session that armed them.
+     * Only save (confirm), retake/discard (rescan), and delete (exit) act,
+     * and only for the review session that armed them.
      */
     @VisibleForTesting
     internal fun startReviewListening() {
@@ -474,6 +478,10 @@ class CameraViewModel @Inject constructor(
                                 ReviewCommand.DISCARD -> {
                                     stopReviewListening()
                                     discardDraft()
+                                }
+                                ReviewCommand.DELETE -> {
+                                    stopReviewListening()
+                                    deleteDraft()
                                 }
                                 ReviewCommand.NONE -> Unit
                             }
@@ -522,7 +530,9 @@ class CameraViewModel @Inject constructor(
 
     private suspend fun recordAndUpload(gen: Long): UtteranceResult {
         try {
-            recorder.start()
+            // Single-word commands ("capture", "save") — short endpointing
+            // so the app answers ~0.5s sooner. Main Talk keeps the default.
+            recorder.start(PttAudioSpec.SHORT_END_SILENCE_MS)
         } catch (e: MicException) {
             val res = if ((e.message ?: "").contains("permission", ignoreCase = true)) {
                 R.string.perm_mic_rationale
@@ -787,6 +797,21 @@ class CameraViewModel @Inject constructor(
         rescan()
     }
 
+    /**
+     * Deletes the unconfirmed draft and exits the camera. Persists nothing.
+     * The screen observes [reviewCancelled] and navigates back once the
+     * spoken confirmation finishes.
+     */
+    fun deleteDraft() {
+        stopReviewListening()
+        runCatching { draftImagePath?.let { File(it).delete() } }
+        clearDrafts()
+        _uiState.update { it.copy(reviewBody = null) }
+        gate.speak(context.getString(R.string.camera_review_deleted)) {
+            _reviewCancelled.tryEmit(Unit)
+        }
+    }
+
     private fun clearDrafts() {
         billDraft = null
         docDraft = null
@@ -842,6 +867,10 @@ class CameraViewModel @Inject constructor(
             has("do not save") || has("dont save") || has("not save") ||
                 has("discard") || has("retake") || has("take again") ||
                 has("no") || has("nope") -> ReviewCommand.DISCARD
+            // "don't delete it" is ignored, not misread as a verdict.
+            has("do not delete") || has("dont delete") || has("not delete") ->
+                ReviewCommand.NONE
+            has("delete") -> ReviewCommand.DELETE
             has("save") || has("yes") || has("yeah") || has("yep") ||
                 has("confirm") -> ReviewCommand.SAVE
             else -> ReviewCommand.NONE
@@ -898,7 +927,7 @@ class CameraViewModel @Inject constructor(
         private const val GATE_WAIT_MS = 300L
         private const val GATE_WAIT_ROUNDS = 20
         /** Breather between takes: lets guidance interleave, bounds call rate. */
-        private const val INTER_UTTERANCE_MS = 500L
+        private const val INTER_UTTERANCE_MS = 250L
 
         /** Only "doc" selects document mode; missing/invalid values mean bill. */
         fun normalizeMode(raw: String?): String =

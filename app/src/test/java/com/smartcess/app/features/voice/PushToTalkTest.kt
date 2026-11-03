@@ -74,7 +74,7 @@ class PushToTalkTest {
         var cancels = 0
         override var isRecording = false
         override var autoStopped = false
-        override fun start() {
+        override fun start(endSilenceMs: Long) {
             startError?.let { throw it }
             starts++
             isRecording = true

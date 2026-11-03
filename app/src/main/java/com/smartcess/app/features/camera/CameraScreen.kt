@@ -39,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -102,7 +103,8 @@ fun CameraScreen(
         if (!hasPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
     }
     LaunchedEffect(Unit) {
-        viewModel.captured.collect { result -> onCaptured(result) }
+        launch { viewModel.captured.collect { result -> onCaptured(result) } }
+        launch { viewModel.reviewCancelled.collect { onBack() } }
     }
 
     if (!hasPermission) {

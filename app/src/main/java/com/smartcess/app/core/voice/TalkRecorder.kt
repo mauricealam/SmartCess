@@ -26,6 +26,12 @@ object PttAudioSpec {
     const val SPEECH_CONFIRM_MS = 300L
     /** Trailing silence after confirmed speech that ends capture by itself. */
     const val END_SILENCE_MS = 1_200L
+    /**
+     * Shorter trailing silence for single-word camera confirmations
+     * ("save", "retake", "delete"). Main Talk keeps [END_SILENCE_MS]
+     * so natural pauses mid-sentence never cut the user off.
+     */
+    const val SHORT_END_SILENCE_MS = 700L
     /** Cutoff when nothing was said at all; slow starters keep time to begin. */
     const val NO_SPEECH_TIMEOUT_MS = 6_000L
 }
@@ -35,8 +41,12 @@ data class RecordedAudio(val file: File, val peak: Int, val durationMs: Long)
 class MicException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 interface TalkRecorder {
-    /** Starts capture on a worker thread. Throws [MicException] without mic access. */
-    fun start()
+    /**
+     * Starts capture on a worker thread. Throws [MicException] without mic access.
+     * [endSilenceMs] overrides the trailing-silence cutoff; callers issuing
+     * single-word prompts may pass [PttAudioSpec.SHORT_END_SILENCE_MS].
+     */
+    fun start(endSilenceMs: Long = PttAudioSpec.END_SILENCE_MS)
     /** Ends capture, finalizes the WAV, returns the recording. */
     fun stop(): RecordedAudio
     /** Ends capture and deletes the file. */
@@ -62,7 +72,7 @@ class TalkRecorderImpl @Inject constructor(
     override val isRecording: Boolean get() = synchronized(lock) { worker?.isAlive == true }
     override val autoStopped: Boolean get() = autoStop
 
-    override fun start() {
+    override fun start(endSilenceMs: Long) {
         synchronized(lock) {
             if (worker?.isAlive == true) return
             stopRequested = false
@@ -91,7 +101,7 @@ class TalkRecorderImpl @Inject constructor(
             record = audioRecord
             val file = File(context.cacheDir, "talk-${UUID.randomUUID()}.wav")
             worker = thread(name = "talk-recorder", isDaemon = true) {
-                captureLoop(audioRecord, file, minBuffer)
+                captureLoop(audioRecord, file, minBuffer, endSilenceMs)
             }
         }
     }
@@ -117,7 +127,7 @@ class TalkRecorderImpl @Inject constructor(
         synchronized(lock) { worker = null }
     }
 
-    private fun captureLoop(recorder: AudioRecord, file: File, minBuffer: Int) {
+    private fun captureLoop(recorder: AudioRecord, file: File, minBuffer: Int, endSilenceMs: Long) {
         val startedMs = System.currentTimeMillis()
         var peak = 0
         var dataBytes = 0
@@ -133,7 +143,7 @@ class TalkRecorderImpl @Inject constructor(
                 val endpoint = SpeechEndpointDetector(
                     speechThreshold = PttAudioSpec.SILENCE_PEAK,
                     speechConfirmMs = PttAudioSpec.SPEECH_CONFIRM_MS,
-                    endSilenceMs = PttAudioSpec.END_SILENCE_MS,
+                    endSilenceMs = endSilenceMs,
                     noSpeechTimeoutMs = PttAudioSpec.NO_SPEECH_TIMEOUT_MS,
                     maxListenMs = PttAudioSpec.MAX_DURATION_MS,
                 )

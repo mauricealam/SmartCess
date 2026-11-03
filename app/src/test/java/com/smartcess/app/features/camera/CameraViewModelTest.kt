@@ -11,6 +11,7 @@ import com.smartcess.app.core.privacy.AnalyticsLogger
 import com.smartcess.app.core.session.BackendVoiceApi
 import com.smartcess.app.core.session.TranscribeResponse
 import com.smartcess.app.core.voice.MicException
+import com.smartcess.app.core.voice.PttAudioSpec
 import com.smartcess.app.core.voice.RecordedAudio
 import com.smartcess.app.core.voice.TalkCues
 import com.smartcess.app.core.voice.TalkRecorder
@@ -83,10 +84,12 @@ class CameraViewModelTest {
         var autoStopNow = false
         var stopPeak = 5000
         var startThrows: Exception? = null
+        var lastEndSilenceMs = -1L
         var file: File = File.createTempFile("utt", ".wav").also { it.writeBytes(ByteArray(128)) }
-        override fun start() {
+        override fun start(endSilenceMs: Long) {
             startThrows?.let { throw it }
             starts++
+            lastEndSilenceMs = endSilenceMs
         }
         override fun stop(): RecordedAudio {
             if (!file.exists()) file.writeBytes(ByteArray(128))
@@ -472,6 +475,66 @@ class CameraViewModelTest {
         assertEquals(CameraPhase.FRAMING, verdict("retake"))
         assertEquals(CameraPhase.FRAMING, verdict("no"))
         coVerify(exactly = 1) { bills.save(any()) } // discards wrote nothing
+    }
+
+    @Test
+    fun reviewCommands_delete_deletesDraftAndCancels() = runTest {
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        val cancelled = async { vm.reviewCancelled.first() }
+        runCurrent()
+        recorder.autoStopNow = true
+        vm.seedReviewForTest(bill = BillExtraction(provider = "City Electric", amount = 42.0))
+        vm.presentReview("Save it?")
+        advanceUntilIdle()
+        voiceApi.hear("delete it")
+        finishSpeech()
+        advanceUntilIdle() // verdict ends the loop; deleted speech pends
+        finishSpeech() // spoken confirmation done -> cancel emitted
+        advanceUntilIdle()
+        assertEquals(1, voiceApi.calls)
+        assertNull(vm.uiState.value.reviewBody)
+        assertEquals(CameraPhase.REVIEW, vm.uiState.value.phase) // screen navigates
+        cancelled.await() // cancel reached the (already-collecting) screen
+        coVerify(exactly = 0) { bills.save(any()) }
+        coVerify(exactly = 0) { documents.save(any()) }
+    }
+
+    @Test
+    fun reviewCommands_deleteNegation_ignored() = runTest {
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        val cancelled = async { vm.reviewCancelled.first() }
+        runCurrent()
+        recorder.autoStopNow = true
+        vm.seedReviewForTest(bill = BillExtraction(provider = "City Electric", amount = 42.0))
+        vm.presentReview("Save it?")
+        advanceUntilIdle()
+        voiceApi.hear("don't delete it", "no")
+        finishSpeech()
+        advanceUntilIdle() // negation ignored, "no" discards
+        assertEquals(2, voiceApi.calls) // both utterances were heard
+        assertFalse(cancelled.isCompleted) // no cancel was emitted
+        cancelled.cancel()
+        assertEquals(CameraPhase.FRAMING, vm.uiState.value.phase)
+        coVerify(exactly = 0) { bills.save(any()) }
+        coVerify(exactly = 0) { documents.save(any()) }
+    }
+
+    @Test
+    fun utterances_useShortEndpointing() = runTest {
+        assertTrue(PttAudioSpec.SHORT_END_SILENCE_MS < PttAudioSpec.END_SILENCE_MS)
+        coEvery { bills.save(any()) } returns ok(7L)
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        recorder.autoStopNow = true
+        vm.seedReviewForTest(bill = BillExtraction(provider = "City Electric", amount = 42.0))
+        vm.presentReview("Save it?")
+        advanceUntilIdle()
+        voiceApi.hear("yes")
+        finishSpeech()
+        advanceUntilIdle()
+        assertEquals(PttAudioSpec.SHORT_END_SILENCE_MS, recorder.lastEndSilenceMs)
     }
 
     @Test

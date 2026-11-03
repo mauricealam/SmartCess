@@ -65,13 +65,14 @@
     <string name="camera_review_save" translatable="true">Save</string>
     <string name="camera_review_discard" translatable="true">Discard and retake</string>
     <string name="camera_review_saved" translatable="true">Saved.</string>
-    <string name="camera_review_bill" translatable="true">Bill from %1$s, %2$s, due %3$s. Save it?</string>
-    <string name="camera_review_doc" translatable="true">%1$s. %2$s Save it?</string>
+    <string name="camera_review_deleted" translatable="true">Deleted. Nothing was saved.</string>
+    <string name="camera_review_bill" translatable="true">Bill from %1$s, %2$s, due %3$s. Say save, retake, or delete.</string>
+    <string name="camera_review_doc" translatable="true">%1$s. %2$s Say save, retake, or delete.</string>
     <string name="camera_demo_no_capture" translatable="true">Guidance test. Capture is disabled in this session.</string>
     <string name="camera_demo_no_capture_bill" translatable="true">Guidance test. Bill scanner. Capture is disabled in this session.</string>
     <string name="camera_demo_no_capture_doc" translatable="true">Guidance test. Document scanner. Capture is disabled in this session.</string>
     <string name="camera_not_ready" translatable="true">Not ready yet. %1$s</string>
-    <string name="camera_review_listening" translatable="true">Listening: say yes to save, or no to discard.</string>
+    <string name="camera_review_listening" translatable="true">Listening: say save, retake, or delete.</string>
     <string name="voice_guide_test" translatable="true">Guidance test. Capture is disabled. Point the camera at a page and follow the spoken directions.</string>
     <string name="bill_unknown_provider" translatable="true">unknown provider</string>
     <string name="bill_no_due_date" translatable="true">no date found</string>
