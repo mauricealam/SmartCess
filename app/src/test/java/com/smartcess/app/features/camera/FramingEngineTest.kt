@@ -231,6 +231,101 @@ class FramingEngineTest {
     }
 
     @Test
+    fun hysteresis_firstFrame_unbanded() {
+        assertEquals(
+            FramingCondition.OFF_RIGHT,
+            FramingEngine.update(input(offsetX = 0.3f), null),
+        )
+    }
+
+    @Test
+    fun hysteresis_coverageDither_holdsFar() {
+        val far = FramingCondition.TOO_FAR
+        // 0.16 passes entry (0.15) but not the 0.18 exit: holds.
+        assertEquals(
+            far,
+            FramingEngine.update(input(coverage = 0.16f), far),
+        )
+        assertEquals(
+            FramingCondition.READY,
+            FramingEngine.update(input(coverage = 0.19f), far),
+        )
+    }
+
+    @Test
+    fun hysteresis_closeDither_holdsClose() {
+        val close = FramingCondition.TOO_CLOSE
+        assertEquals(
+            close,
+            FramingEngine.update(input(coverage = 0.91f), close),
+        )
+        assertEquals(
+            FramingCondition.READY,
+            FramingEngine.update(input(coverage = 0.88f), close),
+        )
+    }
+
+    @Test
+    fun hysteresis_marginDither_holdsEdge() {
+        val edge = FramingCondition.EDGE_LEFT
+        // 0.025 passes entry (0.02) but not the 0.03 exit: holds compound.
+        assertEquals(
+            edge,
+            FramingEngine.update(input(offsetX = -0.3f, minEdgeMargin = 0.025f), edge),
+        )
+        assertEquals(
+            FramingCondition.OFF_LEFT,
+            FramingEngine.update(input(offsetX = -0.3f, minEdgeMargin = 0.05f), edge),
+        )
+    }
+
+    @Test
+    fun hysteresis_offsetDither_holdsOff() {
+        val off = FramingCondition.OFF_LEFT
+        // 0.11 passes entry (0.12) but not the 0.10 exit: holds.
+        assertEquals(
+            off,
+            FramingEngine.update(input(offsetX = -0.11f), off),
+        )
+        assertEquals(
+            FramingCondition.READY,
+            FramingEngine.update(input(offsetX = -0.09f), off),
+        )
+    }
+
+    @Test
+    fun hysteresis_equalRank_switchesImmediately() {
+        // Fast pan across center: same-rank problems never wait.
+        assertEquals(
+            FramingCondition.OFF_RIGHT,
+            FramingEngine.update(input(offsetX = 0.3f), FramingCondition.OFF_LEFT),
+        )
+    }
+
+    @Test
+    fun hysteresis_worseRank_switchesImmediately() {
+        assertEquals(
+            FramingCondition.EDGE_LEFT,
+            FramingEngine.update(
+                input(offsetX = -0.3f, minEdgeMargin = 0.0f),
+                FramingCondition.OFF_LEFT,
+            ),
+        )
+        assertEquals(
+            FramingCondition.TOO_FAR,
+            FramingEngine.update(input(coverage = 0.05f), FramingCondition.OFF_RIGHT),
+        )
+    }
+
+    @Test
+    fun hysteresis_readyLeavesImmediately() {
+        assertEquals(
+            FramingCondition.OFF_RIGHT,
+            FramingEngine.update(input(offsetX = 0.3f), FramingCondition.READY),
+        )
+    }
+
+    @Test
     fun ready_whenMarginClear() {
         assertEquals(
             FramingCondition.READY,

@@ -654,6 +654,37 @@ class CameraViewModelTest {
     }
 
     @Test
+    fun hysteresis_dither_holdsStable_reportsRaw() = runTest {
+        every { guidance.guide(any(), any()) } returns GuidanceOutcome.SPOKEN
+        val demo = viewModel(Routes.MODE_BILL, Routes.CAPTURE_OFF)
+        advanceUntilIdle()
+        demo.logDiag = {}
+        val meta = FrameMeta(width = 480, height = 640, rotation = 0, blocks = 8)
+        // Far, then a dither flicker that passes entry but not the exit band.
+        demo.seedDiagFrameForTest(
+            FramingInput(hasText = true, coverage = 0.10f, minEdgeMargin = 0.2f),
+            meta,
+        )
+        demo.seedDiagFrameForTest(
+            FramingInput(hasText = true, coverage = 0.16f, minEdgeMargin = 0.2f),
+            meta,
+        )
+        advanceUntilIdle()
+        assertEquals(FramingCondition.TOO_FAR, demo.uiState.value.condition)
+        val held = demo.uiState.value.diag
+        assertNotNull(held)
+        assertEquals(FramingCondition.TOO_FAR, held!!.condition)
+        assertEquals(FramingCondition.READY, held.raw)
+        // Clearing the band releases to the new condition.
+        demo.seedDiagFrameForTest(
+            FramingInput(hasText = true, coverage = 0.19f, minEdgeMargin = 0.2f),
+            meta,
+        )
+        advanceUntilIdle()
+        assertEquals(FramingCondition.READY, demo.uiState.value.condition)
+    }
+
+    @Test
     fun demoReady_requestsDemoPhrase_normalKeepsCaptureInvite() = runTest {
         every { guidance.guide(any(), any()) } returns GuidanceOutcome.SPOKEN
         val ready = FramingInput(

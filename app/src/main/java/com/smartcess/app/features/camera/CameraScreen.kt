@@ -509,7 +509,7 @@ private fun DiagPanel(diag: FramingDiag, isDocument: Boolean) {
         "mode=${if (isDocument) "doc" else "bill"} capture=OFF",
         "frame=${diag.frameWidth}x${diag.frameHeight} rot=${diag.rotation} blocks=${diag.blocks}",
         "cov=${format3(diag.coverage)} off=${formatSigned3(diag.offsetX)}/${formatSigned3(diag.offsetY)}",
-        "margin=${format3(diag.margin)} cond=${diag.condition.name}",
+        "margin=${format3(diag.margin)} cond=${diag.condition.name} raw=${diag.raw.name}",
         "spoke=${diag.outcome.name} gate=${if (diag.gateAllowed) "open" else "muted"}",
     )
     Text(

@@ -189,6 +189,7 @@ class CameraViewModel @Inject constructor(
     private var framingStartMs = 0L
     private var firstReadyLogged = false
     private var sessionLogged = false
+    private var stableCondition: FramingCondition? = null
     private var voiceJob: Job? = null
     private var reviewJob: Job? = null
     private var analyzerBound = false
@@ -228,6 +229,7 @@ class CameraViewModel @Inject constructor(
         guidance.reset()
         framingStartMs = 0L
         firstReadyLogged = false
+        stableCondition = null
         imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(context), analyzer)
         if (!captureAllowed && !demoAnnounced) {
             demoAnnounced = true
@@ -253,6 +255,7 @@ class CameraViewModel @Inject constructor(
         guidance.reset()
         framingStartMs = 0L
         firstReadyLogged = false
+        stableCondition = null
         _uiState.update { it.copy(voiceCapture = false) }
     }
 
@@ -261,7 +264,9 @@ class CameraViewModel @Inject constructor(
     private fun onFramingInput(input: FramingInput) {
         if (_uiState.value.phase != CameraPhase.FRAMING) return
         if (framingStartMs == 0L) framingStartMs = System.currentTimeMillis()
-        val condition = FramingEngine.evaluate(input)
+        val raw = FramingEngine.evaluate(input)
+        val condition = FramingEngine.update(input, stableCondition)
+        stableCondition = condition
         val previous = _uiState.value.condition
         val res = FramingPhrases.stringRes(condition, isDocumentMode, captureAllowed)
         _uiState.update {
@@ -272,7 +277,7 @@ class CameraViewModel @Inject constructor(
             )
         }
         val outcome = guidance.guide(condition, context.getString(res))
-        if (_uiState.value.demoNoCapture) publishDiag(input, condition, outcome)
+        if (_uiState.value.demoNoCapture) publishDiag(input, condition, outcome, raw)
         if (condition != previous) {
             viewModelScope.launch {
                 val metadata = mutableMapOf("condition" to condition.name)
@@ -290,7 +295,12 @@ class CameraViewModel @Inject constructor(
      * on condition change (or every [DIAG_LOG_MS]). Numbers and condition
      * names only — never OCR text, images, or document content.
      */
-    private fun publishDiag(input: FramingInput, condition: FramingCondition, outcome: GuidanceOutcome) {
+    private fun publishDiag(
+        input: FramingInput,
+        condition: FramingCondition,
+        outcome: GuidanceOutcome,
+        raw: FramingCondition,
+    ) {
         val meta = lastFrameMeta
         val diag = FramingDiag(
             frameWidth = meta.width,
@@ -302,6 +312,7 @@ class CameraViewModel @Inject constructor(
             offsetY = input.offsetY,
             margin = input.minEdgeMargin,
             condition = condition,
+            raw = raw,
             outcome = outcome,
             gateAllowed = gate.commandsAllowed,
         )
@@ -314,7 +325,7 @@ class CameraViewModel @Inject constructor(
                 "frame=${meta.width}x${meta.height} rot=${meta.rotation} " +
                     "blocks=${meta.blocks} cov=${"%.3f".format(input.coverage)} " +
                     "off=${"%.3f".format(input.offsetX)}/${"%.3f".format(input.offsetY)} " +
-                    "margin=${"%.3f".format(input.minEdgeMargin)} cond=$condition " +
+                    "margin=${"%.3f".format(input.minEdgeMargin)} cond=$condition raw=$raw " +
                     "spoke=$outcome gate=${gate.commandsAllowed}",
             )
         }

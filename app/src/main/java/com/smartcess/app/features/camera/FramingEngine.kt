@@ -70,6 +70,8 @@ data class FramingDiag(
     val offsetY: Float = 0f,
     val margin: Float = 1f,
     val condition: FramingCondition = FramingCondition.NO_TEXT,
+    /** Raw per-frame evaluation before hysteresis (proves dither capture). */
+    val raw: FramingCondition = FramingCondition.NO_TEXT,
     val outcome: GuidanceOutcome = GuidanceOutcome.SPOKEN,
     val gateAllowed: Boolean = true,
 )
@@ -97,6 +99,18 @@ object FramingEngine {
      * and it never proves the whole page is inside the frame.
      */
     const val MIN_EDGE_MARGIN = 0.02f
+
+    /**
+     * Hysteresis exit bands (entry thresholds above are unchanged): leaving
+     * a condition requires clearing its band, so threshold noise cannot
+     * chatter between states. A new or worse problem still switches
+     * immediately — only recovery from a problem is banded.
+     */
+    const val COV_EXIT_BAND = 0.03f
+    const val EDGE_EXIT_BAND = 0.01f
+    const val CENTER_EXIT_TOLERANCE = 0.10f
+    const val SKEW_EXIT_BAND = 2f
+    const val LUMA_EXIT_BAND = 0.05f
 
     fun evaluate(input: FramingInput): FramingCondition {
         if (!input.hasText) return FramingCondition.NO_TEXT
@@ -137,4 +151,52 @@ object FramingEngine {
             if (input.offsetY < 0) FramingCondition.OFF_UP else FramingCondition.OFF_DOWN
         }
     }
+
+    /** Severity rank: lower reports first in [evaluate]. */
+    private fun rank(condition: FramingCondition): Int = when (condition) {
+        FramingCondition.NO_TEXT -> 0
+        FramingCondition.TOO_FAR, FramingCondition.TOO_CLOSE -> 1
+        FramingCondition.EDGE_CROPPED, FramingCondition.EDGE_LEFT,
+        FramingCondition.EDGE_RIGHT, FramingCondition.EDGE_UP,
+        FramingCondition.EDGE_DOWN,
+        -> 2
+        FramingCondition.OFF_LEFT, FramingCondition.OFF_RIGHT,
+        FramingCondition.OFF_UP, FramingCondition.OFF_DOWN,
+        -> 3
+        FramingCondition.TILTED -> 4
+        FramingCondition.TOO_DARK -> 5
+        FramingCondition.READY -> 6
+    }
+
+    /**
+     * Hysteresis stabilizer: [evaluate] decides entry instantly, but leaving
+     * [current] toward a milder condition requires clearing the exit band.
+     * A new or worse problem (rank at or above current) switches at once,
+     * so fast pans and fresh problems are never swallowed. Null starts
+     * unbanded.
+     */
+    fun update(input: FramingInput, current: FramingCondition?): FramingCondition {
+        val raw = evaluate(input)
+        if (current == null || rank(raw) <= rank(current)) return raw
+        return if (exitConfirmed(input, current)) raw else current
+    }
+
+    private fun exitConfirmed(input: FramingInput, current: FramingCondition): Boolean =
+        when (current) {
+            FramingCondition.NO_TEXT -> input.hasText
+            FramingCondition.TOO_FAR -> input.coverage >= MIN_COVERAGE + COV_EXIT_BAND
+            FramingCondition.TOO_CLOSE -> input.coverage <= MAX_COVERAGE - COV_EXIT_BAND
+            FramingCondition.EDGE_CROPPED, FramingCondition.EDGE_LEFT,
+            FramingCondition.EDGE_RIGHT, FramingCondition.EDGE_UP,
+            FramingCondition.EDGE_DOWN,
+            -> input.minEdgeMargin >= MIN_EDGE_MARGIN + EDGE_EXIT_BAND
+            FramingCondition.OFF_LEFT, FramingCondition.OFF_RIGHT,
+            FramingCondition.OFF_UP, FramingCondition.OFF_DOWN,
+            -> kotlin.math.abs(input.offsetX) <= CENTER_EXIT_TOLERANCE &&
+                kotlin.math.abs(input.offsetY) <= CENTER_EXIT_TOLERANCE
+            FramingCondition.TILTED -> input.skewDegrees <= MAX_SKEW_DEGREES - SKEW_EXIT_BAND
+            FramingCondition.TOO_DARK -> input.meanLuminance >= MIN_LUMINANCE + LUMA_EXIT_BAND
+            // READY never blocks here (nothing outranks it), but be permissive.
+            FramingCondition.READY -> true
+        }
 }
