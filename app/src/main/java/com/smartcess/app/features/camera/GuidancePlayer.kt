@@ -16,13 +16,17 @@ enum class GuidanceOutcome {
 /**
  * Speaks one framing instruction at a time with haptic feedback.
  *
- * Speak-on-change only (hearing-fatigue rule): each condition speaks once
- * per continuous occurrence — speech and haptics both fire on the change,
- * repeats stay silent. A new condition (including recovery steps like
- * EDGE_LEFT -> OFF_LEFT -> READY) always speaks immediately; the speaker
- * uses QUEUE_FLUSH, so a new instruction replaces the previous one
- * instead of queueing. All speech routes through the [CameraSpeechGate]
- * so guidance can never trigger voice capture.
+ * Speak-on-stable-change only (hearing-fatigue rule): a condition speaks
+ * once, and only after [STABLE_FRAMES] consecutive requests — single-frame
+ * threshold blips (A -> B -> A) never speak, so oscillation cannot chatter.
+ * Speech and haptics both fire on the stable change; repeats stay silent.
+ * Recovery steps (EDGE_LEFT -> OFF_LEFT -> READY) speak as each stabilizes.
+ * Failsafe: after [MAX_SILENT_REQUESTS] requests without speech (permanent
+ * flip-flop), the current condition speaks anyway — silence must never be
+ * unbounded for a blind user. The speaker uses QUEUE_FLUSH, so a new
+ * instruction replaces the previous one instead of queueing. All speech
+ * routes through the [CameraSpeechGate] so guidance can never trigger
+ * voice capture.
  */
 @Singleton
 class GuidancePlayer @Inject constructor(
@@ -31,6 +35,9 @@ class GuidancePlayer @Inject constructor(
 ) {
     private val vibrator: Vibrator? = context.getSystemService(Vibrator::class.java)
     private var lastCondition: FramingCondition? = null
+    private var pendingCondition: FramingCondition? = null
+    private var pendingCount: Int = 0
+    private var silentRequests: Int = 0
 
     /**
      * Spec haptic preference, refreshed per camera session. Speech guidance
@@ -44,15 +51,36 @@ class GuidancePlayer @Inject constructor(
      * callers may ignore the result.
      */
     fun guide(condition: FramingCondition, instruction: String): GuidanceOutcome {
-        if (condition == lastCondition) return GuidanceOutcome.LATCHED
+        if (condition == lastCondition) {
+            pendingCondition = null
+            pendingCount = 0
+            return GuidanceOutcome.LATCHED
+        }
+        if (condition == pendingCondition) {
+            pendingCount++
+        } else {
+            pendingCondition = condition
+            pendingCount = 1
+        }
+        silentRequests++
+        if (pendingCount >= STABLE_FRAMES || silentRequests >= MAX_SILENT_REQUESTS) {
+            speak(condition, instruction)
+            return GuidanceOutcome.SPOKEN
+        }
+        return GuidanceOutcome.LATCHED
+    }
+
+    private fun speak(condition: FramingCondition, instruction: String) {
         lastCondition = condition
+        pendingCondition = null
+        pendingCount = 0
+        silentRequests = 0
         if (condition == FramingCondition.READY) {
             pulse(READY_PULSE_MS)
         } else {
             pulseWave(patternFor(condition))
         }
         gate.speak(instruction)
-        return GuidanceOutcome.SPOKEN
     }
 
     fun stop() {
@@ -62,6 +90,9 @@ class GuidancePlayer @Inject constructor(
     /** New camera session: forget the latch so guidance speaks again. */
     fun reset() {
         lastCondition = null
+        pendingCondition = null
+        pendingCount = 0
+        silentRequests = 0
     }
 
     private fun pulse(millis: Long) {
@@ -80,6 +111,14 @@ class GuidancePlayer @Inject constructor(
     }
 
     companion object {
+        /** Consecutive identical requests before a new condition speaks. */
+        const val STABLE_FRAMES = 2
+
+        /**
+         * Silence bound: with no stable condition for this many requests,
+         * speak the current one anyway rather than staying mute forever.
+         */
+        const val MAX_SILENT_REQUESTS = 8
         const val READY_PULSE_MS = 220L
 
         /**

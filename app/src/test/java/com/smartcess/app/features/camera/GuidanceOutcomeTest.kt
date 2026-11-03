@@ -5,10 +5,15 @@ import android.os.Vibrator
 import com.smartcess.app.core.ai.Speaker
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** guide() speaks on change only; repeats latch silently (fatigue rule). */
+/**
+ * Speak-on-stable-change: a condition speaks once after two consecutive
+ * requests; blips and repeats stay silent; permanent flip-flop still
+ * speaks within a bounded number of requests.
+ */
 class GuidanceOutcomeTest {
 
     private fun player(speaker: Speaker): GuidancePlayer {
@@ -19,8 +24,12 @@ class GuidanceOutcomeTest {
     }
 
     @Test
-    fun firstGuide_speaks() {
+    fun firstCondition_speaksAfterTwoFrames() {
         val guidance = player(mockk(relaxed = true))
+        assertEquals(
+            GuidanceOutcome.LATCHED,
+            guidance.guide(FramingCondition.TOO_FAR, "Closer."),
+        )
         assertEquals(
             GuidanceOutcome.SPOKEN,
             guidance.guide(FramingCondition.TOO_FAR, "Closer."),
@@ -31,11 +40,11 @@ class GuidanceOutcomeTest {
     fun repeat_latchesSilently() {
         val guidance = player(mockk(relaxed = true))
         guidance.guide(FramingCondition.TOO_FAR, "Closer.")
+        guidance.guide(FramingCondition.TOO_FAR, "Closer.")
         assertEquals(
             GuidanceOutcome.LATCHED,
             guidance.guide(FramingCondition.TOO_FAR, "Closer."),
         )
-        // Still latched no matter how long the condition persists.
         assertEquals(
             GuidanceOutcome.LATCHED,
             guidance.guide(FramingCondition.TOO_FAR, "Closer."),
@@ -43,9 +52,26 @@ class GuidanceOutcomeTest {
     }
 
     @Test
-    fun changedCondition_speaksImmediately() {
+    fun singleFrameBlip_neverSpeaks() {
+        val speaker = mockk<Speaker>(relaxed = true)
+        val guidance = player(speaker)
+        guidance.guide(FramingCondition.TOO_FAR, "Closer.")
+        guidance.guide(FramingCondition.TOO_FAR, "Closer.") // stable: speaks
+        guidance.guide(FramingCondition.OFF_LEFT, "Left.") // one-frame blip
+        guidance.guide(FramingCondition.TOO_FAR, "Closer.")
+        verify(exactly = 1) { speaker.speak("Closer.", any()) }
+        verify(exactly = 0) { speaker.speak("Left.", any()) }
+    }
+
+    @Test
+    fun stableChange_speaksAfterTwoFrames() {
         val guidance = player(mockk(relaxed = true))
         guidance.guide(FramingCondition.TOO_FAR, "Closer.")
+        guidance.guide(FramingCondition.TOO_FAR, "Closer.")
+        assertEquals(
+            GuidanceOutcome.LATCHED,
+            guidance.guide(FramingCondition.OFF_LEFT, "Left."),
+        )
         assertEquals(
             GuidanceOutcome.SPOKEN,
             guidance.guide(FramingCondition.OFF_LEFT, "Left."),
@@ -55,13 +81,11 @@ class GuidanceOutcomeTest {
     @Test
     fun recoveryChain_speaksEachStepOnce() {
         val guidance = player(mockk(relaxed = true))
+        repeat(2) { guidance.guide(FramingCondition.EDGE_LEFT, "Back and left.") }
+        repeat(2) { guidance.guide(FramingCondition.OFF_LEFT, "Left.") }
         assertEquals(
-            GuidanceOutcome.SPOKEN,
-            guidance.guide(FramingCondition.EDGE_LEFT, "Back and left."),
-        )
-        assertEquals(
-            GuidanceOutcome.SPOKEN,
-            guidance.guide(FramingCondition.OFF_LEFT, "Left."),
+            GuidanceOutcome.LATCHED,
+            guidance.guide(FramingCondition.READY, "Ready."),
         )
         assertEquals(
             GuidanceOutcome.SPOKEN,
@@ -74,21 +98,27 @@ class GuidanceOutcomeTest {
     }
 
     @Test
-    fun ready_afterLeaving_speaksAgain() {
-        val guidance = player(mockk(relaxed = true))
-        guidance.guide(FramingCondition.READY, "Ready.")
-        guidance.guide(FramingCondition.TOO_FAR, "Closer.")
-        assertEquals(
-            GuidanceOutcome.SPOKEN,
-            guidance.guide(FramingCondition.READY, "Ready."),
-        )
+    fun permanentFlipFlop_speaksWithinBound() {
+        val speaker = mockk<Speaker>(relaxed = true)
+        val guidance = player(speaker)
+        // Alternate forever: silence is bounded, never permanent.
+        repeat(7) {
+            guidance.guide(FramingCondition.TOO_FAR, "Closer.")
+            guidance.guide(FramingCondition.OFF_LEFT, "Left.")
+        }
+        verify(exactly = 1) { speaker.speak(any(), any()) }
     }
 
     @Test
     fun reset_clearsLatch() {
         val guidance = player(mockk(relaxed = true))
         guidance.guide(FramingCondition.TOO_FAR, "Closer.")
+        guidance.guide(FramingCondition.TOO_FAR, "Closer.")
         guidance.reset()
+        assertEquals(
+            GuidanceOutcome.LATCHED,
+            guidance.guide(FramingCondition.TOO_FAR, "Closer."),
+        )
         assertEquals(
             GuidanceOutcome.SPOKEN,
             guidance.guide(FramingCondition.TOO_FAR, "Closer."),
