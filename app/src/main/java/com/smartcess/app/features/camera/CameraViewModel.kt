@@ -587,10 +587,21 @@ class CameraViewModel @Inject constructor(
             if (e is TimeoutCancellationException) throw UploadException(R.string.voice_timeout)
             throw e
         } catch (e: retrofit2.HttpException) {
+            // Empty Meta transcript (502 ai_unclear) is just a missed
+            // utterance, not an outage: re-listen quietly and stay armed.
+            // Any other HTTP failure still disarms with an announcement.
+            if (isUnclearResponse(e)) throw UnclearException()
             throw UploadException(uploadErrorRes(e))
         } catch (e: IOException) {
             throw UploadException(R.string.voice_api_unavailable)
         }
+    }
+
+    /** True only for the backend's empty-transcript signal (502 ai_unclear). */
+    private fun isUnclearResponse(e: retrofit2.HttpException): Boolean {
+        if (e.code() != 502) return false
+        val body = runCatching { e.response()?.errorBody()?.string() }.getOrNull() ?: ""
+        return body.contains("ai_unclear")
     }
 
     private fun uploadErrorRes(e: retrofit2.HttpException): Int {

@@ -183,10 +183,13 @@ class CameraViewModelTest {
         clockNow += CameraSpeechGate.TAIL_GUARD_MS
     }
 
-    private fun httpError(code: Int): HttpException =
+    private fun httpError(code: Int, body: String = ""): HttpException =
         HttpException(
-            Response.error<TranscribeResponse>(code, "".toResponseBody("text/plain".toMediaType())),
+            Response.error<TranscribeResponse>(code, body.toResponseBody("text/plain".toMediaType())),
         )
+
+    private fun unclearError(): HttpException =
+        httpError(502, """{"error":{"code":"ai_unclear","message":"unclear"}}""")
 
     // Mode routing
 
@@ -420,6 +423,34 @@ class CameraViewModelTest {
     }
 
     @Test
+    fun unclear502_relistensSilently_staysArmed() = runTest {
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        recorder.autoStopNow = true
+        voiceApi.queue.add(unclearError())
+        vm.setVoiceCaptureEnabled(true)
+        advanceTimeBy(3_000)
+        assertTrue(vm.uiState.value.voiceCapture)
+        assertTrue(fakeSpeaker.spoken.isEmpty())
+        assertTrue(startsAtLeast(2))
+        vm.setVoiceCaptureEnabled(false)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun plain502_speaks_disarms() = runTest {
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        recorder.autoStopNow = true
+        voiceApi.queue.add(httpError(502))
+        vm.setVoiceCaptureEnabled(true)
+        advanceTimeBy(3_000)
+        assertFalse(vm.uiState.value.voiceCapture)
+        assertTrue(fakeSpeaker.spoken.isNotEmpty())
+        coVerify(exactly = 0) { bills.save(any()) }
+    }
+
+    @Test
     fun unclearTranscript_relistensSilently() = runTest {
         val vm = viewModel(Routes.MODE_BILL)
         advanceUntilIdle()
@@ -475,6 +506,24 @@ class CameraViewModelTest {
         assertEquals(CameraPhase.FRAMING, verdict("retake"))
         assertEquals(CameraPhase.FRAMING, verdict("no"))
         coVerify(exactly = 1) { bills.save(any()) } // discards wrote nothing
+    }
+
+    @Test
+    fun reviewCommands_unclear502_relistensThenSaves() = runTest {
+        coEvery { bills.save(any()) } returns ok(7L)
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        recorder.autoStopNow = true
+        vm.seedReviewForTest(bill = BillExtraction(provider = "City Electric", amount = 42.0))
+        vm.presentReview("Save it?")
+        advanceUntilIdle()
+        voiceApi.queue.add(unclearError())
+        voiceApi.hear("yes")
+        finishSpeech()
+        advanceUntilIdle() // unclear retried quietly, "yes" ends the loop
+        assertEquals(2, voiceApi.calls)
+        coVerify(exactly = 1) { bills.save(any()) }
+        assertFalse(vm.uiState.value.reviewListening)
     }
 
     @Test
