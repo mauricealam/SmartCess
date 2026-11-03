@@ -6,6 +6,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.smartcess.app.data.local.entity.ReminderEntity
+import com.smartcess.app.data.repository.AppointmentRepository
 import com.smartcess.app.data.repository.ReminderRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.UUID
@@ -22,6 +23,7 @@ class ReminderScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
     private val work: WorkManager,
     private val reminders: ReminderRepository,
+    private val appointments: AppointmentRepository,
 ) {
     suspend fun schedule(reminderId: Long) {
         val reminder = reminders.getById(reminderId) ?: return
@@ -61,12 +63,35 @@ class ReminderScheduler @Inject constructor(
     /** Re-enqueues every SCHEDULED reminder (boot, upgrade, or process death). */
     suspend fun rescheduleAll() {
         reminders.scheduled().forEach { schedule(it.id) }
+        rescheduleTravelNudges()
+    }
+
+    /**
+     * Travel nudges have no reminder rows, so reboot would drop them.
+     * Re-derived from appointments that still have a future trigger.
+     */
+    suspend fun rescheduleTravelNudges(nowMillis: Long = System.currentTimeMillis()) {
+        appointments.withTravelReminder().forEach { appt ->
+            travelTriggerAt(appt.startMillis, appt.travelReminderMinutes, nowMillis)?.let {
+                scheduleTravelNudge(appt.id, it)
+            }
+        }
     }
 
     private fun workName(reminderId: Long) = "reminder-$reminderId"
     private fun travelWorkName(appointmentId: Long) = "travel-$appointmentId"
 
     companion object {
+        /**
+         * Travel-nudge trigger, or null when unset or already past (a reboot
+         * must not resurrect a nudge whose appointment already started).
+         */
+        fun travelTriggerAt(startMillis: Long, leadMinutes: Int?, nowMillis: Long): Long? {
+            if (leadMinutes == null) return null
+            val triggerAt = startMillis - leadMinutes * 60_000L
+            return if (triggerAt > nowMillis) triggerAt else null
+        }
+
         /** Creates a SCHEDULED reminder row for a bill due date minus [daysBefore]. */
         suspend fun billReminderSpec(
             billId: Long,

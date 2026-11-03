@@ -51,8 +51,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
@@ -204,20 +202,10 @@ private fun CameraPreviewContent(
         ) {
             RowHeader(onBack = onBack, titleRes = titleRes)
 
-            // Temporary guidance-test diagnostics (numbers only, no content).
-            val diag = uiState.diag
-            if (uiState.demoNoCapture && diag != null && uiState.phase == CameraPhase.FRAMING) {
-                DiagPanel(diag = diag, isDocument = uiState.isDocument)
-            }
-
             Spacer(Modifier.weight(1f))
 
             if (uiState.isOffline) {
                 Banner(text = stringResource(R.string.banner_offline))
-                Spacer(Modifier.height(8.dp))
-            }
-            if (uiState.demoNoCapture) {
-                Banner(text = stringResource(R.string.camera_demo_no_capture))
                 Spacer(Modifier.height(8.dp))
             }
             val errorRes = uiState.errorRes
@@ -513,33 +501,4 @@ private fun CameraPermissionDenied(
     }
 }
 
-/**
- * Temporary guidance-test readout. Numbers and condition names only —
- * never OCR text or document content. Deliberately silent to TalkBack:
- * it refreshes every analyzed frame.
- */
-@Composable
-private fun DiagPanel(diag: FramingDiag, isDocument: Boolean) {
-    val lines = listOf(
-        "mode=${if (isDocument) "doc" else "bill"} capture=OFF",
-        "frame=${diag.frameWidth}x${diag.frameHeight} rot=${diag.rotation} blocks=${diag.blocks}",
-        "cov=${format3(diag.coverage)} off=${formatSigned3(diag.offsetX)}/${formatSigned3(diag.offsetY)}",
-        "margin=${format3(diag.margin)} cond=${diag.condition.name} raw=${diag.raw.name}",
-        "spoke=${diag.outcome.name} gate=${if (diag.gateAllowed) "open" else "muted"}",
-    )
-    Text(
-        text = lines.joinToString("\n"),
-        fontFamily = FontFamily.Monospace,
-        fontSize = 11.sp,
-        lineHeight = 14.sp,
-        color = Color.White,
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.Black.copy(alpha = 0.72f), RoundedCornerShape(8.dp))
-            .padding(8.dp),
-    )
-}
 
-private fun format3(v: Float): String = "%.3f".format(v)
-
-private fun formatSigned3(v: Float): String = "%+.3f".format(v)

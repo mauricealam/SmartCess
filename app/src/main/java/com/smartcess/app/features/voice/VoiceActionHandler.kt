@@ -60,12 +60,11 @@ object VoiceActionIntents {
     const val SCAN_DOCUMENT = "scan_document"
     const val SCAN_AMBIGUOUS = "scan_ambiguous"
     const val COMPLETE_ROUTINE = "complete_routine"
-    const val GUIDE_TEST = "guide_test"
     private val ALL = setOf(
         ADD_APPOINTMENT, ADD_ROUTINE, DAILY_BRIEFING, ASK_BILL_QUESTION,
         CREATE_REMINDER, CANCEL_REMINDER, ARCHIVE_BILL, EMAIL_BRIEFING,
         READ_DOCUMENT, SCAN_BILL, SCAN_DOCUMENT, SCAN_AMBIGUOUS,
-        COMPLETE_ROUTINE, GUIDE_TEST,
+        COMPLETE_ROUTINE,
     )
     fun isAction(intent: String): Boolean = intent in ALL
 }
@@ -256,7 +255,6 @@ class VoiceActionHandler @Inject constructor(
             VoiceActionIntents.SCAN_DOCUMENT -> guideDocCapture()
             VoiceActionIntents.SCAN_AMBIGUOUS -> askScanChoice(text)
             VoiceActionIntents.COMPLETE_ROUTINE -> startCompleteRoutine(text)
-            VoiceActionIntents.GUIDE_TEST -> guideTest()
             else -> ActionTurn(appContext.getString(R.string.error_generic))
         }
     }
@@ -946,13 +944,6 @@ class VoiceActionHandler @Inject constructor(
         }
         return ActionTurn(appContext.getString(R.string.voice_scan_choice))
     }
-
-    /** Diagnostic session: guidance runs, capture execution is disabled. */
-    private fun guideTest(): ActionTurn =
-        ActionTurn(
-            appContext.getString(R.string.voice_guide_test),
-            navigateTo = Routes.camera(Routes.MODE_BILL, captureOn = false),
-        )
 
     private suspend fun startCompleteRoutine(text: String): ActionTurn {
         val all = routines.dueToday()

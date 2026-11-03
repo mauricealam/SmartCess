@@ -1,5 +1,10 @@
 package com.smartcess.app.features.home
 
+import androidx.activity.ComponentActivity
+import androidx.core.app.NotificationManagerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.runtime.DisposableEffect
 import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -317,7 +322,31 @@ private fun TodayPanel(
     modifier: Modifier = Modifier,
 ) {
     var pendingDelete by remember { mutableStateOf<TodayPreviewItem?>(null) }
+    // Notifications gate every reminder alert: when denied, say so on the hub
+    // instead of letting reminders fire silently. Re-checked on each resume
+    // so a Settings round-trip clears the banner without an app restart.
+    val context = LocalContext.current
+    var notifDenied by remember {
+        mutableStateOf(!NotificationManagerCompat.from(context).areNotificationsEnabled())
+    }
+    DisposableEffect(context) {
+        val lifecycle = (context as? ComponentActivity)?.lifecycle
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                notifDenied = !NotificationManagerCompat.from(context).areNotificationsEnabled()
+            }
+        }
+        lifecycle?.addObserver(observer)
+        onDispose { lifecycle?.removeObserver(observer) }
+    }
     Column(modifier = modifier.verticalScroll(rememberScrollState())) {
+        if (notifDenied) {
+            SmartCessBanner(
+                message = stringResource(R.string.home_notif_denied),
+                kind = BannerKind.WARNING,
+            )
+            Spacer(Modifier.height(8.dp))
+        }
         SmartCessCard {
             Text(
                 text = stringResource(R.string.home_today),

@@ -15,6 +15,9 @@ class AppointmentRepository @Inject constructor(private val dao: AppointmentDao)
     fun observeAll(): Flow<List<AppointmentEntity>> = dao.observeAll()
     suspend fun getById(id: Long): AppointmentEntity? = dao.getById(id)
 
+    /** Travel-nudge re-derive source after reboot (nudges have no reminder rows). */
+    suspend fun withTravelReminder(): List<AppointmentEntity> = dao.withTravelReminder()
+
     suspend fun todayAndTomorrow(): List<AppointmentEntity> {
         val zone = ZoneId.systemDefault()
         val start = LocalDate.now().atStartOfDay(zone).toInstant().toEpochMilli()

@@ -73,13 +73,8 @@ object VoiceFastPath {
         ) {
             return VoiceActionIntents.ASK_BILL_QUESTION
         }
-        // Capture-disabled guidance test (fast path only; not in AI vocab).
-        if (
-            has("\\bguidance test\\b") || has("\\bcamera test\\b") ||
-            has("\\btest (the |my )?(guidance|camera)\\b")
-        ) {
-            return VoiceActionIntents.GUIDE_TEST
-        }
+        // NOTE: the old "guidance test"/"camera test" diagnostic session was
+        // retired before submission: those phrases now fall through to the AI.
         val mentionsDoc = has("\\b(documents?|docs?|papers?|letters?|forms?|files?|scans?|receipts?)\\b")
         // Paper nouns WITHOUT the scan verb (which would self-match): scan
         // routing is explicit — bill words -> bill scanner, document words

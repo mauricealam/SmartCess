@@ -23,4 +23,8 @@ interface AppointmentDao {
     suspend fun setCalendarEvent(id: Long, eventId: Long)
 
     @Query("SELECT * FROM appointments ORDER BY startMillis ASC") suspend fun all(): List<AppointmentEntity>
+
+    /** Travel-nudge source: appointments with a lead time survive reboot via re-derive. */
+    @Query("SELECT * FROM appointments WHERE travelReminderMinutes IS NOT NULL")
+    suspend fun withTravelReminder(): List<AppointmentEntity>
 }

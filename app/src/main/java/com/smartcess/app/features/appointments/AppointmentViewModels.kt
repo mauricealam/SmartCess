@@ -1,5 +1,6 @@
 package com.smartcess.app.features.appointments
 
+import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.provider.CalendarContract
@@ -249,9 +250,25 @@ class AppointmentDetailViewModel @Inject constructor(
         }
     }
 
+    /**
+     * System-calendar delete hook. Default hits the real provider; tests
+     * replace it (ContentResolver is untestable on JVM unit tests).
+     */
+    internal var deleteCalendarEvent: suspend (Long) -> Unit = { eventId ->
+        withContext(Dispatchers.IO) {
+            runCatching {
+                context.contentResolver.delete(
+                    ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventId),
+                    null, null,
+                )
+            }
+        }
+    }
+
     fun delete(onDone: () -> Unit) {
         val appt = _state.value.appointment ?: return
         viewModelScope.launch {
+            appt.calendarEventId?.let { runCatching { deleteCalendarEvent(it) } }
             scheduler.cancelTravelNudge(appt.id)
             appointments.delete(appt.id)
             onDone()

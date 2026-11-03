@@ -900,14 +900,6 @@ class VoiceActionHandlerTest {
     }
 
     @Test
-    fun guideTest_opensCaptureDisabledSession() = runTest {
-        val turn = handler.start("guide_test", "guidance test")
-        assertEquals("literal", turn.speak)
-        assertEquals("camera?mode=bill&capture=off", turn.navigateTo)
-        assertFalse(handler.hasPending)
-    }
-
-    @Test
     fun completeRoutine_singleMatch_confirmsAndCompletes() = runTest {
         coEvery { routines.dueToday(any()) } returns listOf(dueRoutine())
         coEvery { routines.complete(any()) } returns Unit

@@ -129,6 +129,7 @@ class BillResultViewModel @Inject constructor(
     fun confirmArchive(onDone: () -> Unit) {
         val bill = _state.value.bill ?: return
         viewModelScope.launch {
+            cancelBillReminders(bill.id)
             bills.archive(bill.id)
             _state.value = _state.value.copy(archivedMessageRes = R.string.bill_archived)
             onDone()
@@ -169,8 +170,16 @@ class BillResultViewModel @Inject constructor(
     fun confirmDiscard(onDone: () -> Unit) {
         val bill = _state.value.bill ?: return
         viewModelScope.launch {
+            cancelBillReminders(bill.id)
             bills.delete(bill.id)
             onDone()
+        }
+    }
+
+    /** Archived/deleted bills must not keep reminding. */
+    private suspend fun cancelBillReminders(billId: Long) {
+        reminders.scheduledFor(ReminderEntity.KIND_BILL, billId).forEach {
+            runCatching { scheduler.cancel(it.id) }
         }
     }
 
