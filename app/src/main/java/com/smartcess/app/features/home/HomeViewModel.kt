@@ -83,7 +83,7 @@ fun buildHomePreview(data: TodayData): HomeUiState {
         data.urgentEmails.forEach {
             add(
                 TodayPreviewItem(
-                    R.string.home_today_email, listOf(it.subject),
+                    R.string.home_today_email, listOf(it.subject, it.sender),
                     TodayItemKind.EMAIL, it.id,
                 ),
             )
@@ -110,6 +110,14 @@ fun buildHomePreview(data: TodayData): HomeUiState {
         items = all.take(3),
         extraCount = (all.size - 3).coerceAtLeast(0),
     )
+}
+
+/** Home greeting by local hour (5-12 morning, 12-18 afternoon, 18-22 evening, else night). */
+fun greetingResFor(hour: Int): Int = when (hour) {
+    in 5..11 -> R.string.home_greeting_morning
+    in 12..17 -> R.string.home_greeting_afternoon
+    in 18..21 -> R.string.home_greeting_evening
+    else -> R.string.home_greeting_night
 }
 
 @HiltViewModel

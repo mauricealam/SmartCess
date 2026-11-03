@@ -193,7 +193,7 @@ private fun HomePortrait(
         SmartCessHomeHeader()
         Spacer(Modifier.height(8.dp))
         Text(
-            text = stringResource(R.string.home_greeting),
+            text = stringResource(greetingResFor(java.time.LocalTime.now().hour)),
             style = MaterialTheme.typography.bodyLarge,
         )
         Spacer(Modifier.height(12.dp))
@@ -259,7 +259,7 @@ private fun HomeWide(
             SmartCessHomeHeader()
             Spacer(Modifier.height(8.dp))
             Text(
-                text = stringResource(R.string.home_greeting),
+                text = stringResource(greetingResFor(java.time.LocalTime.now().hour)),
                 style = MaterialTheme.typography.bodyLarge,
             )
             Spacer(Modifier.height(12.dp))
@@ -477,6 +477,8 @@ private fun statusFor(textRes: Int): Int {
         R.string.home_today_appointment,
         R.string.home_today_document,
         -> R.string.queue_status_due_soon
+        R.string.home_today_email -> R.string.queue_status_unread
+        R.string.home_today_routine -> R.string.queue_status_due
         else -> R.string.queue_status_queued
     }
 }
@@ -489,6 +491,7 @@ private fun statusColorFor(textRes: Int): Color {
         R.string.home_today_due_soon,
         R.string.home_today_appointment,
         R.string.home_today_document,
+        R.string.home_today_routine,
         -> SmartCessTheme.extra.warning
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }

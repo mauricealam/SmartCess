@@ -120,6 +120,27 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun previewEmailCarriesSubjectAndSender() {
+        val state = buildHomePreview(
+            emptyToday().copy(
+                urgentEmails = listOf(
+                    EmailItemEntity(
+                        id = 31, sender = "Tenaga Nasional",
+                        subject = "Your electricity bill is ready", body = "Body.",
+                        receivedAt = 1L, urgency = "high",
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals(1, state.items.size)
+        val row = state.items.first()
+        assertEquals(TodayItemKind.EMAIL, row.kind)
+        assertEquals(31L, row.id)
+        assertEquals(listOf("Your electricity bill is ready", "Tenaga Nasional"), row.args)
+    }
+
+    @Test
     fun previewTruncatesAndCountsRemainder() {
         val state = buildHomePreview(
             TodayData(

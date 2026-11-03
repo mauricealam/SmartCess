@@ -169,14 +169,19 @@
     <string name="home_today_overdue" translatable="true">%1$s bill overdue</string>
     <string name="home_today_due_soon" translatable="true">%1$s due %2$s</string>
     <string name="home_today_appointment" translatable="true">%1$s at %2$s</string>
-    <string name="home_today_email" translatable="true">Urgent email: %1$s</string>
+    <string name="home_today_email" translatable="true">Urgent email from %2$s: %1$s</string>
     <string name="home_today_routine" translatable="true">Routine due: %1$s</string>
     <string name="home_today_document" translatable="true">Document deadline: %1$s</string>
     <string name="queue_status_overdue" translatable="true">OVERDUE</string>
     <string name="queue_status_due_soon" translatable="true">DUE SOON</string>
     <string name="queue_status_queued" translatable="true">QUEUED</string>
+    <string name="queue_status_unread" translatable="true">UNREAD</string>
+    <string name="queue_status_due" translatable="true">DUE</string>
     <string name="home_more_desc" translatable="true">More options. Opens Bills, Documents, Email briefing, Appointments, Routines, and Settings.</string>
-    <string name="home_greeting" translatable="true">Good day. Here is your daily overview.</string>
+    <string name="home_greeting_morning" translatable="true">Good morning. Here is your daily overview.</string>
+    <string name="home_greeting_afternoon" translatable="true">Good afternoon. Here is your daily overview.</string>
+    <string name="home_greeting_evening" translatable="true">Good evening. Here is your daily overview.</string>
+    <string name="home_greeting_night" translatable="true">Good night. Here is your daily overview.</string>
 
     <!-- More sheet -->
     <string name="more_title" translatable="true">More</string>
