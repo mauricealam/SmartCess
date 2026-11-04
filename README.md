@@ -105,6 +105,59 @@ memory only — it is not displayed anywhere, so **the app has no visible
 per-request log; verification happens in the Render backend logs** (Dashboard →
 service → Logs, or `render logs`).
 
+## Architecture
+
+**How it works** (the demo flow, in order — the video shows these same steps):
+
+1. The user points the phone at a bill; on-device ML Kit text detection +
+   `FramingEngine` speak one positioning instruction per direction until READY.
+2. Tap or voice ("say capture") captures a photo; the app compresses it and
+   runs on-device OCR for a text hint.
+3. The photo + hint go to the backend, which calls Muse Spark for structured
+   field extraction (provider, amount, due date).
+4. The app speaks and shows the extracted result and asks: save, retake, or
+   delete. Nothing persists before the user confirms.
+5. On save, the bill lands in the on-device Room database, appears in Bills /
+   Home Today, and an optional WorkManager reminder is scheduled.
+6. Any Talk turn follows the same spine: push-to-talk recording → backend
+   transcription (`muse-voice-transcribe-1.0`) → Spark intent/slots → read-back
+   → spoken yes/no → same repository save path as the manual screen.
+
+**How it's implemented.** Three parts (detail in `ARCHITECTURE.md`): the
+**native Android app** (Kotlin + Jetpack Compose, MVVM + Repository — there is
+no PWA or web frontend) talks HTTPS + session JWT to the **FastAPI proxy
+backend**, which attaches the server-side Meta key and calls the Meta Model
+API; the **Render backend logs** record every hop with request IDs for
+verification. App → exactly two AI routes (`api/ai/chat`, `api/voice/transcribe`).
+
+**Where each Meta model runs.** All three run on the Meta Model API, invoked
+only by the backend: `muse-spark-1.3` (step 3 extraction; all Talk intents,
+slots, summaries, Q&A), `muse-wonder-1.0` (explicit fallback when Spark fails),
+`muse-voice-transcribe-1.0` (step 6 transcription). Nothing runs on our own
+GPU/compute; on-device AI is limited to ML Kit text detection and OCR.
+
+**Hosting.** No PWA to host — the app ships as a keyless APK attached to the
+GitHub release. The backend runs live at `https://smartcess-sg.onrender.com`
+(Render, Singapore); judges can also deploy their own (see "For judges") or run
+both sides locally without any hosted service.
+
+**Keys.** The Meta Model API key lives only in the backend environment
+(Render dashboard or local `backend/.env`, both git-ignored). It is never
+committed, never baked into the APK (`KEYLESS_DEBUG=true`), never logged, and
+never sent to the phone.
+
+**Pre-existing and third-party code.** All SmartCess code was written for this
+event (repo history runs Oct 27 – Nov 4, 2026). Non-Meta libraries, all
+standard open-source SDKs: Google — CameraX, ML Kit text recognition (GMS),
+Room, WorkManager, Hilt, Credentials/Google ID sign-in, Android TTS (platform);
+Square — Retrofit/OkHttp networking; JetBrains — Kotlin, Coroutines,
+Serialization; backend — FastAPI, Uvicorn, httpx, Pydantic, google-auth, PyJWT,
+websockets; test-only — JUnit4, MockK, Turbine, Espresso. Full pins in
+`gradle/libs.versions.toml` and `backend/requirements.txt`.
+
+**Setup.** "Prerequisites" and "Setup" below plus "For judges" reproduce the
+project end to end from this repo alone.
+
 ## Prerequisites
 
 - Android Studio (Hedgehog or newer) with Android SDK 34
