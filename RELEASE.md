@@ -1,22 +1,46 @@
-# SmartCess Release Guide (v1.0.0 — hackathon submission)
+# SmartCess Release Guide
 
-## Release package
+How to cut, verify, and ship a SmartCess release.
 
-Build the artifacts on a host with the Android SDK (see README setup):
+## Release artifacts
+
+Build on a host with the Android SDK (see README setup):
 
 ```sh
 KEYLESS_DEBUG=true ./gradlew :app:assembleDebug   # keyless test APK
 ./gradlew :app:bundleRelease          # app/build/outputs/bundle/release/*.aab
 ./gradlew :app:testDebugUnitTest      # unit-test report (417 tests)
+./gradlew :app:lintDebug              # must report no errors
 ```
 
-Submission package (Build for Your World, Indie track — due Nov 4, 9PM ET):
+Every release ships:
 
-- [ ] Public GitHub repo with README (setup, build, accessibility, offline behavior)
-- [ ] 3-minute demo video (demo script is kept local-only, not in this repo)
-- [ ] Keyless debug APK attached to the GitHub release for judges (release AAB optional)
+- [ ] Keyless debug APK for testers (no API key baked in; all AI via backend session)
+- [ ] Signed release AAB for the store track (when cutting a store build)
+- [ ] GitHub release notes: version, highlights, known limitations (below)
 - [ ] No secrets in the repo: verify `local.properties`, `.env`, and keystores are
       absent (`git status --ignored`; `.gitignore` covers them)
+
+## Versioning
+
+`app/build.gradle.kts` carries both numbers — bump together per release:
+
+- `versionCode`: monotonically increasing integer (currently 27).
+- `versionName`: `1.0.0-cam.N`, matching `versionCode`, so the build on a
+  tester's phone maps unambiguously to a commit.
+
+Tag the release commit (`v1.0.0-cam.N`) when publishing the GitHub release.
+
+## Pre-release checklist
+
+1. Full suite green: `:app:testDebugUnitTest` (417 tests, 0 failures).
+2. Lint clean: `:app:lintDebug` reports no errors.
+3. Confirm the APK is keyless (built with `KEYLESS_DEBUG=true`).
+4. Device smoke on a mid-range phone: sign in → Talk turn with spoken answer →
+   guided scan → review → save → reminder → Back through the journey.
+5. Confirm the backend is reachable (production: `https://smartcess-sg.onrender.com/health`
+   answers 200; warm it if the free tier slept).
+6. Reviewer pass on the release-notes limitations section — no silent scope changes.
 
 ## GitHub repo structure
 
@@ -36,7 +60,7 @@ SmartCess/
         └── androidTest/  # instrumented tests (Compose + migration)
 ```
 
-## CI/CD readiness
+## CI/CD
 
 `.github/workflows/android.yml` runs on every push/PR to `main`:
 
@@ -50,11 +74,10 @@ SmartCess/
 migration test) on an API 29 emulator, nightly + on demand.
 
 Secrets: set `META_API_KEY` in GitHub Actions secrets only if a CI lane ever needs
-live AI calls; the default lanes are hermetic. Release signing: add a `release`
-lane with `KEYSTORE_*` secrets when cutting a store build; the hackathon ships a
-keyless debug APK + optional signed AAB.
+live AI calls; the default lanes are hermetic. Release signing uses a `release`
+lane with `KEYSTORE_*` secrets when cutting a store build.
 
-## Performance budgets (must verify on a mid-range device)
+## Performance budgets (verify on a mid-range device)
 
 | Budget | Target | How to check |
 |---|---|---|
@@ -72,7 +95,7 @@ Optimizations already in place: image compression, sampled-frame analysis,
 response caching, concurrent-call and per-minute AI limits, retry-with-backoff.
 Not yet implemented: briefing caching, voice debounce, list pagination.
 Note: the first request after the free backend sleeps pays a ~30–60s cold
-start — warm it before judging (see `backend/README.md` pre-demo checklist).
+start — warm it before demos (see `backend/README.md` checklist).
 
 ## Device support
 
@@ -82,7 +105,7 @@ start — warm it before judging (see `backend/README.md` pre-demo checklist).
 - ML Kit GMS build: requires Play Services + first-run model download; without it
   the app degrades to manual capture with a spoken hint
 
-## Known limitations (disclose with the submission)
+## Known limitations (disclose with every release)
 
 - Email inbox is empty until Gmail connects — no demo mail ships.
 - Routines support daily schedules only (weekly/monthly refused with explanation).
@@ -90,10 +113,10 @@ start — warm it before judging (see `backend/README.md` pre-demo checklist).
 - TalkBack semantics are built in but no full TalkBack-only pass has been run.
 - Render free tier sleeps after ~15 min idle; first request wakes it slowly.
 
-## Roadmap structure
+## Roadmap
 
-- **Next (post-hackathon):** on-device framing-threshold tuning, AI-eval sample
-  packs (20 bills / 10 docs / 10 appt+routine + framing cases), signed release
+- **Next:** on-device framing-threshold tuning, AI-eval sample packs
+  (20 bills / 10 docs / 10 appt+routine + framing cases), signed release
   keystore + AAB
 - **3 months:** Gmail/Outlook, multi-page PDF, opt-in cloud backup, trends, SAM refine
 - **6 months:** traffic/maps travel times, caregiver sharing, BM/ZH-CN/Tamil, wearables
@@ -117,8 +140,8 @@ start — warm it before judging (see `backend/README.md` pre-demo checklist).
 - In-app: Settings → Send feedback (stored on-device; support address plugs in
   later); every error is visible + spoken with a next step (note which error
   for reports)
-- GitHub Issues templates (bug / accessibility / idea) + a short post-demo survey
-  link in the release notes
+- GitHub Issues templates (bug / accessibility / idea) + a short post-release
+  survey link in the release notes
 - Co-design loop with a blind TalkBack user: TalkBack-only walkthrough of each
   release; accessibility issues block the next release
 - Opt-in analytics events (`voice_command`, `framing_guidance`, `error_shown`, …)
