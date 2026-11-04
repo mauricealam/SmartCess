@@ -50,7 +50,8 @@ class MainActivity : ComponentActivity() {
         healthMonitor.warmup()
         // Brand moment: hold the splash just long enough for the reveal to
         // read (it overlaps real cold-start init; total stays in budget).
-        // Reduced motion skips the wait and the exit fade entirely.
+        // Reduced motion skips the wait. There is no exit fade: the splash
+        // vanishes the instant Home is ready.
         val reduceMotion = try {
             Settings.Global.getFloat(
                 contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f,
@@ -64,14 +65,9 @@ class MainActivity : ComponentActivity() {
             if (!reduceMotion) delay(SPLASH_MIN_MILLIS)
             ready = true
         }
-        splash.setOnExitAnimationListener { provider ->
-            if (reduceMotion) {
-                provider.remove()
-            } else {
-                provider.view.animate().alpha(0f).setDuration(300)
-                    .withEndAction { provider.remove() }.start()
-            }
-        }
+        // No exit fade: the splash is removed the instant Home is ready, so
+        // the logo can never ghost over the home screen.
+        splash.setOnExitAnimationListener { provider -> provider.remove() }
         enableEdgeToEdge()
         // Single white theme: dark status/nav icons stay readable even when
         // the phone itself is in dark mode.
