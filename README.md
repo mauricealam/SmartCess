@@ -143,6 +143,34 @@ service → Logs, or `render logs`).
    ./gradlew :app:assembleDebug
    ```
 
+## For judges: run SmartCess yourself
+
+**Option A — fastest (no key needed).** Install the APK from the GitHub
+release on an Android 8.0+ phone, sign in with Google, and use it against our
+hosted Singapore backend. If the app says it is preparing, the free tier is
+waking (~30–60s) — try again in a moment.
+
+**Option B — full self-host with your own Meta key.**
+
+1. Get a Meta Model API key at `https://dev.meta.ai` (dashboard → API keys).
+2. Deploy the backend (`backend/`, see `backend/README.md` "Render free-tier
+   configuration" and "Environment variables"): set `META_API_KEY` to your
+   key, plus `JWT_SECRET` (any long random string) and
+   `GOOGLE_SERVER_CLIENT_ID` (your own Google Cloud web client ID).
+   Or run it locally (`backend/README.md` "Local development") with the same
+   variables in `backend/.env` (see `backend/.env.example`).
+3. Point the app at your backend: `BACKEND_URL=https://your-service/` in
+   `local.properties`, root `.env`, or process env, plus your
+   `GOOGLE_SERVER_CLIENT_ID`.
+4. Build and install: `KEYLESS_DEBUG=true ./gradlew :app:assembleDebug`,
+   then `adb install -r app/build/outputs/apk/debug/app-debug.apk`.
+
+The key goes **only** in the backend environment — never in the app, its
+resources, or its build config. Keyless builds send an empty baked key, and
+the app authenticates to your backend with its Google session JWT. (The hidden
+developer key slot is a debug-only troubleshooting aid; it is not part of
+either path above.)
+
 ## Build
 
 ```sh
