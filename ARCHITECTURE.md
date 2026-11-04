@@ -4,7 +4,7 @@ MVVM + Repository, single-activity Jetpack Compose (Material 3, single white
 theme) app with Hilt dependency injection. Package: `com.smartcess.app`.
 Min SDK 26, target/compile 34.
 
-Mantra: **Transcribe listens, Spark thinks, ML Kit guides, the app acts safely.**
+Mantra: **Transcribe listens, Spark thinks, the camera guides, the app acts safely.**
 
 ## Architecture diagram
 
@@ -33,7 +33,7 @@ flowchart TB
 
     subgraph AI["AI layer — core.ai + backend"]
         STT["Push-to-talk upload<br/>WAV → backend →<br/>muse-voice-transcribe-1.0"]
-        SPK["SparkClient → backend /api/ai/chat<br/>muse-spark-1.3<br/>explicit wonder-1.0 fallback"]
+        SPK["SparkClient → backend /api/ai/chat<br/>1.3 → wonder-1.0 → 1.2<br/>explicit fallback chain"]
         SCH["SparkSchemas +<br/>versioned SparkPrompts"]
         SFE["Safety: ContentSafety ·<br/>Resilience · UsageTracker"]
         SPK --> SCH
@@ -46,13 +46,13 @@ flowchart TB
         AUTH --> PROXY
     end
 
-    subgraph DEV["On-device — offline capable"]
-        MLK["ML Kit<br/>framing bounds + OCR"]
+    subgraph DEV["On-device — offline capable, no ML"]
+        EDGE["EdgeDetector (Sobel)<br/>framing bounds, no model"]
         FRM["FramingEngine +<br/>GuidancePlayer<br/>TTS + haptics"]
         CAM["CameraX<br/>Preview · Analysis · Capture"]
         SPKR["Speaker (TTS)"]
-        CAM --> MLK
-        MLK --> FRM
+        CAM --> EDGE
+        EDGE --> FRM
         FRM --> SPKR
     end
 
@@ -72,8 +72,8 @@ flowchart TB
     STT --> PROXY
     REPO <--> ROOM
     REPO --> WORK
-    SPK -.->|single network touch<br/>extractBill image+OCR hint| REPO
-    HVM <-.->|offline fallback<br/>OCR + raw TTS| MLK
+    SPK -.->|single network touch<br/>extractBill image| REPO
+    HVM <-.->|offline: framing only<br/>capture fails honestly| EDGE
 ```
 
 ## Layer responsibilities
@@ -90,14 +90,16 @@ flowchart TB
   (`BriefingRepository.getTodayData()`); returns `SaveOutcome(id, validation)`
   so low-confidence saves surface review UI.
 - **AI (`core/ai/` + backend)** — `SparkClient` (cache-first,
-  invalid-JSON retry-once-then-safe-default, explicit primary→fallback models),
+  invalid-JSON retry-once-then-safe-default, explicit 1.3 → wonder-1.0 →
+  1.2 fallback chain with per-attempt model logging),
   versioned prompts, JSON schemas, rate limiting, retries, usage logging.
   All Meta traffic goes through the authenticated backend proxy; the app never
   holds the Meta key in distributed builds.
 - **On-device (`core/voice`, `core/media`, `features/camera/`)** — push-to-talk
   recording with auto-stop, image compression, pure JVM-testable `FramingEngine`
-  with priority no-text > far/close > edge+direction > off-center > tilt >
-  lighting, and speak-once-per-direction guidance with hysteresis.
+  with priority no-document > far/close > edge+direction > off-center >
+  lighting, EMA-smoothed input, speak-once-per-direction guidance with
+  hysteresis, and sticky READY (leaving READY needs a firm excursion).
 - **Persistence (`data/local/`, `core/work/`, `core/privacy/`)** — Room v2
   (schema export on, reviewed migrations), WorkManager unique-work reminders,
   typed JSON/CSV export + full delete, opt-in analytics (metadata only).
@@ -105,12 +107,13 @@ flowchart TB
 ## Key flows
 
 **Guided bill scan (core loop):**
-CameraX frames → ML Kit text bounds (sampled frames) → `FramingEngine` →
-`GuidancePlayer` speaks one instruction per direction (haptic tick) → READY
-→ tap or voice capture → compress → bill extraction over the single network
-touch → `validateBill` → spoken + shown review (save / retake / delete) →
-user-confirmed save to the correct repository (bill vs document mode is
-explicit end to end).
+CameraX frames → Sobel edges → morphological close → largest-component page
+blob, segmented from background texture (sampled frames) → `FramingEngine` →
+`GuidancePlayer` speaks one short instruction per direction, once only
+(haptic tick) → READY (sticky + capture beep) → tap or voice capture →
+compress → bill extraction over the single network touch → `validateBill` →
+spoken + shown review (save / retake / delete) → user-confirmed save to the
+correct repository (bill vs document mode is explicit end to end).
 
 **Talk turn:**
 Talk tap → record with auto-stop → HTTPS upload → backend transcribes
@@ -153,16 +156,18 @@ first non-blank wins) → absent. Test and release builds set
 never needs it (backend/session path). No hard-coded keys anywhere.
 Backend URL resolves the same way (`BACKEND_URL`), pointing at the Singapore
 service (`https://smartcess-sg.onrender.com`). With no network, every AI entry
-degrades to labelled offline drafts/banners; on-device framing, OCR, and TTS
-keep working.
+degrades to labelled offline banners; on-device framing (edge detection) and
+TTS keep working, while capture fails honestly with a spoken rescan path.
 
 ## Decisions & trade-offs
 
 - Push-to-talk HTTPS upload instead of a realtime socket: reliable on mobile
   networks and simple to secure; live interim transcription is deferred (the
   backend keeps a dormant relay for that milestone).
-- ML Kit GMS (not bundled) for OCR: smaller APK, needs Play Services +
-  first-run model download; failure degrades to manual capture with a spoken hint.
+- No-model Sobel edge detection for framing bounds (morphological close +
+  largest-component segmentation so background texture can't inflate the
+  box): zero extra dependencies, works fully offline; tilt guidance is
+  unavailable (paper skew cannot be estimated from edges alone).
 - Routines are daily-only in both manual and voice paths: weekly/monthly
   requests are refused with an explanation rather than mis-scheduled.
 - Email is a saved on-device inbox with no provider connected yet: the retired

@@ -14,7 +14,14 @@ class FramingEngineTest {
         skewDegrees: Float = 0f,
         meanLuminance: Float = 0.6f,
         minEdgeMargin: Float = 1f,
-    ) = FramingInput(hasText, coverage, offsetX, offsetY, skewDegrees, meanLuminance, minEdgeMargin)
+        marginLeft: Float = 1f,
+        marginTop: Float = 1f,
+        marginRight: Float = 1f,
+        marginBottom: Float = 1f,
+    ) = FramingInput(
+        hasText, coverage, offsetX, offsetY, skewDegrees, meanLuminance, minEdgeMargin,
+        marginLeft, marginTop, marginRight, marginBottom,
+    )
 
     @Test
     fun noText_whenNoBlocks() {
@@ -326,10 +333,222 @@ class FramingEngineTest {
     }
 
     @Test
+    fun ready_holdsOnSmallOffsetWobble() {
+        // 0.14 grazes past entry (0.12) but not the READY exit (0.16).
+        assertEquals(
+            FramingCondition.READY,
+            FramingEngine.update(input(offsetX = 0.14f), FramingCondition.READY),
+        )
+        assertEquals(
+            FramingCondition.OFF_RIGHT,
+            FramingEngine.update(input(offsetX = 0.17f), FramingCondition.READY),
+        )
+    }
+
+    @Test
+    fun ready_holdsOnMarginGraze() {
+        // 0.015 grazes past entry (0.02) but not the READY exit (0.01).
+        assertEquals(
+            FramingCondition.READY,
+            FramingEngine.update(input(minEdgeMargin = 0.015f), FramingCondition.READY),
+        )
+        assertEquals(
+            FramingCondition.EDGE_CROPPED,
+            FramingEngine.update(input(minEdgeMargin = 0.005f), FramingCondition.READY),
+        )
+    }
+
+    @Test
+    fun ready_holdsOnCoverageWobble() {
+        assertEquals(
+            FramingCondition.READY,
+            FramingEngine.update(input(coverage = 0.93f), FramingCondition.READY),
+        )
+        assertEquals(
+            FramingCondition.TOO_CLOSE,
+            FramingEngine.update(input(coverage = 0.96f), FramingCondition.READY),
+        )
+    }
+
+    @Test
+    fun ready_losesPageImmediately() {
+        assertEquals(
+            FramingCondition.NO_TEXT,
+            FramingEngine.update(input(hasText = false), FramingCondition.READY),
+        )
+    }
+
+    @Test
     fun ready_whenMarginClear() {
         assertEquals(
             FramingCondition.READY,
             FramingEngine.evaluate(input(minEdgeMargin = 0.2f)),
+        )
+    }
+
+    @Test
+    fun smooth_nullSeedsInstantly() {
+        val raw = input(coverage = 0.9f, offsetX = 0.2f)
+        assertEquals(raw, smoothFraming(null, raw))
+    }
+
+    @Test
+    fun smooth_halvesJumps() {
+        val prev = input(coverage = 0.10f, offsetX = 0.0f, minEdgeMargin = 0.2f)
+        val raw = input(coverage = 0.30f, offsetX = 0.2f, minEdgeMargin = 0.0f)
+        val out = smoothFraming(prev, raw)
+        assertEquals(0.20f, out.coverage, 1e-6f)
+        assertEquals(0.10f, out.offsetX, 1e-6f)
+        assertEquals(0.10f, out.minEdgeMargin, 1e-6f)
+    }
+
+    @Test
+    fun smooth_passesPresenceTiltAndLightThrough() {
+        val prev = input(hasText = false, skewDegrees = 30f, meanLuminance = 0.05f)
+        val raw = input(hasText = true, skewDegrees = 0f, meanLuminance = 0.9f)
+        val out = smoothFraming(prev, raw)
+        assertEquals(true, out.hasText)
+        assertEquals(0f, out.skewDegrees, 0f)
+        assertEquals(0.9f, out.meanLuminance, 1e-6f)
+    }
+
+    @Test
+    fun overflow_touchLeftOnly_reportsCompound() {
+        // Close pan: centroid is centered but the page extends past the
+        // left edge, so guidance must carry the shift, not just back-off.
+        assertEquals(
+            FramingCondition.EDGE_LEFT,
+            FramingEngine.evaluate(
+                input(
+                    coverage = 0.95f, minEdgeMargin = 0.0f,
+                    marginLeft = 0.0f, marginTop = 0.2f,
+                    marginRight = 0.2f, marginBottom = 0.2f,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun overflow_touchRightOnly_reportsCompound() {
+        assertEquals(
+            FramingCondition.EDGE_RIGHT,
+            FramingEngine.evaluate(
+                input(
+                    coverage = 0.95f, minEdgeMargin = 0.0f,
+                    marginLeft = 0.2f, marginTop = 0.2f,
+                    marginRight = 0.0f, marginBottom = 0.2f,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun overflow_touchVertical_reportsCompound() {
+        assertEquals(
+            FramingCondition.EDGE_UP,
+            FramingEngine.evaluate(
+                input(
+                    coverage = 0.95f, minEdgeMargin = 0.0f,
+                    marginLeft = 0.2f, marginTop = 0.0f,
+                    marginRight = 0.2f, marginBottom = 0.2f,
+                ),
+            ),
+        )
+        assertEquals(
+            FramingCondition.EDGE_DOWN,
+            FramingEngine.evaluate(
+                input(
+                    coverage = 0.95f, minEdgeMargin = 0.0f,
+                    marginLeft = 0.2f, marginTop = 0.2f,
+                    marginRight = 0.2f, marginBottom = 0.0f,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun overflow_bothSidesTouch_staysTooClose() {
+        // Page wider than the frame on both sides: no shift helps.
+        assertEquals(
+            FramingCondition.TOO_CLOSE,
+            FramingEngine.evaluate(
+                input(
+                    coverage = 0.96f, minEdgeMargin = 0.0f,
+                    marginLeft = 0.0f, marginTop = 0.2f,
+                    marginRight = 0.0f, marginBottom = 0.2f,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun edge_touchOnlyCentered_reportsCompound() {
+        assertEquals(
+            FramingCondition.EDGE_LEFT,
+            FramingEngine.evaluate(
+                input(
+                    minEdgeMargin = 0.0f,
+                    marginLeft = 0.0f, marginTop = 0.3f,
+                    marginRight = 0.3f, marginBottom = 0.3f,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun edge_decisiveCentroid_winsOverTouch() {
+        // Stray edges can touch the far side; the mass center decides.
+        assertEquals(
+            FramingCondition.EDGE_RIGHT,
+            FramingEngine.evaluate(
+                input(
+                    offsetX = 0.3f, minEdgeMargin = 0.0f,
+                    marginLeft = 0.0f, marginTop = 0.3f,
+                    marginRight = 0.3f, marginBottom = 0.3f,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun edge_dominantAxis_mixesCentroidAndTouch() {
+        // Touch-left magnitude 0.3 beats centroid-up 0.15...
+        assertEquals(
+            FramingCondition.EDGE_LEFT,
+            FramingEngine.evaluate(
+                input(
+                    offsetY = -0.15f, minEdgeMargin = 0.0f,
+                    marginLeft = 0.0f, marginTop = 0.3f,
+                    marginRight = 0.3f, marginBottom = 0.3f,
+                ),
+            ),
+        )
+        // ...but a stronger centroid-down 0.35 wins instead.
+        assertEquals(
+            FramingCondition.EDGE_DOWN,
+            FramingEngine.evaluate(
+                input(
+                    offsetY = 0.35f, minEdgeMargin = 0.0f,
+                    marginLeft = 0.0f, marginTop = 0.3f,
+                    marginRight = 0.1f, marginBottom = 0.3f,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun edge_oppositeSideNearEdge_ignoresTouch() {
+        // Both sides near the boundary (0.0 vs 0.025): not clearly
+        // single-sided, so no invented shift.
+        assertEquals(
+            FramingCondition.EDGE_CROPPED,
+            FramingEngine.evaluate(
+                input(
+                    minEdgeMargin = 0.0f,
+                    marginLeft = 0.0f, marginTop = 0.3f,
+                    marginRight = 0.025f, marginBottom = 0.3f,
+                ),
+            ),
         )
     }
 }

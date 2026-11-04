@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import com.smartcess.app.core.ai.BillExtraction
 import com.smartcess.app.core.ai.DocumentSummary
-import com.smartcess.app.core.ai.OcrEngine
 import com.smartcess.app.core.ai.Speaker
 import com.smartcess.app.core.ai.SparkClient
 import com.smartcess.app.core.privacy.AnalyticsLogger
@@ -170,7 +169,6 @@ class CameraViewModelTest {
             recorder = recorder,
             voiceApi = voiceApi,
             cues = mockk<TalkCues>(relaxed = true),
-            ocr = mockk<OcrEngine>(relaxed = true),
             ioDispatcher = testDispatcher,
             savedStateHandle = SavedStateHandle(args),
         ).also { it.micPermissionCheck = { true } }
@@ -912,12 +910,50 @@ class CameraViewModelTest {
         )
         advanceUntilIdle()
         assertEquals(FramingCondition.TOO_FAR, vm.uiState.value.condition)
-        // Clearing the band releases to the new condition.
+        // Clearing the band releases to the new condition. Smoothing lags
+        // the step, so the clearing value persists for three frames.
+        repeat(3) {
+            vm.seedFrameForTest(
+                FramingInput(hasText = true, coverage = 0.19f, minEdgeMargin = 0.2f),
+            )
+        }
+        advanceUntilIdle()
+        assertEquals(FramingCondition.READY, vm.uiState.value.condition)
+    }
+
+    @Test
+    fun smoothing_singleFrameBlip_absorbed() = runTest {
+        every { guidance.guide(any(), any()) } returns GuidanceOutcome.SPOKEN
+        val vm = viewModel(Routes.MODE_BILL)
+        advanceUntilIdle()
+        val steady = FramingInput(
+            hasText = true, coverage = 0.5f, minEdgeMargin = 0.2f,
+            marginLeft = 0.2f, marginTop = 0.2f, marginRight = 0.2f, marginBottom = 0.2f,
+        )
+        vm.seedFrameForTest(steady)
+        advanceUntilIdle()
+        assertEquals(FramingCondition.READY, vm.uiState.value.condition)
+        // One wild frame: EMA halves every jump, so the condition holds.
         vm.seedFrameForTest(
-            FramingInput(hasText = true, coverage = 0.19f, minEdgeMargin = 0.2f),
+            FramingInput(
+                hasText = true, coverage = 0.95f, minEdgeMargin = 0.0f,
+                marginLeft = 0.0f, marginTop = 0.0f, marginRight = 0.0f, marginBottom = 0.0f,
+            ),
         )
         advanceUntilIdle()
         assertEquals(FramingCondition.READY, vm.uiState.value.condition)
+        // But a persistent change still flips within a few frames. The
+        // value must clear the sticky-READY exit (0.95), not just entry.
+        repeat(4) {
+            vm.seedFrameForTest(
+                FramingInput(
+                    hasText = true, coverage = 0.99f, minEdgeMargin = 0.0f,
+                    marginLeft = 0.0f, marginTop = 0.0f, marginRight = 0.0f, marginBottom = 0.0f,
+                ),
+            )
+        }
+        advanceUntilIdle()
+        assertEquals(FramingCondition.TOO_CLOSE, vm.uiState.value.condition)
     }
 
     @Test

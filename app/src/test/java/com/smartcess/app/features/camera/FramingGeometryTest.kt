@@ -59,4 +59,47 @@ class FramingGeometryTest {
         assertEquals(5f, FramingGeometry.uprightSkew(85f, 90), 1e-6f)
         assertEquals(10f, FramingGeometry.uprightSkew(170f, 180), 1e-6f)
     }
+
+    private fun assertSides(
+        expected: FramingGeometry.UprightSides,
+        actual: FramingGeometry.UprightSides,
+    ) {
+        assertEquals(expected.left, actual.left, 1e-6f)
+        assertEquals(expected.top, actual.top, 1e-6f)
+        assertEquals(expected.right, actual.right, 1e-6f)
+        assertEquals(expected.bottom, actual.bottom, 1e-6f)
+    }
+
+    @Test
+    fun sides_identity_atZero() {
+        assertSides(
+            FramingGeometry.UprightSides(0.1f, 0.2f, 0.3f, 0.4f),
+            FramingGeometry.uprightSides(0.1f, 0.2f, 0.3f, 0.4f, 0),
+        )
+    }
+
+    @Test
+    fun sides_rotate90_bufferRight_landsBottom() {
+        // Matches uprightOffsets: buffer east lands south at R=90.
+        assertSides(
+            FramingGeometry.UprightSides(left = 0.4f, top = 0.1f, right = 0.2f, bottom = 0.3f),
+            FramingGeometry.uprightSides(0.1f, 0.2f, 0.3f, 0.4f, 90),
+        )
+    }
+
+    @Test
+    fun sides_rotate180() {
+        assertSides(
+            FramingGeometry.UprightSides(left = 0.3f, top = 0.4f, right = 0.1f, bottom = 0.2f),
+            FramingGeometry.uprightSides(0.1f, 0.2f, 0.3f, 0.4f, 180),
+        )
+    }
+
+    @Test
+    fun sides_rotate270() {
+        assertSides(
+            FramingGeometry.UprightSides(left = 0.2f, top = 0.3f, right = 0.4f, bottom = 0.1f),
+            FramingGeometry.uprightSides(0.1f, 0.2f, 0.3f, 0.4f, 270),
+        )
+    }
 }

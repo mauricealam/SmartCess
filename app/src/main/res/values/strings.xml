@@ -56,11 +56,11 @@
     <string name="framing_move_closer_doc" translatable="true">Move the phone closer to the page.</string>
     <string name="framing_hold_straight_doc" translatable="true">Hold the phone straight over the page.</string>
     <string name="framing_unavailable_doc" translatable="true">Automatic framing is unavailable. Position the page in the frame and tap capture when ready.</string>
-    <string name="framing_edge_cropped" translatable="true">Words reach the edge of the frame. Move the phone back slightly.</string>
-    <string name="framing_edge_left" translatable="true">Words reach the edge of the frame. Move the phone back slightly and to the left.</string>
-    <string name="framing_edge_right" translatable="true">Words reach the edge of the frame. Move the phone back slightly and to the right.</string>
-    <string name="framing_edge_up" translatable="true">Words reach the edge of the frame. Move the phone back slightly and up a little.</string>
-    <string name="framing_edge_down" translatable="true">Words reach the edge of the frame. Move the phone back slightly and down a little.</string>
+    <string name="framing_edge_cropped" translatable="true">Move the phone back slightly.</string>
+    <string name="framing_edge_left" translatable="true">Move the phone back slightly and to the left.</string>
+    <string name="framing_edge_right" translatable="true">Move the phone back slightly and to the right.</string>
+    <string name="framing_edge_up" translatable="true">Move the phone back slightly and up a little.</string>
+    <string name="framing_edge_down" translatable="true">Move the phone back slightly and down a little.</string>
     <string name="camera_title_bill" translatable="true">Scan bill</string>
     <string name="camera_title_doc" translatable="true">Scan document</string>
     <string name="camera_processing_doc" translatable="true">Processing your document.</string>

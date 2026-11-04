@@ -7,7 +7,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Local email store. MVP seeds a demo inbox; Gmail/Outlook arrive later.
+ * Local email store. The inbox starts empty; Gmail/Outlook arrive later.
  * Read-only surface: never send, reply, delete, or forward.
  */
 @Singleton

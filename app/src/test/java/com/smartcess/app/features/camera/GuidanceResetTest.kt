@@ -22,13 +22,10 @@ class GuidanceResetTest {
     fun ready_latches_untilReset() {
         val speaker = mockk<Speaker>(relaxed = true)
         val guidance = player(speaker)
-        guidance.guide(FramingCondition.READY, "Ready.")
-        guidance.guide(FramingCondition.READY, "Ready.")
-        guidance.guide(FramingCondition.READY, "Ready.")
+        repeat(5) { guidance.guide(FramingCondition.READY, "Ready.") }
         verify(exactly = 1) { speaker.speak("Ready.", any()) }
         guidance.reset()
-        guidance.guide(FramingCondition.READY, "Ready.")
-        guidance.guide(FramingCondition.READY, "Ready.")
+        repeat(4) { guidance.guide(FramingCondition.READY, "Ready.") }
         verify(exactly = 2) { speaker.speak("Ready.", any()) }
     }
 
@@ -36,13 +33,10 @@ class GuidanceResetTest {
     fun reset_clearsLatch() {
         val speaker = mockk<Speaker>(relaxed = true)
         val guidance = player(speaker)
-        guidance.guide(FramingCondition.TOO_FAR, "Closer.")
-        guidance.guide(FramingCondition.TOO_FAR, "Closer.")
-        guidance.guide(FramingCondition.TOO_FAR, "Closer.")
+        repeat(5) { guidance.guide(FramingCondition.TOO_FAR, "Closer.") }
         verify(exactly = 1) { speaker.speak("Closer.", any()) }
         guidance.reset()
-        guidance.guide(FramingCondition.TOO_FAR, "Closer.")
-        guidance.guide(FramingCondition.TOO_FAR, "Closer.")
+        repeat(4) { guidance.guide(FramingCondition.TOO_FAR, "Closer.") }
         verify(exactly = 2) { speaker.speak("Closer.", any()) }
     }
 }

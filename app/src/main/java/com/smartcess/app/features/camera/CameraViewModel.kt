@@ -3,7 +3,6 @@ package com.smartcess.app.features.camera
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.util.Base64
 import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
@@ -19,15 +18,11 @@ import com.smartcess.app.R
 import com.smartcess.app.ui.format.SmartCessFormat
 import com.smartcess.app.core.ai.AiException
 import com.smartcess.app.core.ai.BillExtraction
-import com.smartcess.app.core.ai.ContentSafety
 import com.smartcess.app.core.ai.DocumentSummary
-import com.smartcess.app.core.ai.OcrEngine
-import com.smartcess.app.core.ai.OfflineDrafts
 import com.smartcess.app.core.ai.OfflineModeException
 import com.smartcess.app.core.ai.SessionExpiredException
 import com.smartcess.app.core.ai.Speaker
 import com.smartcess.app.core.ai.SparkClient
-import com.google.mlkit.vision.common.InputImage
 import com.smartcess.app.core.media.ImageCompressor
 import com.smartcess.app.core.privacy.AnalyticsEvent
 import com.smartcess.app.core.privacy.AnalyticsLogger
@@ -82,7 +77,7 @@ data class CameraUiState(
     @StringRes val instructionRes: Int = R.string.framing_no_text,
     val phase: CameraPhase = CameraPhase.FRAMING,
     val captureEnabled: Boolean = false,
-    /** ML Kit failed; manual capture is allowed (spec partial-failure table). */
+    /** Edge analysis failed; manual capture is allowed (spec partial-failure table). */
     val framingUnavailable: Boolean = false,
     @StringRes val errorRes: Int? = null,
     val isOffline: Boolean = false,
@@ -107,7 +102,7 @@ data class CameraUiState(
 /**
  * Guided-scan owner: framing loop -> capture -> extraction -> review -> save.
  *
- * Framing is fully offline (CameraX + on-device ML Kit + TTS + haptics).
+ * Framing is fully offline (CameraX + no-model edge detection + TTS + haptics).
  * The network is touched exactly once per capture: extraction receives
  * only the final compressed capture (plus an on-device OCR hint).
  * Capture is NOT approval to save: the extraction is shown and spoken in
@@ -130,7 +125,6 @@ class CameraViewModel @Inject constructor(
     private val recorder: TalkRecorder,
     @Named("backendAuthed") private val voiceApi: BackendVoiceApi,
     private val cues: TalkCues,
-    private val ocr: OcrEngine,
     @Named("io") private val ioDispatcher: CoroutineDispatcher,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
@@ -152,7 +146,7 @@ class CameraViewModel @Inject constructor(
     private val _reviewCancelled = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val reviewCancelled: SharedFlow<Unit> = _reviewCancelled.asSharedFlow()
 
-    // CameraX/ML Kit objects stay lazy so the review/save logic is
+    // CameraX objects stay lazy so the review/save logic is
     // constructible on the JVM; the screen binds them via bindAnalyzer().
     val preview: Preview by lazy { Preview.Builder().build() }
     val imageCapture: ImageCapture by lazy {
@@ -163,14 +157,14 @@ class CameraViewModel @Inject constructor(
     val imageAnalysis: ImageAnalysis by lazy {
         ImageAnalysis.Builder()
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-            // Frames arrive upright with rotation 0, so ML Kit boxes and
+            // Frames arrive upright with rotation 0, so edge boxes and
             // the offset math share one coordinate system by construction.
             .setOutputImageRotationEnabled(true)
             .build()
     }
 
     val analyzer by lazy {
-        TextFramingAnalyzer(
+        EdgeFramingAnalyzer(
             onResult = ::onFramingInput,
             onError = { onAnalyzerError() },
         )
@@ -180,6 +174,7 @@ class CameraViewModel @Inject constructor(
     private var firstReadyLogged = false
     private var sessionLogged = false
     private var stableCondition: FramingCondition? = null
+    private var smoothInput: FramingInput? = null
     private var voiceJob: Job? = null
     private var reviewJob: Job? = null
     /** In-flight capture extraction: cancelled when the session ends. */
@@ -238,6 +233,7 @@ class CameraViewModel @Inject constructor(
         framingStartMs = 0L
         firstReadyLogged = false
         stableCondition = null
+        smoothInput = null
         imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(context), analyzer)
     }
 
@@ -257,6 +253,7 @@ class CameraViewModel @Inject constructor(
         framingStartMs = 0L
         firstReadyLogged = false
         stableCondition = null
+        smoothInput = null
         _uiState.update { it.copy(voiceCapture = false) }
     }
 
@@ -265,7 +262,11 @@ class CameraViewModel @Inject constructor(
     private fun onFramingInput(input: FramingInput) {
         if (_uiState.value.phase != CameraPhase.FRAMING) return
         if (framingStartMs == 0L) framingStartMs = System.currentTimeMillis()
-        val condition = FramingEngine.update(input, stableCondition)
+        // EMA smoothing: edge-mass geometry jitters faster than hands move;
+        // the engine decides on the smoothed stream. First frame seeds.
+        smoothInput = smoothFraming(smoothInput, input)
+        val effective = smoothInput!!
+        val condition = FramingEngine.update(effective, stableCondition)
         stableCondition = condition
         val previous = _uiState.value.condition
         val res = FramingPhrases.stringRes(condition, isDocumentMode)
@@ -278,6 +279,11 @@ class CameraViewModel @Inject constructor(
         }
         guidance.guide(condition, context.getString(res))
         if (condition != previous) {
+            if (condition == FramingCondition.READY) {
+                // Capture cue: beep + vibration the moment framing locks,
+                // so the user knows the mic is armed for "capture".
+                cues.recordingStarted()
+            }
             viewModelScope.launch {
                 val metadata = mutableMapOf("condition" to condition.name)
                 if (condition == FramingCondition.READY && !firstReadyLogged) {
@@ -293,7 +299,7 @@ class CameraViewModel @Inject constructor(
     internal fun seedFrameForTest(input: FramingInput) = onFramingInput(input)
 
     private fun onAnalyzerError() {
-        // ML Kit failed: fall back to manual capture with a spoken hint.
+        // Edge analysis failed: fall back to manual capture with a spoken hint.
         _uiState.update { it.copy(framingUnavailable = true, captureEnabled = true) }
         announce(if (isDocumentMode) R.string.framing_unavailable_doc else R.string.framing_unavailable)
     }
@@ -627,18 +633,17 @@ class CameraViewModel @Inject constructor(
                     outFile.writeBytes(compressed)
                     rawFile.delete()
                     val base64 = Base64.encodeToString(compressed, Base64.NO_WRAP)
-                    val ocrHint = analyzer.lastRecognizedText.take(OCR_HINT_MAX).ifBlank { null }
                     if (isDocumentMode) {
-                        val summary = spark.summarizeDocument(ocrHint, base64)
+                        val summary = spark.summarizeDocument(null, base64)
                         enterReview(doc = summary, imagePath = outFile.absolutePath, offline = false)
                     } else {
-                        val extraction = spark.extractBill(base64, ocrHint)
+                        val extraction = spark.extractBill(base64)
                         enterReview(bill = extraction, imagePath = outFile.absolutePath, offline = false)
                     }
                 } catch (e: OfflineModeException) {
-                    reviewOfflineDraft(outFile)
+                    offlineCaptureFailed(outFile, signInRequired = false)
                 } catch (e: SessionExpiredException) {
-                    reviewOfflineDraft(outFile, signInRequired = true)
+                    offlineCaptureFailed(outFile, signInRequired = true)
                 } catch (e: AiException) {
                     fail(R.string.error_extraction_failed, speak = true)
                 } catch (e: Exception) {
@@ -649,37 +654,16 @@ class CameraViewModel @Inject constructor(
     }
 
     /**
-     * Offline flow: OCR the capture on-device and hold a low-confidence
-     * draft for review. Nothing is persisted until the user confirms Save.
+     * Offline flow: without on-device OCR there is nothing truthful to
+     * review, so the capture is discarded and the failure is spoken with a
+     * rescan path. Nothing is persisted.
      */
-    private suspend fun reviewOfflineDraft(outFile: File?, signInRequired: Boolean = false) {
-        val ocrText = runCatching {
-            if (outFile != null) {
-                ocr.recognizeText(InputImage.fromFilePath(context, Uri.fromFile(outFile)))
-            } else {
-                analyzer.lastRecognizedText
-            }
-        }.getOrNull().orEmpty().ifBlank { analyzer.lastRecognizedText }
-        if (isDocumentMode) {
-            enterReview(
-                doc = DocumentSummary(
-                    title = "",
-                    type = "",
-                    summary = "${ContentSafety.OFFLINE_LABEL} ${ocrText.take(500)}",
-                    confidence = 0.0,
-                ),
-                imagePath = outFile?.absolutePath,
-                offline = true,
-                signInRequired = signInRequired,
-            )
-        } else {
-            enterReview(
-                bill = OfflineDrafts.billFromOcr(ocrText),
-                imagePath = outFile?.absolutePath,
-                offline = true,
-                signInRequired = signInRequired,
-            )
-        }
+    private fun offlineCaptureFailed(outFile: File?, signInRequired: Boolean) {
+        runCatching { outFile?.delete() }
+        fail(
+            if (signInRequired) R.string.auth_sign_in_required else R.string.backend_down,
+            speak = true,
+        )
     }
 
     /** Holds an extraction for explicit review. Persists nothing. */
@@ -972,7 +956,6 @@ class CameraViewModel @Inject constructor(
     companion object {
         private const val CAPTURE_DIR_BILL = "bills"
         private const val CAPTURE_DIR_DOC = "docs"
-        private const val OCR_HINT_MAX = 500
         private const val CAPTURE_WORD = "capture"
         private const val REVIEW_SUMMARY_MAX = 200
         const val UPLOAD_TIMEOUT_MS = 45_000L

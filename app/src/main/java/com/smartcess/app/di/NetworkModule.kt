@@ -3,8 +3,6 @@ package com.smartcess.app.di
 import com.smartcess.app.core.ai.AiEvalLogger
 import com.smartcess.app.core.ai.AndroidSpeaker
 import com.smartcess.app.core.ai.InMemoryAiEvalLogger
-import com.smartcess.app.core.ai.MlKitOcrEngine
-import com.smartcess.app.core.ai.OcrEngine
 import com.smartcess.app.core.ai.OfflineModeException
 import com.smartcess.app.core.ai.Speaker
 import com.smartcess.app.core.ai.SparkApi
@@ -192,10 +190,6 @@ object NetworkModule {
     @Provides
     @Named("io")
     fun provideIoDispatcher(): CoroutineDispatcher = Dispatchers.IO
-
-    @Provides
-    @Singleton
-    fun provideOcrEngine(impl: MlKitOcrEngine): OcrEngine = impl
 
     @Provides
     @Singleton

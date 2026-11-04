@@ -8,7 +8,13 @@ routines, and speaks a prioritized Daily Briefing — every action available by 
 voice and touch. The frontend is a native Android application (Kotlin + Jetpack
 Compose) backed by a Python FastAPI service; there is no web or PWA client.
 
-Current build: `1.0.0-cam.25` — 417 JVM unit tests green, lint reports 0 errors,
+Every AI call in SmartCess goes to Meta's models on the Meta Model API — Muse
+Spark for thinking, Muse Voice Transcribe for listening — invoked only by the
+backend. There is no on-device ML and no other model provider anywhere in the
+runtime path: camera framing is plain no-model edge detection, and speech output
+is platform TTS.
+
+Current build: `1.0.0-cam.29` — 449 JVM unit tests green, lint reports 0 errors,
 keyless debug APK (no API key inside; all AI goes through the backend session).
 
 ## Features
@@ -17,14 +23,14 @@ keyless debug APK (no API key inside; all AI goes through the backend session).
 |---|---|
 | Talk (universal voice) | Push-to-talk anywhere from Home: speak a request, hear the answer. Creates appointments, routines, and reminders; speaks the Daily Briefing; answers saved-bill questions; cancels reminders and archives bills — every committing step reads back details and waits for spoken yes/no |
 | Daily Briefing + Home Today | Prioritized list (overdue bills, bills due < 7 days, today's/tomorrow's appointments, routines due). Every row taps through to details and deletes per-item with confirmation |
-| Bill Watcher | Guided camera scan with spoken + haptic positioning ("move left", "ready"), tap or voice capture → AI extraction → spoken review (save / retake / delete) → save → optional reminder → bill comparison |
+| Bill Watcher | Guided camera scan with spoken + haptic positioning ("move left", "ready" + capture beep), tap or voice capture → AI extraction → spoken review (save / retake / delete) → save → optional reminder → bill comparison |
 | Email Briefing | Reads the saved on-device inbox. The inbox is currently empty — Gmail is not connected yet — so this section stays dormant; no demo mail ships |
 | Document Reader | Scan or import a document: plain summary + Q&A; saved documents can be read back from Talk ("here is the summary", never presented as full text) |
 | Appointment Assistant | Voice or manual creation; phone-calendar export and 30/60/90-min travel reminders, each behind its own approval |
 | Routine Guardian | Daily routines (medication/delivery/recurring) with reminders and completion tracking. Daily schedules only — weekly/monthly requests are refused with an explanation, never silently scheduled daily. Never gives medical advice |
 | Reminders | Voice or manual creation with read-back + confirmation, cancellation with record read-back, scheduled local notifications |
 
-Core mantra: **Transcribe listens, Spark thinks, ML Kit guides, the app acts safely.**
+Core mantra: **Transcribe listens, Spark thinks, the camera guides, the app acts safely.**
 
 ## How voice works
 
@@ -33,8 +39,9 @@ Talk uses push-to-talk over HTTPS, not a live socket:
 1. Tap Talk (audible + haptic cue), speak, auto-stop on silence.
 2. The recording uploads to our backend, which transcribes it with
    `muse-voice-transcribe-1.0`.
-3. Intents and structured extraction run on `muse-spark-1.3`, with an explicit
-   `muse-wonder-1.0` fallback (no silent model switching).
+3. Intents and structured extraction run on `muse-spark-1.3`, with explicit
+   fallbacks (`muse-wonder-1.0`, then `muse-spark-1.2` as last resort). Every
+   attempt logs its outgoing model — nothing switches silently.
 4. Android TTS speaks the answer; the same text shows for low-vision users.
 5. Follow-up turns stay hands-free: the mic reopens after a 400 ms audio-tail
    guard, up to a cap, then asks for a manual tap.
@@ -62,7 +69,7 @@ holds the Meta key in distributed builds.
 | `muse-spark-1.3` | Primary brain: Talk intent classification, appointment/routine/reminder slot extraction, bill-field extraction from captures, document summaries, saved-bill Q&A |
 | `muse-wonder-1.0` | Explicit fallback, called only when a Spark request fails; the outgoing model is logged per request, never switched silently |
 | `muse-voice-transcribe-1.0` | Transcription of every push-to-talk recording, including camera "say capture" and spoken review answers |
-| `muse-spark-1.2` | Present in the backend allowlist but **never called** (the app falls back 1.3 → Wonder directly) |
+| `muse-spark-1.2` | Emergency last resort: called only when both 1.3 and Wonder fail on the same request |
 
 Not used: `sam-3.1` and `muse-image-1.0` exist only as off-by-default feature
 flags; the app never calls them.
@@ -109,11 +116,12 @@ service → Logs, or `render logs`).
 
 **How it works** (the demo flow, in order — the video shows these same steps):
 
-1. The user points the phone at a bill; on-device ML Kit text detection +
-   `FramingEngine` speak one positioning instruction per direction until READY.
-2. Tap or voice ("say capture") captures a photo; the app compresses it and
-   runs on-device OCR for a text hint.
-3. The photo + hint go to the backend, which calls Muse Spark for structured
+1. The user points the phone at a bill; no-model edge detection on the camera
+   feed + `FramingEngine` speak one positioning instruction per direction
+   until READY.
+2. Tap or voice ("say capture") captures a photo; the app compresses it for
+   upload.
+3. The photo goes to the backend, which calls Muse Spark for structured
    field extraction (provider, amount, due date).
 4. The app speaks and shows the extracted result and asks: save, retake, or
    delete. Nothing persists before the user confirms.
@@ -130,11 +138,14 @@ backend**, which attaches the server-side Meta key and calls the Meta Model
 API; the **Render backend logs** record every hop with request IDs for
 verification. App → exactly two AI routes (`api/ai/chat`, `api/voice/transcribe`).
 
-**Where each Meta model runs.** All three run on the Meta Model API, invoked
+**Where each Meta model runs.** All four run on the Meta Model API, invoked
 only by the backend: `muse-spark-1.3` (step 3 extraction; all Talk intents,
 slots, summaries, Q&A), `muse-wonder-1.0` (explicit fallback when Spark fails),
+`muse-spark-1.2` (emergency last resort when both fail),
 `muse-voice-transcribe-1.0` (step 6 transcription). Nothing runs on our own
-GPU/compute; on-device AI is limited to ML Kit text detection and OCR.
+GPU/compute, and there is no on-device ML at all: framing uses plain Sobel
+edge detection on the camera feed, so every model the project calls is a Meta
+model.
 
 **Hosting.** No PWA to host — the app ships as a keyless APK attached to the
 GitHub release. The backend runs live at `https://smartcess-sg.onrender.com`
@@ -148,8 +159,8 @@ never sent to the phone.
 
 **Pre-existing and third-party code.** All SmartCess code was written for this
 event (repo history runs Oct 27 – Nov 4, 2026). Non-Meta libraries, all
-standard open-source SDKs: Google — CameraX, ML Kit text recognition (GMS),
-Room, WorkManager, Hilt, Credentials/Google ID sign-in, Android TTS (platform);
+standard open-source SDKs: Google — CameraX, Room, WorkManager, Hilt,
+Credentials/Google ID sign-in, Android TTS (platform);
 Square — Retrofit/OkHttp networking; JetBrains — Kotlin, Coroutines,
 Serialization; backend — FastAPI, Uvicorn, httpx, Pydantic, google-auth, PyJWT,
 websockets; test-only — JUnit4, MockK, Turbine, Espresso. Full pins in
@@ -227,7 +238,7 @@ either path above.)
 ```sh
 KEYLESS_DEBUG=true ./gradlew :app:assembleDebug   # keyless debug APK
 ./gradlew :app:assembleRelease        # release APK/AAB (minified, see proguard-rules.pro)
-./gradlew :app:testDebugUnitTest      # JVM unit tests (417)
+./gradlew :app:testDebugUnitTest      # JVM unit tests (449)
 ./gradlew :app:lintDebug              # Android lint (must report no errors)
 ./gradlew :app:assembleDebugAndroidTest  # instrumented tests compile
 ```
@@ -247,9 +258,10 @@ SmartCess is TalkBack-first; accessibility issues block release.
 - Large-text and high-contrast modes are supported; minimum type size is 12sp.
 - Voice ↔ touch parity: everything speakable is tappable and vice versa
   (e.g. "Scan my bill" ⇔ the Scan Bill button; capture by tap or by saying "capture").
-- Guided scanning speaks one instruction per direction (no nagging repeats)
-  with haptic ticks ("Move closer…", "Hold straight…", "Ready. Tap capture or
-  say capture").
+- Guided scanning speaks one short instruction per direction, once only (no
+  repeats), with haptic ticks ("Move the phone slightly to the left…",
+  "Ready. Tap capture or say capture" plus a capture beep). Ready is sticky:
+  small wobbles can't flap it back to guidance.
 
 Manual check: enable TalkBack and complete the full bill flow (talk → scan → review →
 save → reminder) using audio alone.
@@ -258,11 +270,12 @@ save → reminder) using audio alone.
 
 SmartCess degrades gracefully with no network:
 
-- Guided camera framing keeps working fully on-device (ML Kit + TTS + haptics).
-- OCR falls back to on-device ML Kit; raw text is read aloud.
+- Guided camera framing keeps working fully on-device (edge detection + TTS +
+  haptics) — no model, no network.
+- Reading needs a connection: offline capture fails honestly with a spoken
+  "check your connection" message and a rescan path instead of drafting.
 - Offline output is always labelled **"Offline mode. Please review."**
-- Saves are allowed but flagged low-confidence for later review; retry when online.
-- Bill capture, briefings, and reminders work from cached local data where possible.
+- Briefings and reminders work from cached local data where possible.
 
 ## Limitations
 
@@ -276,7 +289,8 @@ Completed and device-verified:
   completion tracking, reminders with scheduled notifications
 - Document import + summary + saved-document reading; tappable Home Today rows
   with per-item delete; Settings with JSON/CSV export and full delete
-- Offline on-device framing, OCR fallback, and labelled offline drafts
+- Offline on-device framing (no-model edge detection); capture fails honestly
+  offline with a spoken rescan path
 
 Prototype / dormant (present but not end-to-end):
 

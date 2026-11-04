@@ -13,7 +13,7 @@ a pull request.
 ## Required gates (all must pass)
 
 ```sh
-./gradlew :app:testDebugUnitTest   # 417 JVM unit tests, 0 failures
+./gradlew :app:testDebugUnitTest   # 449 JVM unit tests, 0 failures
 ./gradlew :app:lintDebug           # must report no errors
 ```
 

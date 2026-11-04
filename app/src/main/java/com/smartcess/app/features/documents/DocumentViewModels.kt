@@ -6,17 +6,17 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
+import android.util.Base64
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.mlkit.vision.common.InputImage
 import com.smartcess.app.R
 import com.smartcess.app.core.ai.ContentSafety
 import com.smartcess.app.core.ai.DocumentSummary
-import com.smartcess.app.core.ai.OcrEngine
 import com.smartcess.app.core.ai.Speaker
 import com.smartcess.app.core.ai.SessionExpiredException
 import com.smartcess.app.core.ai.SparkClient
+import com.smartcess.app.core.media.ImageCompressor
 import com.smartcess.app.core.work.ReminderScheduler
 import com.smartcess.app.data.local.entity.DocumentEntity
 import com.smartcess.app.data.local.entity.ReminderEntity
@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
@@ -50,7 +51,6 @@ data class DocumentsUiState(
 class DocumentsViewModel @Inject constructor(
     private val documents: DocumentRepository,
     private val spark: SparkClient,
-    private val ocr: OcrEngine,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -60,7 +60,10 @@ class DocumentsViewModel @Inject constructor(
     private val _state = MutableStateFlow(DocumentsUiState())
     val state: StateFlow<DocumentsUiState> = _state.asStateFlow()
 
-    /** Imports a text, image, or single-page PDF file; images/PDFs are read on-device with ML Kit OCR. */
+    /**
+     * Imports a text, image, or single-page PDF file. Text is read on-device;
+     * images/PDFs go to Spark as pictures (no on-device OCR exists).
+     */
     fun importFile(uri: Uri) {
         viewModelScope.launch {
             _state.value = DocumentsUiState(reading = true)
@@ -69,40 +72,69 @@ class DocumentsViewModel @Inject constructor(
                 _state.value = DocumentsUiState(errorRes = R.string.doc_unsupported)
                 return@launch
             }
-            val read = runCatching { readText(uri) }.getOrNull()
-            val text = read?.text
-            if (text.isNullOrBlank()) {
-                val res = if (mime == "application/pdf") {
-                    R.string.doc_pdf_failed
-                } else {
-                    R.string.documents_import_failed
-                }
-                _state.value = DocumentsUiState(errorRes = res)
-                return@launch
-            }
-            val result = runCatching { spark.summarizeDocument(text, null) }
-            val summary = result.getOrNull()
-            if (summary == null) {
-                _state.value = DocumentsUiState(
-                    draft = DocumentSummary(
-                        title = "",
-                        type = "",
-                        summary = "${ContentSafety.OFFLINE_LABEL} ${text.take(500)}",
-                        confidence = 0.0,
-                    ),
-                    draftSource = uri.toString(),
-                    offline = true,
-                    signInRequired = result.exceptionOrNull() is SessionExpiredException,
-                    messageRes = read?.noteRes,
-                )
+            if (mime.startsWith("text/")) {
+                importTextFile(uri)
             } else {
-                _state.value = DocumentsUiState(
-                    draft = summary,
-                    draftSource = uri.toString(),
-                    messageRes = read?.noteRes,
-                )
+                importImageFile(uri, mime)
             }
         }
+    }
+
+    /** Plain-text import; offline keeps a draft of the real on-device text. */
+    private suspend fun importTextFile(uri: Uri) {
+        val text = runCatching { readTextFile(uri) }.getOrNull().orEmpty()
+        if (text.isBlank()) {
+            _state.value = DocumentsUiState(errorRes = R.string.documents_import_failed)
+            return
+        }
+        val result = runCatching { spark.summarizeDocument(text, null) }
+        val summary = result.getOrNull()
+        if (summary == null) {
+            _state.value = DocumentsUiState(
+                draft = DocumentSummary(
+                    title = "",
+                    type = "",
+                    summary = "${ContentSafety.OFFLINE_LABEL} ${text.take(500)}",
+                    confidence = 0.0,
+                ),
+                draftSource = uri.toString(),
+                offline = true,
+                signInRequired = result.exceptionOrNull() is SessionExpiredException,
+            )
+        } else {
+            _state.value = DocumentsUiState(
+                draft = summary,
+                draftSource = uri.toString(),
+            )
+        }
+    }
+
+    /**
+     * Image/PDF import via Spark's picture path. Offline there is nothing
+     * truthful to draft (no on-device OCR), so this fails honestly.
+     */
+    private suspend fun importImageFile(uri: Uri, mime: String) {
+        val failedRes = if (mime == "application/pdf") {
+            R.string.doc_pdf_failed
+        } else {
+            R.string.documents_import_failed
+        }
+        val read = runCatching { readImageBase64(uri, mime) }.getOrNull()
+        val base64 = read?.base64
+        if (base64.isNullOrBlank()) {
+            _state.value = DocumentsUiState(errorRes = failedRes)
+            return
+        }
+        val summary = runCatching { spark.summarizeDocument(null, base64) }.getOrNull()
+        if (summary == null) {
+            _state.value = DocumentsUiState(errorRes = failedRes)
+            return
+        }
+        _state.value = DocumentsUiState(
+            draft = summary,
+            draftSource = uri.toString(),
+            messageRes = read.noteRes,
+        )
     }
 
     private fun isSupported(mime: String): Boolean =
@@ -140,35 +172,33 @@ class DocumentsViewModel @Inject constructor(
     }
 
     companion object {
-        /** PDF render cap: readable for OCR without blowing memory. */
+        /** PDF render cap: readable for Spark without blowing memory. */
         private const val MAX_PDF_EDGE = 2048f
         private const val MAX_PDF_SCALE = 2.5f
     }
 
-    private data class ReadResult(val text: String, @StringRes val noteRes: Int? = null)
+    private data class ReadResult(val base64: String, @StringRes val noteRes: Int? = null)
 
-    private suspend fun readText(uri: Uri): ReadResult = withContext(Dispatchers.IO) {
-        val mime = context.contentResolver.getType(uri) ?: ""
-        if (mime.startsWith("text/")) {
-            val text = context.contentResolver.openInputStream(uri)?.bufferedReader().use {
-                it?.readText()
-            } ?: ""
-            return@withContext ReadResult(text)
-        }
-        if (mime == "application/pdf") return@withContext renderFirstPageAndOcr(uri)
-        val bitmap = context.contentResolver.openInputStream(uri)?.use {
-            BitmapFactory.decodeStream(it)
-        } ?: return@withContext ReadResult("")
-        val text = ocr.recognizeText(InputImage.fromBitmap(bitmap, 0))
-        bitmap.recycle()
-        ReadResult(text)
+    private suspend fun readTextFile(uri: Uri): String = withContext(Dispatchers.IO) {
+        context.contentResolver.openInputStream(uri)?.bufferedReader().use {
+            it?.readText()
+        } ?: ""
     }
 
+    private suspend fun readImageBase64(uri: Uri, mime: String): ReadResult =
+        withContext(Dispatchers.IO) {
+            if (mime == "application/pdf") return@withContext renderFirstPage(uri)
+            val bitmap = context.contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it)
+            } ?: return@withContext ReadResult("")
+            return@withContext ReadResult(bitmap.toBase64(), null)
+        }
+
     /**
-     * Single-page-first PDF support (spec): renders page 0 on-device and OCRs
-     * it. Never leaves the phone; multi-page PDFs keep a first-page note.
+     * Single-page-first PDF support (spec): renders page 0 on-device for the
+     * Spark picture path. Multi-page PDFs keep a first-page note.
      */
-    private suspend fun renderFirstPageAndOcr(uri: Uri): ReadResult = withContext(Dispatchers.IO) {
+    private suspend fun renderFirstPage(uri: Uri): ReadResult = withContext(Dispatchers.IO) {
         val pfd = try {
             context.contentResolver.openFileDescriptor(uri, "r")
         } catch (_: Exception) {
@@ -191,15 +221,27 @@ class DocumentsViewModel @Inject constructor(
                         )
                         val matrix = Matrix().apply { setScale(scale, scale) }
                         page.render(bitmap, null, matrix, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                        val text = ocr.recognizeText(InputImage.fromBitmap(bitmap, 0))
-                        bitmap.recycle()
                         val note = if (renderer.pageCount > 1) R.string.doc_first_page_only else null
-                        return@withContext ReadResult(text, note)
+                        return@withContext ReadResult(bitmap.toBase64(), note)
                     }
                 }
             } catch (_: Exception) {
                 return@withContext ReadResult("")
             }
+        }
+    }
+
+    /** Compresses for upload; recycles the bitmap. Empty on any failure. */
+    private fun Bitmap.toBase64(): String {
+        return try {
+            val stream = ByteArrayOutputStream()
+            compress(Bitmap.CompressFormat.JPEG, 90, stream)
+            val compressed = ImageCompressor.compress(stream.toByteArray())
+            Base64.encodeToString(compressed, Base64.NO_WRAP)
+        } catch (_: Exception) {
+            ""
+        } finally {
+            runCatching { recycle() }
         }
     }
 }

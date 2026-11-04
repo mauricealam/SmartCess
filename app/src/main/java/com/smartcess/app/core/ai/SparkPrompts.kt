@@ -46,14 +46,14 @@ Command: "$text""""
         },
     )
 
-    fun bill(ocrHint: String?): SparkPrompt = SparkPrompt(
+    fun bill(): SparkPrompt = SparkPrompt(
         instruction = """Extract the bill from this image as JSON: provider, amount (number),
 currency (3-letter code), due_date (YYYY-MM-DD), account_reference,
 billing_period_start (YYYY-MM-DD or null), billing_period_end (YYYY-MM-DD or null),
 required_action (pay_before_due_date|review_bill|contact_provider|no_action_required),
 confidence, missing_fields, summary (one spoken sentence).
 $GLOBAL_RULES""",
-        input = ocrHint?.let { "OCR hint: $it" } ?: "See attached bill photo.",
+        input = "See attached bill photo.",
     )
 
     fun compare(current: String, previous: String): SparkPrompt = SparkPrompt(

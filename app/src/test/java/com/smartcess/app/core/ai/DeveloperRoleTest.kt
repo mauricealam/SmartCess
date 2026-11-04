@@ -71,14 +71,14 @@ class DeveloperRoleTest {
                 return jsonResponse("""{"provider":"TNB","confidence":0.9}""")
             }
         }
-        val result = client(api).extractBill("QUJD", ocrHint = "TNB")
+        val result = client(api).extractBill("QUJD")
         assertEquals("TNB", result.provider)
         val messages = seen!!.messages
         assertEquals(2, messages.size)
         assertEquals("developer", messages[0].role)
         assertEquals("user", messages[1].role)
         assertTrue(textOf(messages[0]).contains("Extract the bill"))
-        assertTrue(textOf(messages[1]).contains("TNB"))
+        assertTrue(textOf(messages[1]).contains("See attached bill photo"))
         val imagePart = messages[1].content.jsonArray.first { part ->
             part.jsonObject["type"]?.jsonPrimitive?.contentOrNull == "image_url"
         }

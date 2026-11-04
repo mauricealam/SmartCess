@@ -23,7 +23,9 @@ enum class GuidanceOutcome {
  * Recovery steps (EDGE_LEFT -> OFF_LEFT -> READY) speak as each stabilizes.
  * Failsafe: after [MAX_SILENT_REQUESTS] requests without speech (permanent
  * flip-flop), the current condition speaks anyway — silence must never be
- * unbounded for a blind user. The speaker uses QUEUE_FLUSH, so a new
+ * unbounded for a blind user. Speak-once: a persisting condition never
+ * re-speaks (hearing-fatigue rule); only a genuine change speaks. The
+ * speaker uses QUEUE_FLUSH, so a new
  * instruction replaces the previous one instead of queueing. All speech
  * routes through the [CameraSpeechGate] so guidance can never trigger
  * voice capture.
@@ -111,8 +113,12 @@ class GuidancePlayer @Inject constructor(
     }
 
     companion object {
-        /** Consecutive identical requests before a new condition speaks. */
-        const val STABLE_FRAMES = 2
+        /**
+         * Consecutive identical requests before a new condition speaks.
+         * Four frames (~400 ms at the sampled rate): edge-mass geometry
+         * flickers in shorter bursts, while genuine moves persist.
+         */
+        const val STABLE_FRAMES = 4
 
         /**
          * Silence bound: with no stable condition for this many requests,

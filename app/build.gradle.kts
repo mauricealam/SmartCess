@@ -64,8 +64,8 @@ android {
         applicationId = "com.smartcess.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 28
-        versionName = "1.0.0-cam.28"
+        versionCode = 29
+        versionName = "1.0.0-cam.29"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "META_API_KEY", "\"$metaApiKey\"")
         buildConfigField("String", "META_API_BASE_URL", "\"$metaApiBaseUrl\"")
@@ -156,7 +156,6 @@ dependencies {
     implementation(libs.camerax.camera2)
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.view)
-    implementation(libs.mlkit.text.recognition)
 
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)

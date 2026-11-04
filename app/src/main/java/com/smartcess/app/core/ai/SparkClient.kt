@@ -60,11 +60,11 @@ class SparkClient @Inject constructor(
             maxTokens = 256,
         )
 
-    suspend fun extractBill(imageBase64: String, ocrHint: String? = null): BillExtraction =
+    suspend fun extractBill(imageBase64: String): BillExtraction =
         completeJson(
             feature = "bill_extract",
             schemaName = "bill",
-            prompt = SparkPrompts.bill(ocrHint),
+            prompt = SparkPrompts.bill(),
             imageBase64 = imageBase64,
             timeoutMillis = config.extractionTimeoutMillis,
             parser = { raw -> json.decodeFromString(BillExtraction.serializer(), raw) },

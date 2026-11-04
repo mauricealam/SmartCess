@@ -9,7 +9,7 @@ Build on a host with the Android SDK (see README setup):
 ```sh
 KEYLESS_DEBUG=true ./gradlew :app:assembleDebug   # keyless test APK
 ./gradlew :app:bundleRelease          # app/build/outputs/bundle/release/*.aab
-./gradlew :app:testDebugUnitTest      # unit-test report (417 tests)
+./gradlew :app:testDebugUnitTest      # unit-test report (449 tests)
 ./gradlew :app:lintDebug              # must report no errors
 ```
 
@@ -33,7 +33,7 @@ Tag the release commit (`v1.0.0-cam.N`) when publishing the GitHub release.
 
 ## Pre-release checklist
 
-1. Full suite green: `:app:testDebugUnitTest` (417 tests, 0 failures).
+1. Full suite green: `:app:testDebugUnitTest` (449 tests, 0 failures).
 2. Lint clean: `:app:lintDebug` reports no errors.
 3. Confirm the APK is keyless (built with `KEYLESS_DEBUG=true`).
 4. Device smoke on a mid-range phone: sign in → Talk turn with spoken answer →
@@ -102,8 +102,8 @@ start — warm it before demos (see `backend/README.md` checklist).
 - Min API 26 (Android 8.0), target SDK 34; portrait phones primary
 - Latest TalkBack; rear camera with autofocus preferred; microphone required
 - Must run on 3GB RAM — test on one mid-range + one low-end device + emulator CI
-- ML Kit GMS build: requires Play Services + first-run model download; without it
-  the app degrades to manual capture with a spoken hint
+- Framing is no-model edge detection: no Play Services model download needed;
+  reading needs a network connection (offline capture fails with spoken guidance)
 
 ## Known limitations (disclose with every release)
 
@@ -130,11 +130,11 @@ Full tiers live in README "Limitations"; the short version:
 | Meta Model API unreachable / key absent | Fail-closed offline mode with labelled drafts; backend proxy with explicit model config; overrides via env |
 | Invalid AI JSON | Retry once, then safe default + warning; schemas validated |
 | Low-confidence extraction | 0.70 gate forces mandatory review + warning banner |
-| No network | Full on-device framing + OCR + TTS, labelled "Offline mode. Please review." |
+| No network | Full on-device framing (edge detection) + TTS, labelled "Offline mode. Please review."; capture speaks a rescan path |
 | Accidental side effects | Approval-gated actions; banned actions (pay/email-submit/call) have no code path |
 | Medical-advice / crisis content | Refusal + supportive-crisis response via ContentSafety on AI output |
 | Secret leakage | Meta key server-side only; test builds forced keyless (`KEYLESS_DEBUG=true`); never logged; CI hermetic |
-| Regression | 417 unit tests + versioned prompts; lint must report no errors |
+| Regression | 449 unit tests + versioned prompts; lint must report no errors |
 
 ## User feedback hooks
 

@@ -851,8 +851,8 @@ class VoiceActionHandler @Inject constructor(
     // Milestone 3: email briefing, document reading, capture guidance, routine completion
 
     /**
-     * Spoken email briefing over the local inbox (demo-seeded until Gmail
-     * lands). Read-only: nothing is marked read. Sample data is announced.
+     * Spoken email briefing over the local inbox (empty until Gmail
+     * lands). Read-only: nothing is marked read.
      */
     private suspend fun speakEmailBriefing(): ActionTurn {
         runCatching { emails.pruneDemoSeeds() }
