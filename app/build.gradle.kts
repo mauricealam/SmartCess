@@ -52,7 +52,7 @@ val metaSttUrl: String =
     configValue("META_STT_URL").takeIf { it.isNotBlank() } ?: "wss://api.meta.ai/v1/asr/realtime"
 // SmartCess backend (Render free). Public URL, safe to default; override per env.
 val backendBaseUrl: String =
-    configValue("BACKEND_URL").takeIf { it.isNotBlank() } ?: "https://smartcess-backend.onrender.com/"
+    configValue("BACKEND_URL").takeIf { it.isNotBlank() } ?: "https://smartcess-sg.onrender.com/"
 // Google Sign-In server (Web) client ID: public identifier, safe to embed.
 val googleServerClientId: String = configValue("GOOGLE_SERVER_CLIENT_ID")
 

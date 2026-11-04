@@ -151,10 +151,10 @@ API key resolution: hidden developer Settings screen entry (debug only) →
 first non-blank wins) → absent. Test and release builds set
 `KEYLESS_DEBUG=true`, forcing the baked key empty: the production transport
 never needs it (backend/session path). No hard-coded keys anywhere.
-Backend URL resolves the same way (`BACKEND_URL`), defaulting to
-`https://smartcess-backend.onrender.com/`; production runs in Singapore
-(`https://smartcess-sg.onrender.com`). With no network, every AI entry degrades
-to labelled offline drafts/banners; on-device framing, OCR, and TTS keep working.
+Backend URL resolves the same way (`BACKEND_URL`), pointing at the Singapore
+service (`https://smartcess-sg.onrender.com`). With no network, every AI entry
+degrades to labelled offline drafts/banners; on-device framing, OCR, and TTS
+keep working.
 
 ## Decisions & trade-offs
 

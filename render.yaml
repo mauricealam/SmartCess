@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: smartcess-backend
+    name: smartcess-sg
     runtime: docker
     plan: free
     dockerfilePath: ./backend/Dockerfile

@@ -46,11 +46,9 @@ that future milestone). The Meta API key lives only on the backend.
 
 Thin stateless FastAPI proxy (`backend/`) between the app and the Meta Model API:
 Google sign-in → session JWTs → chat proxy, bill extraction, and voice
-transcription. **Production is `https://smartcess-sg.onrender.com`** (Render,
+transcription. The backend runs at `https://smartcess-sg.onrender.com` (Render,
 Singapore region — Meta chat models 404 from some other Render regions, so the
-region is load-bearing). The code default `https://smartcess-backend.onrender.com/`
-is only a fallback when `BACKEND_URL` is unset; always set `BACKEND_URL` to the
-Singapore service for demos and judging. Full endpoint, environment-variable, and
+region is load-bearing). Full endpoint, environment-variable, and
 cold-start documentation in [`backend/README.md`](backend/README.md).
 
 ## Meta AI Integration & Verification
@@ -124,10 +122,9 @@ service → Logs, or `render logs`).
 2. Set up the backend (one free Render service; full guide in `backend/README.md`):
    - Deploy `backend/` to Render with `META_API_KEY`, `JWT_SECRET`, and
      `GOOGLE_SERVER_CLIENT_ID` as environment secrets.
-   - Point the app at the Singapore production service:
+   - Point the app at the backend:
      `BACKEND_URL=https://smartcess-sg.onrender.com/` (process env,
-     `local.properties`, or root `.env` — first non-blank wins). The code
-     default `https://smartcess-backend.onrender.com/` is only a fallback.
+     `local.properties`, or root `.env` — first non-blank wins).
 3. Register Google Sign-In (one-time, Google Cloud Console, one project):
    - Create an OAuth client ID of type **Android** for package
      `com.smartcess.app` with your keystore SHA-1 (debug keystore for dev,
