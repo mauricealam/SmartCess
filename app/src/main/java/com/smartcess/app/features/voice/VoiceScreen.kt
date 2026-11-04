@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.DisposableEffect
@@ -116,6 +117,10 @@ fun VoiceScreen(
     }
 
     val goBack = { viewModel.cancel(); onBack() }
+    // System Back/gesture must match the toolbar arrow exactly: without
+    // this, a pop skips cancel() and the singleton recorder, speaker, and
+    // pending voice action outlive the screen.
+    BackHandler { goBack() }
 
     Column(
         modifier = modifier

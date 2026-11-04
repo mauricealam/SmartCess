@@ -1,5 +1,6 @@
 package com.smartcess.app.features.appointments
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,6 +47,9 @@ fun AppointmentsScreen(
     val form by viewModel.form.collectAsState()
     var showForm by remember { mutableStateOf(false) }
     var showSaveConfirm by remember { mutableStateOf(false) }
+    // First Back collapses the form (the draft stays in the ViewModel);
+    // a second Back leaves the screen.
+    BackHandler(enabled = showForm) { showForm = false }
 
     Column(
         modifier = modifier
