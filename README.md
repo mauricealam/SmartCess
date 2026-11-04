@@ -5,7 +5,8 @@
 SmartCess is a voice-first, TalkBack-first Android life-admin assistant for blind and
 low-vision users. It reads bills, summarizes documents, tracks appointments and
 routines, and speaks a prioritized Daily Briefing — every action available by both
-voice and touch.
+voice and touch. The frontend is a native Android application (Kotlin + Jetpack
+Compose) backed by a Python FastAPI service; there is no web or PWA client.
 
 Current build: `1.0.0-cam.25` — 417 JVM unit tests green, lint reports 0 errors,
 keyless debug APK (no API key inside; all AI goes through the backend session).
@@ -45,9 +46,66 @@ that future milestone). The Meta API key lives only on the backend.
 
 Thin stateless FastAPI proxy (`backend/`) between the app and the Meta Model API:
 Google sign-in → session JWTs → chat proxy, bill extraction, and voice
-transcription. Production runs on Render in Singapore
-(`https://smartcess-sg.onrender.com`). Full endpoint, environment-variable, and
+transcription. **Production is `https://smartcess-sg.onrender.com`** (Render,
+Singapore region — Meta chat models 404 from some other Render regions, so the
+region is load-bearing). The code default `https://smartcess-backend.onrender.com/`
+is only a fallback when `BACKEND_URL` is unset; always set `BACKEND_URL` to the
+Singapore service for demos and judging. Full endpoint, environment-variable, and
 cold-start documentation in [`backend/README.md`](backend/README.md).
+
+## Meta AI Integration & Verification
+
+Every model call runs on the **Meta Model API** (`https://api.meta.ai`), invoked
+**only by the backend** — the Android app never contacts Meta directly and never
+holds the Meta key in distributed builds.
+
+| Exact model ID | Purpose in SmartCess |
+|---|---|
+| `muse-spark-1.3` | Primary brain: Talk intent classification, appointment/routine/reminder slot extraction, bill-field extraction from captures, document summaries, saved-bill Q&A |
+| `muse-wonder-1.0` | Explicit fallback, called only when a Spark request fails; the outgoing model is logged per request, never switched silently |
+| `muse-voice-transcribe-1.0` | Transcription of every push-to-talk recording, including camera "say capture" and spoken review answers |
+| `muse-spark-1.2` | Present in the backend allowlist but **never called** (the app falls back 1.3 → Wonder directly) |
+
+Not used: `sam-3.1` and `muse-image-1.0` exist only as off-by-default feature
+flags; the app never calls them.
+
+**Request path.** The app sends exactly two AI requests, both authenticated with
+its session JWT over HTTPS to the backend:
+`POST api/ai/chat` (every Spark call, including bill extraction — the backend's
+separate `/api/ai/bill-extract` route exists but the app does not call it) and
+`POST api/voice/transcribe` (WAV upload). The backend validates the JWT,
+attaches the server-side Meta key, and forwards to
+`POST https://api.meta.ai/v1/chat/completions` and
+`POST https://api.meta.ai/v1/asr/transcribe` respectively. (A debug-only
+developer key slot exists for troubleshooting; test and release builds are
+keyless and always use the backend path.)
+
+**Verifying with backend logs.** Each hop is logged; correlate by request ID
+(`rid=`). A healthy Talk turn shows all three lines:
+
+```text
+httpx … POST https://api.meta.ai/v1/chat/completions "HTTP/1.1 200 OK"
+smartcess.ai chat sub=10752449 model=muse-spark-1.3 3650ms in=346 out=948
+smartcess.http POST /api/ai/chat -> 200 3651ms rid=4d4d9c394709
+```
+
+What the logs expose, honestly:
+
+| Signal | Where | Notes |
+|---|---|---|
+| Meta endpoint + Meta status | httpx line | Exact URL and Meta HTTP status per call |
+| Model ID | `model=` on the `smartcess.ai chat` line | Only the chat path restates it per request |
+| App request ID | `rid=` on every `smartcess.http` line | Correlates app→backend hops; Meta's own request IDs are not surfaced |
+| App status + latency | `-> 200 3651ms` on the `smartcess.http` line | End-to-end per request |
+| Meta latency + tokens | `3650ms in=.. out=..` on the `smartcess.ai` line | Chat only |
+| STT file + latency | `stt file sub=.. bytes=.. ms=.. Xms` | Model comes from the `muse-voice-transcribe-1.0` server setting, not restated per line |
+
+Known logging gaps (not claimed otherwise): the bill-extraction success line
+does not restate the model (it uses the `muse-spark-1.3` server default), and
+the app-side `UsageTracker` collects aggregate per-feature counts/latency in
+memory only — it is not displayed anywhere, so **the app has no visible
+per-request log; verification happens in the Render backend logs** (Dashboard →
+service → Logs, or `render logs`).
 
 ## Prerequisites
 
@@ -66,10 +124,10 @@ cold-start documentation in [`backend/README.md`](backend/README.md).
 2. Set up the backend (one free Render service; full guide in `backend/README.md`):
    - Deploy `backend/` to Render with `META_API_KEY`, `JWT_SECRET`, and
      `GOOGLE_SERVER_CLIENT_ID` as environment secrets.
-   - The app defaults to `https://smartcess-backend.onrender.com/`. To point
-     at the Singapore production service or a local tunnel instead, set
-     `BACKEND_URL` (process env, `local.properties`, or root `.env` — first
-     non-blank wins).
+   - Point the app at the Singapore production service:
+     `BACKEND_URL=https://smartcess-sg.onrender.com/` (process env,
+     `local.properties`, or root `.env` — first non-blank wins). The code
+     default `https://smartcess-backend.onrender.com/` is only a fallback.
 3. Register Google Sign-In (one-time, Google Cloud Console, one project):
    - Create an OAuth client ID of type **Android** for package
      `com.smartcess.app` with your keystore SHA-1 (debug keystore for dev,
@@ -129,6 +187,35 @@ SmartCess degrades gracefully with no network:
 - Offline output is always labelled **"Offline mode. Please review."**
 - Saves are allowed but flagged low-confidence for later review; retry when online.
 - Bill capture, briefings, and reminders work from cached local data where possible.
+
+## Limitations
+
+Completed and device-verified:
+
+- Universal Talk executor (appointments, routines, reminders, briefing, bill
+  Q&A, cancellation, archive) with read-back + spoken confirmation
+- Guided bill/document scanning with voice capture and save / retake / delete
+  review, bill reminders, and bill comparison
+- Appointments (calendar export, travel reminders), daily routines with
+  completion tracking, reminders with scheduled notifications
+- Document import + summary + saved-document reading; tappable Home Today rows
+  with per-item delete; Settings with JSON/CSV export and full delete
+- Offline on-device framing, OCR fallback, and labelled offline drafts
+
+Prototype / dormant (present but not end-to-end):
+
+- Email briefing: the saved-inbox UI exists but no provider is connected, so
+  the inbox is empty and the section never renders
+- Realtime transcription relay: a dormant backend WebSocket exists; the app
+  ships push-to-talk upload only
+- SAM 3.1 / Muse Image: off-by-default flags, never called
+
+Planned (not started): Gmail connection, weekly/monthly routine schedules,
+opt-in cloud backup, usage trends, additional languages, wearables.
+
+Also note: TalkBack semantics are built in but no full TalkBack-only pass has
+been run, and the free Render tier sleeps after ~15 min idle (first request
+takes ~30–60s to wake it).
 
 ## Project structure
 

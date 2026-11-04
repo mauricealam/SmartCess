@@ -129,6 +129,21 @@ calendar, archive, delete) asks through a confirmation dialog or spoken
 confirmation first. Banned actions — pay, send email, submit forms, navigate,
 call — have no code path at all.
 
+## Android → backend → Meta request path
+
+The app layer never contacts Meta. Retrofit interfaces (`BackendChatApi`,
+`BackendVoiceApi`, `BackendAuthApi`) send session-JWT-authenticated HTTPS to
+exactly two AI routes: `POST api/ai/chat` (all Spark work — intents, slot
+extraction, bill extraction, summaries, Q&A) and `POST api/voice/transcribe`
+(WAV upload). The FastAPI backend validates the JWT, enforces the model
+allowlist, attaches the server-side Meta key, and forwards to
+`https://api.meta.ai/v1/chat/completions` and `/v1/asr/transcribe`. Responses
+return parsed JSON or transcript text; failures map to typed errors
+(`SessionExpired`, `RateLimited`, `Timeout`, …) that the app speaks. Every hop
+is logged server-side with a request ID (see README "Meta AI Integration &
+Verification"). The backend's separate `/api/ai/bill-extract` route exists but
+the app does not call it — extraction goes through the chat route.
+
 ## Configuration
 
 API key resolution: hidden developer Settings screen entry (debug only) →

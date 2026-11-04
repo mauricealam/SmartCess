@@ -107,11 +107,12 @@ start — warm it before demos (see `backend/README.md` checklist).
 
 ## Known limitations (disclose with every release)
 
-- Email inbox is empty until Gmail connects — no demo mail ships.
-- Routines support daily schedules only (weekly/monthly refused with explanation).
-- Live realtime transcription is deferred; Talk uses push-to-talk upload.
-- TalkBack semantics are built in but no full TalkBack-only pass has been run.
-- Render free tier sleeps after ~15 min idle; first request wakes it slowly.
+Full tiers live in README "Limitations"; the short version:
+
+- Prototype/dormant: empty email inbox (no provider), push-to-talk only (no
+  realtime transcription), SAM/Image flags off, daily-only routines.
+- Not yet verified: no full TalkBack-only pass; performance budgets unmeasured.
+- Infra: Render free tier sleeps after ~15 min idle; first request wakes it slowly.
 
 ## Roadmap
 
