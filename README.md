@@ -188,9 +188,7 @@ project end to end from this repo alone.
      `GOOGLE_SERVER_CLIENT_ID` (root `.env`, `local.properties`, or process
      env at build time). No `google-services.json` is needed.
 4. Test APKs must be keyless: build with `KEYLESS_DEBUG=true` so no Meta key
-   is baked in (the app uses the backend/session path). A hidden developer
-   screen (Settings → tap Version 7 times) can hold a local key for direct-Meta
-   debugging only — never distribute such APKs.
+   is baked in (the app uses the backend/session path).
 5. Open the project in Android Studio and let Gradle sync, or build from the CLI:
    ```sh
    ./gradlew :app:assembleDebug
