@@ -328,3 +328,8 @@ Further reading: [ARCHITECTURE.md](ARCHITECTURE.md) ·
 - Storage is local-first with export and full delete in Settings.
 - Analytics are opt-in and carry metadata only — no images, message text,
   keys, or PII are ever logged. There is no crash reporter.
+
+## License
+
+SmartCess is released under the Apache License, Version 2.0. See
+[LICENSE](LICENSE) for the full text.
