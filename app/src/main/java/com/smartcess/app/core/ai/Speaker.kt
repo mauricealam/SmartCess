@@ -10,9 +10,9 @@ import javax.inject.Singleton
 /**
  * App speech. Android platform TTS only — no model, no network.
  *
- * Retired: on-device OCR and offline text drafts used ML Kit, a non-Meta
- * model, so they were removed for model compliance. Offline capture now
- * fails honestly with a rescan path instead of drafting from OCR.
+ * Retired: on-device text recognition and offline text drafts used a
+ * non-Meta model, so they were removed for model compliance. Offline
+ * capture now fails honestly with a rescan path instead of drafting.
  */
 interface Speaker {
     fun speak(text: String)

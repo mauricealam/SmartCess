@@ -9,6 +9,5 @@
 # kotlinx.serialization: keep serializers
 -keepattributes *Annotation*, InnerClasses
 -dontnote kotlinx.serialization.**
-# ML Kit / CameraX: keep public API surface used via reflection
--keep class com.google.mlkit.** { *; }
--dontwarn com.google.mlkit.**
+# CameraX: keep public API surface used via reflection
+-dontwarn androidx.camera.**

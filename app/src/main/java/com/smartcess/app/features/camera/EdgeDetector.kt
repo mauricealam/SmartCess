@@ -5,8 +5,8 @@ package com.smartcess.app.features.camera
  * downscaled Y plane decide whether a subject (bill/document) is in frame
  * and where its mass sits. Pure JVM: no Android classes, no ML, no network.
  *
- * This replaces ML Kit text recognition so every model SmartCess calls is a
- * Meta model; framing bounds need no model at all.
+ * Framing bounds need no model at all, so every model SmartCess calls is a
+ * Meta model.
  *
  * Pipeline: Sobel threshold → morphological close (radius [CLOSE_RADIUS]:
  * merges text lines into a page blob) → largest 8-connected component →
